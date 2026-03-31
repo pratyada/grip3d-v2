@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="keywords" content="3D globe, country energy profile, power plants map, installed capacity globe, global energy visualization, GRIP 3D, WRI power plant database, energy mix globe, renewable energy map, coal gas nuclear solar wind hydro">
+<meta name="description" content="GRIP 3D maps Country Energy Profiles and 35,000 geolocated power plants on a live 3D globe — installed capacity, fuel mix, generation data and plant-level detail across 167 countries.">
+<title>GRIP 3D — Country Energy Profile &amp; Power Plants on the Globe</title>
+<link href="../../../css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="../../../css/main.css">
+<script src="../../../js/bootstrap.bundle.min.js"></script><link rel="icon" type="image/png" href="../../../img/favicon-grip3d-16.png" sizes="16x16">
+<link rel="icon" type="image/png" href="../../../img/favicon-grip3d-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="../../../img/favicon-grip3d-64.png" sizes="64x64">
+</head>
+<body>
+<link href="../../../css/use-case.css" rel="stylesheet">
+<header><nav class="navbar navbar-expand-lg sticky-top navbar-dark px-3"><div class="container-fluid">
+<a class="navbar-brand" href="/"><img src="../../../img/grip3d-logo-trans-128.png" alt="Grip3D Logo" width="90" height="32" class="d-inline-block align-text-top"></a><button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarNav"><ul class="navbar-nav ms-auto">
+<li class="nav-item"><a class="nav-link" href="/">
+								About Us
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/use-cases">
+								Use Cases
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/integration">
+								Integration
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/leadership">
+								Leadership
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/contact">
+								Contact Us
+							</a></li>
+</ul></div>
+</div></nav></header><main class="container container--wide"><section class="uc-hero"><div>
+<div class="kicker">UC12 · Energy Intelligence / Global Power Infrastructure</div>
+<h1>Country Energy Profile &amp; Power Plants on the Globe</h1>
+<p>Installed capacity choropleth across 167 countries — 3 MW to 1.4M MW — and 35,000 geolocated power plants by fuel type, all on one live 3D globe. Click any country or plant for full energy profile.</p>
+<div class="cta">
+<a class="btn btn--blue" href="../index.html">Open interactive demo</a><a class="btn btn--blue" href="/use-cases">Back to all use cases</a>
+</div>
+<div class="panel prose" style="margin-top: 150px"><p>GRIP 3D fuses two global energy datasets into a single interactive 3D globe: a Country Energy Profile choropleth showing installed electricity capacity from 3 MW to 1.4 million MW per country, and the WRI Global Power Plant Database — 35,000 geolocated plants colour-coded by fuel type, with dot size proportional to capacity. Click any country to see its full energy profile: total installed capacity, generation by fuel, renewable share, and CO₂ intensity. Click any plant dot for its name, operator, fuel, MW output, and annual generation. Built for energy analysts, investors, utilities, policy teams, and sustainability professionals who need to understand the global power landscape at planetary scale.</p></div>
+</div>
+<div class="hero-card">
+<img src="../../../img/tile-12.jpg" alt="Global Demographics Globe preview"><div class="meta">
+<strong style="color:var(--text)">What this demo shows:</strong><br>
+							The US glows deepest red — 1.4M MW of installed capacity. Every dot is a real power plant: orange for gas, light blue for wind, yellow for solar, black for coal. The energy mix of every nation, visible in one view.
+						</div>
+</div></section><section class="section"><div class="uc-two-col">
+<div class="panel">
+<div class="lbl">What teams struggle with today</div>
+<p style="margin:0 0 10px;color:var(--muted);font-family:var(--font-body);font-size:13px;line-height:1.7;">Global energy data is locked in national statistics portals, IEA reports, and spreadsheet databases. There is no way to see the full planetary picture — which countries are coal-heavy, where solar is surging, where capacity gaps exist — without building it yourself.</p>
+<ul>
+<li>Country energy data is fragmented across IEA, EIA, IRENA, Ember, and national sources</li>
+<li>Power plant databases exist only as CSV files with no spatial layer</li>
+<li>No single view shows both country-level capacity and plant-level detail</li>
+<li>Energy transition progress is invisible without comparative geographic context</li>
+</ul>
+</div>
+<div class="panel">
+<div class="lbl">How GRIP 3D solves it in 3D</div>
+<p style="margin:0 0 10px;color:var(--muted);font-family:var(--font-body);font-size:13px;line-height:1.7;">GRIP 3D layers a country-level capacity choropleth over a live plant-level dot map — giving energy professionals both the macro and micro view of global power infrastructure on one interactive globe.</p>
+<ul>
+<li>167-country choropleth: installed capacity 3 MW → 1.4M MW, purple-to-red scale</li>
+<li>35,000 power plants as colour-coded dots — fuel type on sight, capacity by dot size</li>
+<li>Click any country for full energy profile: capacity, generation mix, renewable share</li>
+<li>Click any plant for name, operator, fuel, MW, annual generation, and source link</li>
+</ul>
+</div>
+</div></section><section class="section"><h2>Why this works at global scale</h2>
+<div class="impact">
+<div class="impact-card">
+<div class="impact-k">Power plants mapped</div>
+<div class="impact-v">35,000+</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Countries profiled</div>
+<div class="impact-v">167</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Capacity range</div>
+<div class="impact-v">3 MW – 1.4M MW</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Fuel types</div>
+<div class="impact-v">10 colours</div>
+</div>
+</div></section><section class="section"><h2>The Two Layers</h2>
+<div class="stats-strip">
+<div class="stat-cell">
+<div class="stat-num">167</div>
+<div class="stat-lbl">Country Profiles</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">35K+</div>
+<div class="stat-lbl">Power Plants</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">10</div>
+<div class="stat-lbl">Fuel Types</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">1.4M MW</div>
+<div class="stat-lbl">Max Capacity (US)</div>
+</div>
+</div>
+<div class="layer-block">
+<div class="layer-block-header">
+<div class="layer-block-icon" style="background:rgba(239,68,68,0.12); color:#ef4444;">🌍</div>
+<div>
+<div class="layer-block-title">Layer 1 — Country Energy Profile</div>
+<div class="layer-block-sub">Installed capacity choropleth · 167 countries · Purple → Red scale · 3 MW to 1.4M MW</div>
+</div>
+<div class="layer-block-api">Ember + IRENA + WRI</div>
+</div>
+<div class="layer-block-body">
+<div>
+<div class="layer-block-body-lbl">What it shows</div>
+<ul>
+<li>Each country filled with a colour representing total installed electricity capacity (MW)</li>
+<li>Scale: deep purple (lowest, ~3 MW) → red-pink → crimson → deep red (highest, 1.4M MW)</li>
+<li>Click any country to open profile panel: total capacity, generation by source, CO₂ intensity, renewable share</li>
+<li>Layer panel legend shows live colour scale from 3 MW to 1.4M MW</li>
+<li>Compare energy superpowers (US, China, India) vs developing nations visually at a glance</li>
+</ul>
+</div>
+<div>
+<div class="layer-block-body-lbl">Capacity Scale (MW)</div>
+<div class="capacity-scale">
+<div class="capacity-band" style="background:#3b0764;">3</div>
+<div class="capacity-band" style="background:#6b21a8;">10K</div>
+<div class="capacity-band" style="background:#a21caf;">50K</div>
+<div class="capacity-band" style="background:#c026d3;">200K</div>
+<div class="capacity-band" style="background:#db2777;">500K</div>
+<div class="capacity-band" style="background:#e11d48;">1M+</div>
+<div class="capacity-band" style="background:#be123c;">1.4M</div>
+</div>
+<ul>
+<li>United States — ~1,400,000 MW (highest)</li>
+<li>China — ~1,350,000 MW</li>
+<li>India — ~480,000 MW</li>
+<li>Germany — ~240,000 MW</li>
+<li>Brazil — ~190,000 MW</li>
+<li>Small island nations — ~3–50 MW (lowest)</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="layer-block">
+<div class="layer-block-header">
+<div class="layer-block-icon" style="background:rgba(245,158,11,0.12); color:#f59e0b;">⚡</div>
+<div>
+<div class="layer-block-title">Layer 2 — Power Plants</div>
+<div class="layer-block-sub">35,000 geolocated plants · 10 fuel types · Dot size = capacity · Click for full profile</div>
+</div>
+<div class="layer-block-api">WRI GPPD v1.3</div>
+</div>
+<div class="layer-block-body">
+<div>
+<div class="layer-block-body-lbl">What it shows</div>
+<ul>
+<li>Every plant in the WRI Global Power Plant Database plotted as a geo-located dot</li>
+<li>Dot colour = primary fuel type (10 colours, see key)</li>
+<li>Dot size scales with installed capacity (MW) — large plants dominate visually</li>
+<li>Click any dot: plant name, owner/operator, primary fuel, capacity (MW), annual generation (GWh), commissioning year, and data source link</li>
+<li>Filter by fuel type to show only coal, solar, wind, nuclear, hydro etc. on the globe</li>
+</ul>
+</div>
+<div>
+<div class="layer-block-body-lbl">Fuel Type Colour Key</div>
+<div class="fuel-grid">
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#000000;"></span>Coal <small>Thermal</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#bc80bd;"></span>Gas <small>Thermal</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#593704;"></span>Oil <small>Thermal</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#e31a1c;"></span>Nuclear <small>Thermal</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#0565a6;"></span>Hydro <small>Renewable</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#ff7f00;"></span>Solar <small>Renewable</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#5ca2d1;"></span>Wind <small>Renewable</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#229a00;"></span>Biomass <small>Renewable</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#fdbf6f;"></span>Geothermal <small>Renewable</small>
+</div>
+<div class="fuel-chip">
+<span class="fuel-dot" style="background:#6a3d9a;"></span>Waste <small>Other</small>
+</div>
+</div>
+</div>
+</div>
+</div></section><section class="section"><h2>Country Profile Examples</h2>
+<p style="font-size:14px;color:var(--muted);margin-bottom:24px;">Click any country on the globe to open its energy profile panel — here's a sample of what's surfaced.</p>
+<div class="country-card">
+<div class="country-card-header">
+<div class="country-flag">🇺🇸</div>
+<div>
+<div class="country-name">United States</div>
+<div class="country-sub">Highest installed capacity globally · Diverse fuel mix</div>
+</div>
+</div>
+<div class="country-metrics">
+<div class="metric-cell">
+<div class="metric-val">1.4M MW</div>
+<div class="metric-lbl">Installed Capacity</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">43%</div>
+<div class="metric-lbl">Renewable Share</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">~6,000</div>
+<div class="metric-lbl">Power Plants</div>
+</div>
+</div>
+</div>
+<div class="country-card">
+<div class="country-card-header">
+<div class="country-flag">🇮🇳</div>
+<div>
+<div class="country-name">India</div>
+<div class="country-sub">Fastest growing energy market · Coal + Solar surge</div>
+</div>
+</div>
+<div class="country-metrics">
+<div class="metric-cell">
+<div class="metric-val">480K MW</div>
+<div class="metric-lbl">Installed Capacity</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">41%</div>
+<div class="metric-lbl">Renewable Share</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">~1,700</div>
+<div class="metric-lbl">Power Plants</div>
+</div>
+</div>
+</div>
+<div class="country-card">
+<div class="country-card-header">
+<div class="country-flag">🇩🇪</div>
+<div>
+<div class="country-name">Germany</div>
+<div class="country-sub">Energiewende leader · High renewables, phase-out of coal &amp; nuclear</div>
+</div>
+</div>
+<div class="country-metrics">
+<div class="metric-cell">
+<div class="metric-val">240K MW</div>
+<div class="metric-lbl">Installed Capacity</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">59%</div>
+<div class="metric-lbl">Renewable Share</div>
+</div>
+<div class="metric-cell">
+<div class="metric-val">~1,100</div>
+<div class="metric-lbl">Power Plants</div>
+</div>
+</div>
+</div></section><section class="section"><h2>Capabilities</h2>
+<div class="panel">
+<div class="lbl">Layers approach · APIs ready · Energy intelligence</div>
+<ul class="cap-list">
+<li>Country Energy Profile choropleth — 167 countries, installed capacity 3 MW to 1.4M MW</li>
+<li>35,000+ power plants as geo-located, colour-coded, size-scaled dots by fuel type</li>
+<li>Click-to-profile on any country: capacity, generation mix, renewable share, CO₂ intensity</li>
+<li>Click-to-detail on any plant: name, operator, fuel, MW, annual GWh, commissioning year</li>
+<li>Filter globe by fuel type — show only coal, solar, wind, nuclear, hydro, or any combination</li>
+<li>Layer toggle — view country choropleth, plant dots, or both simultaneously</li>
+<li>Capacity range legend (3 MW → 1.4M MW) displayed live in layer panel on the globe</li>
+<li>APIs for custom plant data ingestion — connect private utility portfolios alongside open data</li>
+</ul>
+</div></section><section class="section"><h2>Data &amp; API Stack</h2>
+<p style="font-size:14px;color:var(--muted);margin-bottom:28px;">GRIP 3D UC12 is powered by two open, authoritative global energy datasets — the WRI Global Power Plant Database for plant-level detail, and Ember / IRENA for country-level capacity and generation profiles.</p>
+<div class="panel" style="margin-bottom:20px;">
+<div class="api-src-lbl" style="background:rgba(245,158,11,0.08);color:#f59e0b;border:1px solid rgba(245,158,11,0.2);">
+							⚡ WRI Global Power Plant Database v1.3 — <code>datasets.wri.org · CC BY 4.0</code>
+</div>
+<table class="api-table">
+<thead><tr>
+<th style="width:30%">Field</th>
+<th style="width:30%">Used for</th>
+<th>Detail</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>latitude, longitude</code></td>
+<td>Plot plant dot on globe</td>
+<td>Geolocated for all 35,000+ plants across 167 countries</td>
+</tr>
+<tr>
+<td><code>primary_fuel</code></td>
+<td>Dot colour by fuel type</td>
+<td>Coal, Gas, Oil, Nuclear, Hydro, Solar, Wind, Biomass, Geothermal, Waste</td>
+</tr>
+<tr>
+<td><code>capacity_mw</code></td>
+<td>Dot size on globe</td>
+<td>Installed capacity in MW — sqrt-scaled for visual balance</td>
+</tr>
+<tr>
+<td><code>name, owner</code></td>
+<td>Plant detail panel on click</td>
+<td>Plant name and operator/owner organisation</td>
+</tr>
+<tr>
+<td><code>generation_gwh_*</code></td>
+<td>Annual generation in click panel</td>
+<td>Reported or estimated annual generation 2013–2019 (GWh)</td>
+</tr>
+<tr>
+<td><code>commissioning_year</code></td>
+<td>Plant age in detail panel</td>
+<td>Year plant was commissioned or last major upgrade</td>
+</tr>
+<tr>
+<td><code>country, country_long</code></td>
+<td>Country filter layer</td>
+<td>ISO 3-letter code and full country name</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="panel">
+<div class="api-src-lbl" style="background:rgba(59,130,246,0.08);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">
+							🌍 Ember Yearly Electricity Data + IRENA Capacity Statistics — <code>CC BY 4.0</code>
+</div>
+<table class="api-table">
+<thead><tr>
+<th style="width:30%">Field</th>
+<th style="width:30%">Used for</th>
+<th>Detail</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>installed_capacity_mw</code></td>
+<td>Country choropleth fill colour</td>
+<td>Total installed electricity capacity per country in MW — drives purple-to-red scale</td>
+</tr>
+<tr>
+<td><code>generation_twh by source</code></td>
+<td>Energy mix chart in country panel</td>
+<td>Annual generation by Coal, Gas, Oil, Nuclear, Hydro, Solar, Wind, Other Renewables (TWh)</td>
+</tr>
+<tr>
+<td><code>renewables_share_elec</code></td>
+<td>Renewable % in country panel</td>
+<td>Share of electricity from renewables — updated annually for 200+ geographies</td>
+</tr>
+<tr>
+<td><code>co2_intensity_gco2_per_kwh</code></td>
+<td>CO₂ intensity in country panel</td>
+<td>Carbon intensity of electricity generation in gCO₂ per kWh</td>
+</tr>
+<tr>
+<td><code>demand_twh</code></td>
+<td>Electricity demand in country panel</td>
+<td>Annual electricity demand in TWh — net imports calculated</td>
+</tr>
+</tbody>
+</table>
+</div></section><section class="section"><h2>Who Uses This</h2>
+<div class="uc-two-col">
+<div class="panel">
+<div class="lbl">Industries</div>
+<ul>
+<li>
+<strong style="color:var(--text)">Energy &amp; Utilities</strong> — Map competitor plant portfolios globally; visualise capacity gaps and renewable penetration by region for strategic planning</li>
+<li>
+<strong style="color:var(--text)">Investment &amp; Finance</strong> — Screen energy transition opportunities by country — overlay renewable share, CO₂ intensity, and installed capacity to identify markets ripe for investment</li>
+<li>
+<strong style="color:var(--text)">Government &amp; Policy</strong> — Benchmark national energy profiles against regional peers; identify capacity shortfalls and model transition pathways visually</li>
+<li>
+<strong style="color:var(--text)">ESG &amp; Sustainability</strong> — Layer CO₂ intensity over supply chain footprints; quantify Scope 2 emissions exposure by grid region</li>
+</ul>
+</div>
+<div class="panel">
+<div class="lbl">Teams</div>
+<ul>
+<li>
+<strong style="color:var(--text)">Energy Analysts &amp; Researchers</strong> — 35,000 geolocated plants plus country profiles on one spatial canvas — a reference layer for any energy modelling workflow</li>
+<li>
+<strong style="color:var(--text)">Media &amp; Journalism</strong> — Visualise the global energy mix as a story — where coal dominates, where the renewable transition is happening fastest</li>
+<li>
+<strong style="color:var(--text)">Developers &amp; Data Teams</strong> — API-ready layer ingestion — connect private utility data, EIA feeds, or proprietary plant databases into the globe</li>
+<li>
+<strong style="color:var(--text)">Executive &amp; Strategy</strong> — One globe view replaces a dozen country energy reports — board-ready global energy intelligence</li>
+</ul>
+</div>
+</div></section><section class="section"><h2>Platform Views</h2>
+<div class="gallery gallery--3">
+<div class="gallery__main"><img src="../../../img/UC12_1.jpg"></div>
+<div class="gallery__right">
+<img src="../../../img/UC12_2.jpg"><img src="../../../img/UC12_3.jpg">
+</div>
+</div></section><div class="bottom-cta">
+<div>
+<p class="t">Open for consulting and partner integrations</p>
+<p class="s">If you want this use case mapped to your data sources, we can deliver a fast prototype and integration plan — including layers, APIs, and deployment options.</p>
+</div>
+<a class="btn btn--blue" href="/contact">Request a demo</a>
+</div></main><footer class="footer footer--pro"><div class="container">
+<div class="row">
+<div class="col-md-6">
+<div class="brand"><img src="../../../img/grip3d-logo-trans-128.png" alt="Grip3D Logo"></div>
+<p class="body" style="margin-top:10px;">
+						Fully interactive 3D globe experiences for operations, analytics, and real-time layered intelligence.
+					</p>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Demos</div>
+<div style="display:grid; gap:8px;">
+<a href="../../uc1/index.html">Satellites</a><a href="../../uc2/index.html">Fleets &amp; Ships</a><a href="../../uc3/index.html">Airplane Live</a><a href="../../uc4/index.html">Weather Map</a><a href="../../uc5/index.html">Saas Startup Metrics</a>
+</div>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Demos</div>
+<div style="display:grid; gap:8px;">
+<a href="../../uc7/index.html">Demographics &amp; Population</a><a href="../../uc8/index.html">Earthquakes &amp; Volcanoes</a><a href="../../uc11/index.html">Live Radio Stations</a><a href="../index.html">Energy &amp; Power Plants</a><a href="../../uc13/index.html">Air Quality &amp; Pollen</a>
+</div>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Contact</div>
+<a href="mailto:connect@grip3d.com">connect@grip3d.com</a>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 GRIP 3D</span><span>Built for partners • APIs available</span>
+</div>
+</div></footer>
+</body>
+</html>

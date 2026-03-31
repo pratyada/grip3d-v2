@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="keywords" content="3D globe, air quality index, AQI globe, pollen index map, air quality stations, GRIP 3D, global air pollution, PM2.5 globe, OpenAQ, Google Pollen API, real-time air quality visualization">
+<meta name="description" content="GRIP 3D maps live Air Quality Index, Pollen Index, and Air Quality Station data onto a 3D globe — giving health, environment, and operations teams a real-time planetary view of the air we breathe.">
+<title>GRIP 3D — Air Quality Index, Pollen &amp; Stations on the Globe</title>
+<link href="../../../css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="../../../css/main.css">
+<script src="../../../js/bootstrap.bundle.min.js"></script><link rel="icon" type="image/png" href="../../../img/favicon-grip3d-16.png" sizes="16x16">
+<link rel="icon" type="image/png" href="../../../img/favicon-grip3d-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="../../../img/favicon-grip3d-64.png" sizes="64x64">
+</head>
+<body>
+<link href="../../../css/use-case.css" rel="stylesheet">
+<header><nav class="navbar navbar-expand-lg sticky-top navbar-dark px-3"><div class="container-fluid">
+<a class="navbar-brand" href="/"><img src="../../../img/grip3d-logo-trans-128.png" alt="Grip3D Logo" width="90" height="32" class="d-inline-block align-text-top"></a><button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarNav"><ul class="navbar-nav ms-auto">
+<li class="nav-item"><a class="nav-link" href="/">
+								About Us
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/use-cases">
+								Use Cases
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/integration">
+								Integration
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/leadership">
+								Leadership
+							</a></li>
+<li class="nav-item"><a class="nav-link" href="/contact">
+								Contact Us
+							</a></li>
+</ul></div>
+</div></nav></header><main class="container container--wide"><section class="uc-hero"><div>
+<div class="kicker">UC13 · Air Quality / Environmental Intelligence</div>
+<h1>Air Quality, Pollen &amp; Stations on the Globe</h1>
+<p>Live Air Quality Index heatmap, Universal Pollen Index, and 30,000+ ground-level monitoring stations — three environmental layers on one 3D globe, updated in real time.</p>
+<div class="cta">
+<a class="btn btn--blue" href="../index.html">Open interactive demo</a><a class="btn btn--blue" href="/use-cases">Back to all use cases</a>
+</div>
+<div class="panel prose" style="margin-top: 150px"><p>GRIP 3D layers three live environmental data streams onto a single interactive 3D globe: a global Air Quality Index heatmap with PM2.5, PM10, NO₂, O₃, and CO concentrations interpolated across the Earth's surface; a Universal Pollen Index covering Tree, Grass, and Weed pollen across 65+ countries at 1km resolution; and a live network of 30,000+ air quality monitoring stations from the OpenAQ global database. Teams can toggle any layer, click any station dot for live readings, and zoom from planetary heatmap to city-level sensor data in seconds. Built for health, environmental, government, logistics, and enterprise teams who need to understand air quality as a global operational reality — not a local dashboard.</p></div>
+</div>
+<div class="hero-card">
+<img src="../../../img/tile-13.jpg" alt="Global Demographics Globe preview"><div class="meta">
+<strong style="color:var(--text)">What this demo shows:</strong><br>
+							The air we breathe has no borders. AQI, pollen, and station data have never been visible together as a single planetary layer — until now. South Asia, East Africa, and Eastern Europe glow red on the globe. Click anywhere to find out why.
+						</div>
+</div></section><section class="section"><div class="uc-two-col">
+<div class="panel">
+<div class="lbl">What teams struggle with today</div>
+<p style="margin:0 0 10px;color:var(--muted);font-family:var(--font-body);font-size:13px;line-height:1.7;">Air quality data is scattered across national agencies, monitoring networks, and separate pollen trackers — none of them spatially connected. You cannot see the global pattern when your tools only show your country.</p>
+<ul>
+<li>AQI data is locked inside national or regional portals</li>
+<li>Pollen and air quality are never visualized on the same layer</li>
+<li>Station networks are invisible — no spatial view of coverage gaps</li>
+<li>Decision-makers cannot see cross-border pollution movement</li>
+</ul>
+</div>
+<div class="panel">
+<div class="lbl">How GRIP 3D solves it in 3D</div>
+<p style="margin:0 0 10px;color:var(--muted);font-family:var(--font-body);font-size:13px;line-height:1.7;">GRIP 3D fuses AQI heatmap, pollen index tiles, and live station network into three toggleable layers on one globe — turning fragmented environmental data into a unified planetary intelligence view.</p>
+<ul>
+<li>Global AQI heatmap interpolated from real-time station readings</li>
+<li>Pollen Index tiles (Tree, Grass, Weed) draped over the 3D globe surface</li>
+<li>30,000+ OpenAQ stations plotted as clickable geo-located dots</li>
+<li>Drill from global heatmap to individual station readings in one click</li>
+</ul>
+</div>
+</div></section><section class="section"><h2>Why this works at global scale</h2>
+<div class="impact">
+<div class="impact-card">
+<div class="impact-k">AQI stations live</div>
+<div class="impact-v">30,000+</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Pollen coverage</div>
+<div class="impact-v">65+ countries</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Pollen resolution</div>
+<div class="impact-v">1 km</div>
+</div>
+<div class="impact-card">
+<div class="impact-k">Layers on one globe</div>
+<div class="impact-v">3 live streams</div>
+</div>
+</div></section><section class="section"><h2>The Three Layers</h2>
+<div class="stats-strip">
+<div class="stat-cell">
+<div class="stat-num">AQI</div>
+<div class="stat-lbl">Air Quality Index</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">UPI</div>
+<div class="stat-lbl">Pollen Index</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">30K+</div>
+<div class="stat-lbl">Live Stations</div>
+</div>
+<div class="stat-cell">
+<div class="stat-num">Real‑time</div>
+<div class="stat-lbl">All Layers</div>
+</div>
+</div>
+<div class="layer-block">
+<div class="layer-block-header">
+<div class="layer-block-icon" style="background:rgba(239,68,68,0.12); color:#ef4444;">🌫️</div>
+<div>
+<div class="layer-block-title">Layer 1 — Air Quality Index (AQI)</div>
+<div class="layer-block-sub">Real-time global heatmap · PM2.5, PM10, NO₂, O₃, CO, SO₂</div>
+</div>
+<div class="layer-block-api">OpenAQ v3 + Open-Meteo CAMS</div>
+</div>
+<div class="layer-block-body">
+<div>
+<div class="layer-block-body-lbl">What it shows</div>
+<ul>
+<li>Full-globe AQI heatmap interpolated from ground station readings</li>
+<li>Color scale: Green (Good) → Yellow → Orange → Red → Purple → Maroon (Hazardous)</li>
+<li>Drill down to individual pollutant concentrations: PM2.5, PM10, NO₂, O₃, CO, SO₂</li>
+<li>Cross-border pollution corridors visible — Indo-Gangetic Plain, Saharan dust, Southeast Asia burning season</li>
+<li>Hourly updates — track pollution events as they develop in real time</li>
+</ul>
+</div>
+<div>
+<div class="layer-block-body-lbl">AQI Index Scale</div>
+<div class="aqi-scale">
+<div class="aqi-band" style="background:#00e400;">Good</div>
+<div class="aqi-band" style="background:#ffff00;">Moderate</div>
+<div class="aqi-band" style="background:#ff7e00;">Sensitive</div>
+<div class="aqi-band" style="background:#ff0000; color:rgba(255,255,255,0.85);">Unhealthy</div>
+<div class="aqi-band" style="background:#8f3f97; color:rgba(255,255,255,0.85);">Very Unhl.</div>
+<div class="aqi-band" style="background:#7e0023; color:rgba(255,255,255,0.85);">Hazardous</div>
+</div>
+<ul>
+<li>0–50 · Good — Air quality satisfactory</li>
+<li>51–100 · Moderate — Acceptable for most</li>
+<li>101–150 · Unhealthy for Sensitive Groups</li>
+<li>151–200 · Unhealthy — Everyone may be affected</li>
+<li>201–300 · Very Unhealthy</li>
+<li>301+ · Hazardous — Emergency conditions</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="layer-block">
+<div class="layer-block-header">
+<div class="layer-block-icon" style="background:rgba(132,204,22,0.12); color:#84cc16;">🌿</div>
+<div>
+<div class="layer-block-title">Layer 2 — Pollen Index (UPI)</div>
+<div class="layer-block-sub">Universal Pollen Index · Tree, Grass &amp; Weed · 65+ countries · 1km resolution</div>
+</div>
+<div class="layer-block-api">Google Pollen API</div>
+</div>
+<div class="layer-block-body">
+<div>
+<div class="layer-block-body-lbl">What it shows</div>
+<ul>
+<li>Heatmap tiles for Tree, Grass, and Weed pollen draped on 3D globe surface</li>
+<li>Universal Pollen Index (UPI) scale 0–5: None → Very Low → Low → Medium → High → Very High</li>
+<li>5-day forecast — see how pollen season is evolving over the next week</li>
+<li>Up to 15 plant species: Birch, Oak, Olive, Cypress, Grass, Mugwort, Ragweed, and more</li>
+<li>Health recommendations per location and pollen type — surfaced in click panel</li>
+</ul>
+</div>
+<div>
+<div class="layer-block-body-lbl">Pollen Types on Globe</div>
+<div class="pollen-chips">
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#22c55e;"></span>Grass <small>UPI 0–5</small>
+</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#a16207;"></span>Tree <small>UPI 0–5</small>
+</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#f59e0b;"></span>Weed <small>UPI 0–5</small>
+</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#d1d5db;"></span>Birch</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#86efac;"></span>Oak</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#fde68a;"></span>Olive</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#c4b5fd;"></span>Ragweed</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#6ee7b7;"></span>Mugwort</div>
+<div class="pollen-chip">
+<span class="pollen-chip-dot" style="background:#fca5a5;"></span>Cypress</div>
+</div>
+</div>
+</div>
+</div>
+<div class="layer-block">
+<div class="layer-block-header">
+<div class="layer-block-icon" style="background:rgba(59,130,246,0.12); color:#3b82f6;">📡</div>
+<div>
+<div class="layer-block-title">Layer 3 — Air Quality Stations</div>
+<div class="layer-block-sub">30,000+ ground monitors · 100+ countries · Click for live readings</div>
+</div>
+<div class="layer-block-api">OpenAQ API v3</div>
+</div>
+<div class="layer-block-body">
+<div>
+<div class="layer-block-body-lbl">What it shows</div>
+<ul>
+<li>Every OpenAQ station plotted as a geo-located dot on the globe</li>
+<li>Dot colour encodes current AQI level — green to maroon at a glance</li>
+<li>Click any station: live readings for PM2.5, PM10, NO₂, O₃, CO, SO₂</li>
+<li>Station metadata: name, operator, country, last updated timestamp</li>
+<li>Coverage gap layer — regions without monitoring stations highlighted</li>
+</ul>
+</div>
+<div>
+<div class="layer-block-body-lbl">Station data fields</div>
+<ul>
+<li>PM2.5 — Fine particulate matter (µg/m³)</li>
+<li>PM10 — Coarse particulate matter (µg/m³)</li>
+<li>NO₂ — Nitrogen dioxide (ppb)</li>
+<li>O₃ — Ground-level ozone (ppb)</li>
+<li>CO — Carbon monoxide (ppm)</li>
+<li>SO₂ — Sulfur dioxide (ppb)</li>
+</ul>
+</div>
+</div>
+</div></section><section class="section"><h2>Capabilities</h2>
+<div class="panel">
+<div class="lbl">Layers approach · APIs ready · Real-time environmental intelligence</div>
+<ul class="cap-list">
+<li>Three live environmental layers toggleable independently on a single 3D globe</li>
+<li>Global AQI heatmap with pollutant drill-down — PM2.5, PM10, NO₂, O₃, CO, SO₂</li>
+<li>Pollen Index heatmap tiles (Tree, Grass, Weed) at 1km resolution over 65+ countries</li>
+<li>5-day pollen forecast per location surfaced in click panel with health recommendations</li>
+<li>30,000+ OpenAQ monitoring stations as clickable geo-located points with live readings</li>
+<li>Cross-layer correlation — toggle AQI and pollen simultaneously to see compound risk zones</li>
+<li>Coverage gap visualization — identify regions without any active monitoring</li>
+<li>APIs for custom station ingestion — connect private sensor networks alongside public data</li>
+</ul>
+</div></section><section class="section"><h2>API Stack</h2>
+<p style="font-size:14px;color:var(--muted);margin-bottom:28px;">GRIP 3D UC13 is powered by three open or publicly available environmental APIs, fused into a unified globe layer system.</p>
+<div class="panel" style="margin-bottom:20px;">
+<div class="api-src-lbl" style="background:rgba(59,130,246,0.08);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">
+							📡 OpenAQ API v3 — <code style="font-family:monospace;font-size:11px;color:#22d3ee;background:rgba(34,211,238,0.07);padding:2px 6px;border-radius:4px;">https://api.openaq.org/v3</code>
+</div>
+<table class="api-table">
+<thead><tr>
+<th style="width:42%">Endpoint</th>
+<th style="width:28%">Used for</th>
+<th>Returns</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>/locations?limit=1000&amp;has_geo=true</code></td>
+<td>Plot all stations on globe</td>
+<td>id, name, coordinates, country, last updated</td>
+</tr>
+<tr>
+<td><code>/locations/{id}/latest</code></td>
+<td>Live readings on station click</td>
+<td>PM2.5, PM10, NO₂, O₃, CO, SO₂ with timestamps</td>
+</tr>
+<tr>
+<td><code>/measurements?location_id={id}&amp;limit=24</code></td>
+<td>24h station chart in click panel</td>
+<td>Hourly readings per pollutant for trend view</td>
+</tr>
+<tr>
+<td><code>/countries</code></td>
+<td>Country filter for station layer</td>
+<td>All countries with station counts and codes</td>
+</tr>
+<tr>
+<td><code>/parameters</code></td>
+<td>Pollutant filter selector</td>
+<td>All measurable parameters with units</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="panel" style="margin-bottom:20px;">
+<div class="api-src-lbl" style="background:rgba(132,204,22,0.08);color:#84cc16;border:1px solid rgba(132,204,22,0.2);">
+							🌿 Google Pollen API — <code style="font-family:monospace;font-size:11px;color:#22d3ee;background:rgba(34,211,238,0.07);padding:2px 6px;border-radius:4px;">https://pollen.googleapis.com/v1</code>
+</div>
+<table class="api-table">
+<thead><tr>
+<th style="width:42%">Endpoint</th>
+<th style="width:28%">Used for</th>
+<th>Returns</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>/mapTypes/{TREE|GRASS|WEED}/heatmapTiles/{z}/{x}/{y}</code></td>
+<td>Pollen heatmap tiles on globe surface</td>
+<td>PNG tile with UPI colour-coded pollen level</td>
+</tr>
+<tr>
+<td><code>/forecast:lookup?location.lat=&amp;location.lng=&amp;days=5</code></td>
+<td>5-day pollen forecast in click panel</td>
+<td>Daily UPI per pollen type, health recommendations, plant info</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="panel">
+<div class="api-src-lbl" style="background:rgba(249,115,22,0.08);color:#f97316;border:1px solid rgba(249,115,22,0.2);">
+							🌡️ Open-Meteo Air Quality API — <code style="font-family:monospace;font-size:11px;color:#22d3ee;background:rgba(34,211,238,0.07);padding:2px 6px;border-radius:4px;">https://air-quality-api.open-meteo.com/v1/air-quality</code>
+</div>
+<table class="api-table">
+<thead><tr>
+<th style="width:42%">Parameter</th>
+<th style="width:28%">Used for</th>
+<th>Source</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>&amp;hourly=pm2_5,pm10,nitrogen_dioxide,ozone</code></td>
+<td>AQI heatmap interpolation grid</td>
+<td>CAMS European 11km + CAMS Global 45km forecast</td>
+</tr>
+<tr>
+<td><code>&amp;hourly=carbon_monoxide,sulphur_dioxide,dust</code></td>
+<td>Additional pollutant layers</td>
+<td>CAMS Global atmospheric composition model</td>
+</tr>
+<tr>
+<td><code>&amp;hourly=european_aqi,us_aqi</code></td>
+<td>AQI heatmap colour scale calculation</td>
+<td>Standardised EU &amp; US AQI index values per grid cell</td>
+</tr>
+<tr>
+<td><code>&amp;hourly=alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen</code></td>
+<td>Supplementary pollen layer species</td>
+<td>CAMS European pollen forecast model</td>
+</tr>
+</tbody>
+</table>
+</div></section><section class="section"><h2>Who Uses This</h2>
+<div class="uc-two-col">
+<div class="panel">
+<div class="lbl">Industries</div>
+<ul>
+<li>
+<strong style="color:var(--text)">Public Health &amp; Government</strong> — Monitor national air quality at a glance; identify pollution hotspots and cross-border events requiring policy response</li>
+<li>
+<strong style="color:var(--text)">Healthcare &amp; Pharma</strong> — Layer AQI and pollen to model respiratory disease burden by region and season; target patient alerts geographically</li>
+<li>
+<strong style="color:var(--text)">Logistics &amp; Aviation</strong> — Overlay AQI with flight corridors; monitor dust and pollution events that affect visibility and operations</li>
+<li>
+<strong style="color:var(--text)">Real Estate &amp; Urban Planning</strong> — AQI and station coverage as a site selection layer — identify clean-air zones vs chronic pollution areas</li>
+</ul>
+</div>
+<div class="panel">
+<div class="lbl">Teams</div>
+<ul>
+<li>
+<strong style="color:var(--text)">Environmental Researchers</strong> — A global canvas for pollution correlation studies — AQI, pollen, and station density on one spatial view</li>
+<li>
+<strong style="color:var(--text)">Media &amp; Journalism</strong> — Visualize air quality crises as they unfold — wildfires, industrial accidents, seasonal smog — on a globe anyone can understand</li>
+<li>
+<strong style="color:var(--text)">Allergy &amp; Wellness Apps</strong> — Embed live pollen and AQI globe widgets into consumer health products powered by the GRIP 3D API layer</li>
+<li>
+<strong style="color:var(--text)">ESG &amp; Sustainability Teams</strong> — Map air quality against operations and supply chain footprint; benchmark environmental performance by region</li>
+</ul>
+</div>
+</div></section><section class="section"><h2>Platform Views</h2>
+<div class="gallery gallery--3">
+<div class="gallery__main"><img src="../../../img/UC13_1.jpg"></div>
+<div class="gallery__right">
+<img src="../../../img/UC13_2.jpg"><img src="../../../img/UC13_3.jpg">
+</div>
+</div></section><div class="bottom-cta">
+<div>
+<p class="t">Open for consulting and partner integrations</p>
+<p class="s">If you want this use case mapped to your data sources, we can deliver a fast prototype and integration plan — including layers, APIs, and deployment options.</p>
+</div>
+<a class="btn btn--blue" href="/contact">Request a demo</a>
+</div></main><footer class="footer footer--pro"><div class="container">
+<div class="row">
+<div class="col-md-6">
+<div class="brand"><img src="../../../img/grip3d-logo-trans-128.png" alt="Grip3D Logo"></div>
+<p class="body" style="margin-top:10px;">
+						Fully interactive 3D globe experiences for operations, analytics, and real-time layered intelligence.
+					</p>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Demos</div>
+<div style="display:grid; gap:8px;">
+<a href="../../uc1/index.html">Satellites</a><a href="../../uc2/index.html">Fleets &amp; Ships</a><a href="../../uc3/index.html">Airplane Live</a><a href="../../uc4/index.html">Weather Map</a><a href="../../uc5/index.html">Saas Startup Metrics</a>
+</div>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Demos</div>
+<div style="display:grid; gap:8px;">
+<a href="../../uc7/index.html">Demographics &amp; Population</a><a href="../../uc8/index.html">Earthquakes &amp; Volcanoes</a><a href="../../uc11/index.html">Live Radio Stations</a><a href="../../uc12/index.html">Energy &amp; Power Plants</a><a href="../index.html">Air Quality &amp; Pollen</a>
+</div>
+</div>
+<div class="col-md-2">
+<div class="footer-title">Contact</div>
+<a href="mailto:connect@grip3d.com">connect@grip3d.com</a>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 GRIP 3D</span><span>Built for partners • APIs available</span>
+</div>
+</div></footer>
+</body>
+</html>
