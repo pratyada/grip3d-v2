@@ -31,6 +31,7 @@ export interface Pass {
   aos: string
   los: string
   duration: string
+  durationMins: number
   qvContact: string
   elevation: number
   overallStatus: PassStatus
@@ -281,7 +282,7 @@ export function generatePasses(): Pass[] {
     const eNB = `${enbPrefix}-eNB-${siteCode}-${String(enbNum).padStart(2, "0")}`
     const cell = `CELL-${siteCode}-${cellNum}`
     const aos = generateAOS(i)
-    const durationMins = srInt(i * 23 + 9, 8, 32)
+    const durationMins = srInt(i * 23 + 9, 5, 8)
     const los = addMinutes(aos, durationMins)
     const duration = formatDuration(durationMins)
     const qvContact = `QV-${passNum}-${siteCode}`
@@ -317,6 +318,7 @@ export function generatePasses(): Pass[] {
       aos,
       los,
       duration,
+      durationMins,
       qvContact,
       elevation,
       overallStatus,
@@ -478,11 +480,12 @@ export function getTimeSeriesForPass(passId: string, vendor: RanVendor): TimeSer
   const idx = parseInt(passId.replace("P", "")) - 47001
   const pass = getPasses()[idx]
   const maxElevation = pass?.elevation ?? 45
+  const durationMins = pass?.durationMins ?? 6
   const points: TimeSeriesPoint[] = []
 
-  for (let t = 0; t < 30; t++) {
+  for (let t = 0; t < durationMins; t++) {
     // Parabolic elevation: peaks in middle
-    const frac = t / 29
+    const frac = t / Math.max(durationMins - 1, 1)
     const elevFrac = Math.sin(frac * Math.PI)
     const elevation = elevFrac * maxElevation
 

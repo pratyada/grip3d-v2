@@ -13,7 +13,7 @@ const S = {
   page: {
     minHeight: "100vh",
     background: "var(--bg)",
-    padding: "32px 24px 64px",
+    padding: "clamp(16px, 4vw, 32px) clamp(12px, 3vw, 24px) 48px",
     maxWidth: "1400px",
     margin: "0 auto",
   } as React.CSSProperties,
@@ -78,7 +78,7 @@ export default function UC10Page() {
       {/* Stats row */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
         gap: "12px",
         marginBottom: "28px",
       }}>
@@ -197,8 +197,8 @@ export default function UC10Page() {
         borderRadius: "12px",
         overflow: "hidden",
       }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1100px" }}>
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
                 {[

@@ -18,8 +18,8 @@ function statusColor(status: "PASS" | "FAIL"): string {
 function blockStyle(status: "PASS" | "FAIL"): React.CSSProperties {
   const color = statusColor(status)
   return {
-    minWidth: "160px",
-    padding: "16px",
+    minWidth: "130px",
+    padding: "12px",
     borderRadius: "12px",
     border: `2px solid ${color}`,
     background: status === "PASS" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
@@ -101,12 +101,12 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
       </div>
 
       {/* Scrollable diagram */}
-      <div style={{ overflowX: "auto", paddingBottom: "8px" }}>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "8px" }}>
         <div style={{
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          minWidth: "max-content",
+          minWidth: "900px",
           padding: "16px",
           background: "var(--surface)",
           borderRadius: "12px",
@@ -116,8 +116,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           {/* 1. UE / User Terminal */}
           <div style={blockStyle("PASS")}>
             <div style={blockIcon("📱")}>📱</div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>User Terminal</div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>NTN UE</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>User Terminal</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>NTN UE</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
@@ -135,8 +135,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           {/* 3. Satellite */}
           <div style={blockStyle(pass.domainStatus.satellite)}>
             <div style={blockIcon("🛰️")}>🛰️</div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>{pass.satellite}</div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>LEO · 590km</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>{pass.satellite}</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>LEO · 590km</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
@@ -156,8 +156,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
 
           {/* 5. Ground Station Compound */}
           <div style={{
-            minWidth: "200px",
-            padding: "16px",
+            minWidth: "180px",
+            padding: "12px",
             borderRadius: "12px",
             border: `2px solid ${gsColor}`,
             background: pass.domainStatus.groundStation === "PASS" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
@@ -177,7 +177,7 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
               marginBottom: "10px",
             }}>{pass.domainStatus.groundStation}</div>
             {/* 2x2 sub-blocks */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(80px, 1fr))", gap: "6px" }}>
               {/* ACU */}
               <div style={{
                 padding: "8px",
@@ -231,8 +231,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           {/* 7. RAN / eNB */}
           <div style={blockStyle(pass.domainStatus.ran)}>
             <div style={blockIcon("📶")}>📶</div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>{pass.eNB}</div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>{pass.ranVendor}</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>{pass.eNB}</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>{pass.ranVendor}</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
@@ -253,8 +253,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           {/* 9. Core Network */}
           <div style={blockStyle(pass.domainStatus.core)}>
             <div style={blockIcon("🌐")}>🌐</div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>EPC Core</div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>MME + SGW + PGW</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>EPC Core</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>MME + SGW + PGW</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
@@ -275,8 +275,8 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           {/* 11. Web / Internet */}
           <div style={blockStyle("PASS")}>
             <div style={blockIcon("🖥️")}>🖥️</div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Internet</div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>DPI · Content</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>Internet</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>DPI · Content</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
@@ -289,6 +289,9 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           </div>
 
         </div>
+      </div>
+      <div style={{ fontSize: "10px", color: "var(--muted)", textAlign: "center", marginTop: "4px", opacity: 0.6 }}>
+        ← scroll to see full diagram →
       </div>
     </div>
   )

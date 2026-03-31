@@ -70,7 +70,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "28px 24px 64px", maxWidth: "1200px", margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "clamp(16px, 4vw, 28px) clamp(12px, 3vw, 24px) 48px", maxWidth: "1200px", margin: "0 auto" }}>
       {/* Back */}
       <div style={{ marginBottom: "20px" }}>
         <Link href="/uc10" style={{ color: "var(--muted)", fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
@@ -87,12 +87,12 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
         marginBottom: "16px",
         display: "flex",
         flexWrap: "wrap",
-        gap: "24px",
+        gap: "16px",
         alignItems: "center",
       }}>
         <div>
           <div style={{ fontSize: "11px", color: "var(--muted)", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Pass ID</div>
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--accent)" }}>{pass.passId}</div>
+          <div style={{ fontSize: "clamp(16px, 4vw, 20px)", fontWeight: 800, color: "var(--accent)" }}>{pass.passId}</div>
         </div>
         <div>
           <div style={{ fontSize: "11px", color: "var(--muted)", marginBottom: "2px" }}>Satellite</div>
@@ -164,6 +164,8 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
         marginBottom: "24px",
         borderBottom: "1px solid var(--border)",
         paddingBottom: "0",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
       }}>
         {tabs.map(tab => {
           const isActive = activeTab === tab.id
@@ -172,7 +174,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: "10px 18px",
+                padding: "8px 12px",
                 background: "transparent",
                 border: "none",
                 borderBottom: `2px solid ${isActive ? tabBorderColor[tab.id] : "transparent"}`,
@@ -185,6 +187,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
                 gap: "6px",
                 transition: "all 0.15s",
                 marginBottom: "-1px",
+                whiteSpace: "nowrap",
               }}
             >
               <span>{tab.icon}</span>
@@ -215,7 +218,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
               Kuiper LEO phased array link quality — EIRP, link budget, Doppler compensation, beam efficiency
             </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
             <KpiCard label="EIRP" value={kpis.satellite.eirp} unit="dBW" threshold=">45 dBW"
               status={kpiStatus(kpis.satellite.eirp, 45, true)} reference="ITU-R S.580 / Kuiper FL-1" />
             <KpiCard label="Link Margin" value={kpis.satellite.linkMargin} unit="dB" threshold=">6 dB"
@@ -276,7 +279,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* ACU */}
           {gsSubTab === "acu" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
               <KpiCard label="Azimuth Tracking Error" value={kpis.groundStation.acu.azimuthTrackingError} unit="°" threshold="<0.5°"
                 status={kpiStatus(kpis.groundStation.acu.azimuthTrackingError, 0.5, false)} reference="Antenna pointing accuracy" />
               <KpiCard label="Elevation Tracking Error" value={kpis.groundStation.acu.elevationTrackingError} unit="°" threshold="<0.4°"
@@ -301,7 +304,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Beacon */}
           {gsSubTab === "beacon" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
               <KpiCard label="Beacon Level" value={kpis.groundStation.beacon.beaconLevel} unit="dBm" threshold=">-88 dBm"
                 status={kpiStatus(kpis.groundStation.beacon.beaconLevel, -88, true)} reference="S-band beacon receiver" />
               <KpiCard label="Beacon SNR" value={kpis.groundStation.beacon.beaconSNR} unit="dB" threshold=">12 dB"
@@ -333,7 +336,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Signal Analyzer */}
           {gsSubTab === "signalAnalyzer" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
               <KpiCard label="Rx Signal Level" value={kpis.groundStation.signalAnalyzer.rxSignalLevel} unit="dBm" threshold=">-82 dBm"
                 status={kpiStatus(kpis.groundStation.signalAnalyzer.rxSignalLevel, -82, true)} reference="Downconverter output" />
               <div style={{
@@ -369,7 +372,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* BPMS */}
           {gsSubTab === "bpms" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
               <KpiCard label="Demodulation Lock" value="" isBoolean booleanValue={kpis.groundStation.bpms.demodulationLock}
                 status={kpis.groundStation.bpms.demodulationLock ? "pass" : "fail"} reference="BPMS demodulator sync" />
               <KpiCard label="FEC Correction Rate" value={kpis.groundStation.bpms.fecCorrectionRate} unit="%" threshold="<3%"
@@ -397,7 +400,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Accessibility */}
           <SectionHeader title="Accessibility" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <KpiCard label="RRC Setup Success Rate" value={kpis.ran.rrcSetupSuccessRate} unit="%" threshold=">95%"
               status={kpiStatus(kpis.ran.rrcSetupSuccessRate, 95, true)} reference="3GPP TS 32.450 · RRC.SR.01" />
             <KpiCard label="E-RAB Setup Success Rate" value={kpis.ran.erabSetupSuccessRate} unit="%" threshold=">95%"
@@ -408,7 +411,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Retainability */}
           <SectionHeader title="Retainability" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <KpiCard label="Call Drop Rate" value={kpis.ran.callDropRate} unit="%" threshold="<1%"
               status={kpiStatus(kpis.ran.callDropRate, 1, false)} reference="3GPP TS 32.450 · CDR.01" />
             <KpiCard label="E-RAB Drop Rate" value={kpis.ran.erabDropRate} unit="%" threshold="<1%"
@@ -419,7 +422,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Availability */}
           <SectionHeader title="Availability" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <KpiCard label="Cell Availability" value={kpis.ran.cellAvailability} unit="%" threshold=">99%"
               status={kpiStatus(kpis.ran.cellAvailability, 99, true)} reference="3GPP TS 32.450 · CA.01" />
             <KpiCard label="Handover Success Rate" value={kpis.ran.handoverSuccessRate} unit="%" threshold=">95%"
@@ -428,7 +431,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Quality */}
           <SectionHeader title="Quality / Integrity" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <KpiCard label="DL Throughput" value={kpis.ran.dlThroughput} unit="Mbps" threshold=">30 Mbps"
               status={kpiStatus(kpis.ran.dlThroughput, 30, true)} reference="Average user DL" />
             <KpiCard label="UL Throughput" value={kpis.ran.ulThroughput} unit="Mbps" threshold=">10 Mbps"
@@ -441,7 +444,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Signal Quality */}
           <SectionHeader title="Signal Quality (NTN)" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
             <KpiCard label="RSRP" value={kpis.ran.rsrp} unit="dBm" threshold=">-100 dBm"
               status={kpiStatus(kpis.ran.rsrp, -100, true)} reference="Reference signal received power" />
             <KpiCard label="RSRQ" value={kpis.ran.rsrq} unit="dB" threshold=">-12 dB"
@@ -464,7 +467,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Control Plane */}
           <SectionHeader title="Control Plane" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <KpiCard label="PDP Context Activation Rate" value={kpis.core.pdpContextActivationRate} unit="%" threshold=">99%"
               status={kpiStatus(kpis.core.pdpContextActivationRate, 99, true)} reference="3GPP TS 32.451" />
             <KpiCard label="PDP Context Success Rate" value={kpis.core.pdpContextSuccessRate} unit="%" threshold=">98.5%"
@@ -481,7 +484,7 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
 
           {/* Data Plane */}
           <SectionHeader title="Data Plane" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
             <KpiCard label="PGW Data Path Success Rate" value={kpis.core.pgwDataPathSuccessRate} unit="%" threshold=">99%"
               status={kpiStatus(kpis.core.pgwDataPathSuccessRate, 99, true)} reference="S5/S8 data path" />
             <KpiCard label="DPI Throughput" value={kpis.core.dpiThroughput} unit="Gbps" threshold="Informational"

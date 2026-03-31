@@ -38,7 +38,7 @@ const S = {
   page: {
     minHeight: "100vh",
     background: "var(--bg)",
-    padding: "32px 24px 80px",
+    padding: "clamp(16px, 4vw, 32px) clamp(12px, 3vw, 24px) 80px",
     maxWidth: "1300px",
     margin: "0 auto",
   } as React.CSSProperties,
@@ -117,13 +117,13 @@ const S = {
 
   grid2: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "16px",
   } as React.CSSProperties,
 
   grid3: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "16px",
   } as React.CSSProperties,
 
@@ -131,7 +131,7 @@ const S = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "12px",
-    padding: "20px",
+    padding: "clamp(12px, 3vw, 20px)",
   } as React.CSSProperties,
 
   chartTitle: {
@@ -264,6 +264,8 @@ export default function PassGraphsPage({
         gap: "4px",
         marginBottom: "28px",
         borderBottom: "1px solid var(--border)",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
       }}>
         {mainTabs.map(tab => {
           const isActive = activeMainTab === tab.id
@@ -272,7 +274,7 @@ export default function PassGraphsPage({
               key={tab.id}
               onClick={() => setActiveMainTab(tab.id)}
               style={{
-                padding: "10px 20px",
+                padding: "8px 16px",
                 background: "transparent",
                 border: "none",
                 borderBottom: `2px solid ${isActive ? "var(--accent)" : "transparent"}`,
@@ -282,6 +284,7 @@ export default function PassGraphsPage({
                 cursor: "pointer",
                 marginBottom: "-1px",
                 transition: "all 0.15s",
+                whiteSpace: "nowrap",
               }}
             >
               {tab.label}
@@ -308,11 +311,14 @@ export default function PassGraphsPage({
             border: "1px solid var(--border)",
             borderRadius: "12px",
             overflow: "hidden",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
           }}>
             {/* Table header */}
             <div style={{
               display: "grid",
               gridTemplateColumns: "160px 1fr 100px 80px 70px",
+              minWidth: "500px",
               gap: "0",
               padding: "10px 16px",
               background: "var(--surface-2)",
@@ -336,6 +342,7 @@ export default function PassGraphsPage({
                 style={{
                   display: "grid",
                   gridTemplateColumns: "160px 1fr 100px 80px 70px",
+                  minWidth: "500px",
                   gap: "0",
                   padding: "10px 16px",
                   background: i % 2 === 0 ? "var(--surface)" : "var(--surface-2)",
