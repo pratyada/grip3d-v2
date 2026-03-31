@@ -160,6 +160,22 @@ export interface TimeSeriesPoint {
   elevationError: number
   rxSignalLevel: number
   ber: number
+  rachAttempts: number
+  rachSuccessRate: number
+  rrcSetupTime: number
+  erabSetupTime: number
+  pdcpSduLossUL: number
+  pdcpSduLossDL: number
+  prbUsageDL: number
+  activeUEs: number
+  rachSuccessCount: number
+  rrcAttempts: number
+  rrcSuccessCount: number
+  erabAttempts: number
+  erabSuccessCount: number
+  rrcSetupSuccessRate: number
+  erabSetupSuccessRate: number
+  cellAvailability: number
 }
 
 // ─── Radar Data ───────────────────────────────────────────────────────────────
@@ -478,6 +494,25 @@ export function getTimeSeriesForPass(passId: string, vendor: RanVendor): TimeSer
     const dlThroughput = dlBase * signalBoost + sr(s + 1, -5, 5)
     const ulThroughput = dlThroughput * sr(s + 2, 0.3, 0.45)
 
+    const rachAttempts = srInt(s + 20, 10, 50)
+    const rachSuccessRate = 94 + signalBoost * 5.8 + sr(s + 21, -1, 1)
+    const rrcSetupTime = 8 + (1 - signalBoost) * 20 + sr(s + 22, -2, 2)
+    const erabSetupTime = 12 + (1 - signalBoost) * 25 + sr(s + 23, -2, 2)
+    const pdcpSduLossUL = Math.max(0, 0.8 - signalBoost * 0.7 + sr(s + 24, -0.1, 0.1))
+    const pdcpSduLossDL = Math.max(0, 0.6 - signalBoost * 0.5 + sr(s + 25, -0.1, 0.1))
+    const prbUsageDL = 20 + signalBoost * 60 + sr(s + 26, -5, 5)
+    const activeUEs = srInt(s + 27, 1, 12) + Math.floor(signalBoost * 8)
+    const rachSuccessCount = Math.floor(rachAttempts * rachSuccessRate / 100)
+    const rrcAttempts = srInt(s + 28, 5, 30)
+    // Use vendor-dependent RRC SR baseline
+    const rrcSRBaseline = vendor === "Nokia" ? 99.5 : vendor === "Ericsson" ? 99.2 : vendor === "Samsung" ? 98.7 : 98.3
+    const rrcSetupSuccessRateTS = rrcSRBaseline + sr(s + 29, -0.5, 0.5)
+    const rrcSuccessCount = Math.floor(rrcAttempts * (rrcSetupSuccessRateTS / 100))
+    const erabAttempts = srInt(s + 29, 3, 20)
+    const erabSuccessCount = Math.floor(erabAttempts * 0.985)
+    const erabSetupSuccessRateTS = rrcSRBaseline - 0.3 + sr(s + 30, -0.3, 0.3)
+    const cellAvailabilityTS = 99.2 + sr(s + 31, -0.5, 0.5)
+
     points.push({
       minute: t + 1,
       elevation,
@@ -497,6 +532,22 @@ export function getTimeSeriesForPass(passId: string, vendor: RanVendor): TimeSer
       elevationError: 0.5 - signalBoost * 0.4 + sr(s + 14, -0.04, 0.04),
       rxSignalLevel: -88 + signalBoost * 23 + sr(s + 15, -2, 2),
       ber: Math.pow(10, -7 + (1 - signalBoost) * 3 + sr(s + 16, -0.5, 0.5)),
+      rachAttempts,
+      rachSuccessRate,
+      rrcSetupTime,
+      erabSetupTime,
+      pdcpSduLossUL,
+      pdcpSduLossDL,
+      prbUsageDL,
+      activeUEs,
+      rachSuccessCount,
+      rrcAttempts,
+      rrcSuccessCount,
+      erabAttempts,
+      erabSuccessCount,
+      rrcSetupSuccessRate: rrcSetupSuccessRateTS,
+      erabSetupSuccessRate: erabSetupSuccessRateTS,
+      cellAvailability: cellAvailabilityTS,
     })
   }
 
@@ -636,4 +687,188 @@ export function getRSRPHeatmap(passId: string, vendor: RanVendor): HeatmapCell[]
   })
 
   return cells
+}
+
+// ─── PM Counters ──────────────────────────────────────────────────────────────
+
+export interface PMCounter {
+  counterId: string
+  kpiName: string
+  value: number
+  unit: string
+  status: "pass" | "warn" | "fail"
+}
+
+export function getPMCounters(passId: string, vendor: RanVendor): PMCounter[] {
+  const idx = parseInt(passId.replace("P", "")) - 47001
+  const seed = idx * 2000
+
+  function counterStatus(value: number, threshold: number | null, higherIsBetter: boolean, naCounter: boolean): "pass" | "warn" | "fail" {
+    if (naCounter || threshold === null) return "pass"
+    if (higherIsBetter) {
+      if (value >= threshold) return "pass"
+      if (value >= threshold * 0.95) return "warn"
+      return "fail"
+    } else {
+      if (value <= threshold) return "pass"
+      if (value <= threshold * 1.05) return "warn"
+      return "fail"
+    }
+  }
+
+  const cellAvail = sr(seed + 1, 97, 99.95)
+  const rachAttempts = srInt(seed + 2, 500, 1500)
+  const rachSR = sr(seed + 3, 94, 99.8)
+  const rrcReestSR = sr(seed + 4, 98, 99.9)
+  const avgRrcUEs = sr(seed + 5, 0, 8)
+  const erabAttempts = srInt(seed + 6, 40, 200)
+  const erabSR = sr(seed + 7, 97, 99.9)
+  const erabQci8Att = srInt(seed + 8, 20, 80)
+  const erabQci8SR = sr(seed + 9, 97, 99.9)
+  const rbDropRatio = sr(seed + 10, 0.1, 2.5)
+  const ulThptQci8 = sr(seed + 11, 200, 600)
+  const dlThptQci8 = sr(seed + 12, 1500, 5000)
+  const pdcpThptUL = sr(seed + 13, 300, 800)
+  const pdcpThptDL = sr(seed + 14, 3000, 8000)
+  const rssiPucch = sr(seed + 15, -92, -78)
+  const rssiPusch = sr(seed + 16, -95, -80)
+  const avgCqi = sr(seed + 17, 5, 13)
+  const sinrPucch = sr(seed + 18, 8, 18)
+  const sinrPusch = sr(seed + 19, 7, 16)
+
+  return [
+    {
+      counterId: "LTE_6159b",
+      kpiName: "E-UTRAN Cell Availability Ratio",
+      value: parseFloat(cellAvail.toFixed(2)),
+      unit: "%",
+      status: counterStatus(cellAvail, 99.0, true, false),
+    },
+    {
+      counterId: "LTE_5569b",
+      kpiName: "E-UTRAN RACH Setup Attempts",
+      value: rachAttempts,
+      unit: "#",
+      status: "pass",
+    },
+    {
+      counterId: "LTE_5569c",
+      kpiName: "E-UTRAN RACH Setup Completion Success Rate",
+      value: parseFloat(rachSR.toFixed(2)),
+      unit: "%",
+      status: counterStatus(rachSR, 97.0, true, false),
+    },
+    {
+      counterId: "LTE_5143a",
+      kpiName: "Total E-UTRAN RRC Connection Re-establishment Success Ratio",
+      value: parseFloat(rrcReestSR.toFixed(2)),
+      unit: "%",
+      status: counterStatus(rrcReestSR, 98.5, true, false),
+    },
+    {
+      counterId: "LTE_5242b",
+      kpiName: "E-UTRAN Average RRC Connected UEs",
+      value: parseFloat(avgRrcUEs.toFixed(1)),
+      unit: "#",
+      status: "pass",
+    },
+    {
+      counterId: "LTE_5118a",
+      kpiName: "E-UTRAN E-RAB Setup Attempts",
+      value: erabAttempts,
+      unit: "#",
+      status: "pass",
+    },
+    {
+      counterId: "LTE_5017a",
+      kpiName: "E-UTRAN E-RAB Setup Success Ratio",
+      value: parseFloat(erabSR.toFixed(2)),
+      unit: "%",
+      status: counterStatus(erabSR, 98.0, true, false),
+    },
+    {
+      counterId: "LTE_5644a",
+      kpiName: "E-UTRAN E-RAB Setup Attempts QCI8",
+      value: erabQci8Att,
+      unit: "#",
+      status: "pass",
+    },
+    {
+      counterId: "LTE_5649a",
+      kpiName: "E-UTRAN E-RAB Setup Success Ratio QCI8",
+      value: parseFloat(erabQci8SR.toFixed(2)),
+      unit: "%",
+      status: counterStatus(erabQci8SR, 98.0, true, false),
+    },
+    {
+      counterId: "LTE_5004d",
+      kpiName: "E-UTRAN Radio Bearer Drop Ratio",
+      value: parseFloat(rbDropRatio.toFixed(3)),
+      unit: "%",
+      status: counterStatus(rbDropRatio, 1.0, false, false),
+    },
+    {
+      counterId: "LTE_5519a",
+      kpiName: "E-UTRAN Averaged IP Throughput UL QCI8",
+      value: parseFloat(ulThptQci8.toFixed(1)),
+      unit: "kbps",
+      status: counterStatus(ulThptQci8, 200, true, false),
+    },
+    {
+      counterId: "LTE_5510c",
+      kpiName: "E-UTRAN Averaged IP Throughput DL QCI8",
+      value: parseFloat(dlThptQci8.toFixed(1)),
+      unit: "kbps",
+      status: counterStatus(dlThptQci8, 2000, true, false),
+    },
+    {
+      counterId: "LTE_8097a",
+      kpiName: "Maximum PDCP Throughput UL",
+      value: parseFloat(pdcpThptUL.toFixed(1)),
+      unit: "kbit/s",
+      status: counterStatus(pdcpThptUL, 300, true, false),
+    },
+    {
+      counterId: "LTE_8096a",
+      kpiName: "Maximum PDCP Throughput DL",
+      value: parseFloat(pdcpThptDL.toFixed(1)),
+      unit: "kbit/s",
+      status: counterStatus(pdcpThptDL, 3000, true, false),
+    },
+    {
+      counterId: "LTE_5441b",
+      kpiName: "E-UTRAN Average RSSI for PUCCH",
+      value: parseFloat(rssiPucch.toFixed(1)),
+      unit: "dBm",
+      status: counterStatus(rssiPucch, -90, true, false),
+    },
+    {
+      counterId: "LTE_5444b",
+      kpiName: "Average RSSI for PUSCH",
+      value: parseFloat(rssiPusch.toFixed(1)),
+      unit: "dBm",
+      status: counterStatus(rssiPusch, -92, true, false),
+    },
+    {
+      counterId: "LTE_5427c",
+      kpiName: "E-UTRAN Average CQI",
+      value: parseFloat(avgCqi.toFixed(1)),
+      unit: "#",
+      status: counterStatus(avgCqi, 7, true, false),
+    },
+    {
+      counterId: "LTE_5541b",
+      kpiName: "E-UTRAN Average SINR for PUCCH",
+      value: parseFloat(sinrPucch.toFixed(1)),
+      unit: "dB",
+      status: counterStatus(sinrPucch, 10, true, false),
+    },
+    {
+      counterId: "LTE_5544b",
+      kpiName: "E-UTRAN Average SINR for PUSCH",
+      value: parseFloat(sinrPusch.toFixed(1)),
+      unit: "dB",
+      status: counterStatus(sinrPusch, 9, true, false),
+    },
+  ]
 }

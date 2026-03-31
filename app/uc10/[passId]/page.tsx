@@ -8,6 +8,7 @@ import { KpiCard } from "@/components/uc10/KpiCard"
 import { PassStatusBadge } from "@/components/uc10/PassStatusBadge"
 import { VendorBadge } from "@/components/uc10/VendorBadge"
 import { DomainBadge } from "@/components/uc10/DomainBadge"
+import { E2EFlowDiagram } from "@/components/uc10/E2EFlowDiagram"
 
 type TabId = "satellite" | "groundStation" | "ran" | "core"
 type GSSubTab = "acu" | "beacon" | "signalAnalyzer" | "bpms"
@@ -152,6 +153,9 @@ export default function PassDetailPage({ params }: { params: Promise<{ passId: s
           <DomainBadge key={d.key} domain={d.key} status={d.status} />
         ))}
       </div>
+
+      {/* E2E Flow Diagram */}
+      <E2EFlowDiagram pass={pass} kpis={kpis} />
 
       {/* Tab bar */}
       <div style={{
