@@ -1,33 +1,30 @@
-import { NextResponse } from "next/server"
-
-// Cache TLE data for 10 minutes — TLEs change slowly
-export const revalidate = 600
+// TLE text is updated by CelesTrak every 2 hours.
+// We cache for 1 hour on Vercel edge; Next.js revalidates background.
+export const revalidate = 3600
 
 export async function GET() {
   try {
     const res = await fetch(
-      "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=json",
+      "https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=tle",
       {
-        next: { revalidate: 600 },
+        next: { revalidate: 3600 },
         headers: { "User-Agent": "GRIP3D/1.5 contact@grip3d.com" },
       }
     )
     if (!res.ok) {
-      return NextResponse.json(
-        { error: `CelesTrak returned ${res.status}` },
-        { status: 502 }
-      )
+      return new Response(`CelesTrak error ${res.status}`, { status: 502 })
     }
-    const data = await res.json()
-    return NextResponse.json(data, {
+    const text = await res.text()
+    if (!text || text.length < 100) {
+      return new Response("Empty TLE response from CelesTrak", { status: 502 })
+    }
+    return new Response(text, {
       headers: {
-        "Cache-Control": "public, max-age=600, stale-while-revalidate=300",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "public, max-age=3600, stale-while-revalidate=1800",
       },
     })
   } catch (err) {
-    return NextResponse.json(
-      { error: "Failed to fetch TLE data from CelesTrak" },
-      { status: 500 }
-    )
+    return new Response("Failed to fetch TLE data", { status: 500 })
   }
 }

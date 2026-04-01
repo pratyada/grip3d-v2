@@ -5,14 +5,12 @@ import Link from "next/link"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface TLERecord {
-  OBJECT_NAME: string
-  NORAD_CAT_ID: string | number
-  INCLINATION: number
-  TLE_LINE1: string
-  TLE_LINE2: string
-  EPOCH: string
-  MEAN_MOTION: number
+interface TLEEntry {
+  name: string
+  noradId: string
+  inclination: number
+  tle1: string
+  tle2: string
 }
 
 interface ParsedSat {
@@ -59,6 +57,36 @@ const GENERATIONS: Record<GenKey, { label: string; noradMax: number }> = {
   "gen1v5":  { label: "Gen 1.5 (v1.5)",  noradMax: 55742 },
   "gen2mini":{ label: "Gen 2 Mini",       noradMax: 999999 },
   "gen2":    { label: "Gen 2",            noradMax: 999999 },
+}
+
+// ── Parse 3-line TLE text block ───────────────────────────────────────────────
+// TLE format: name / TLE1 (starts "1 ") / TLE2 (starts "2 ") per satellite
+function parseTLEText(text: string): TLEEntry[] {
+  const lines = text.split("\n").map(l => l.trimEnd()).filter(l => l.trim().length > 0)
+  const entries: TLEEntry[] = []
+  let i = 0
+  while (i < lines.length) {
+    const l0 = lines[i]
+    const l1 = lines[i + 1]
+    const l2 = lines[i + 2]
+    if (l1?.startsWith("1 ") && l2?.startsWith("2 ")) {
+      // NORAD ID: chars 2-6 of TLE line 1
+      const noradId = l1.slice(2, 7).trim()
+      // Inclination (degrees): chars 8-16 of TLE line 2
+      const inclination = parseFloat(l2.slice(8, 16))
+      entries.push({
+        name: l0.trim(),
+        noradId,
+        inclination: isFinite(inclination) ? inclination : 53,
+        tle1: l1,
+        tle2: l2,
+      })
+      i += 3
+    } else {
+      i++
+    }
+  }
+  return entries
 }
 
 // ── Helper: classify satellite ────────────────────────────────────────────────
@@ -193,40 +221,39 @@ export default function UC15Page() {
         satLib.current = sLib
         setLoadPct(25)
 
-        // 2. Fetch TLE data from our API proxy
+        // 2. Fetch TLE text from our API proxy
         const res = await fetch("/api/starlink-tle")
-        if (!res.ok) throw new Error(`API error ${res.status}`)
-        const records: TLERecord[] = await res.json()
+        if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`)
+        const tleText = await res.text()
         if (cancelled) return
         setLoadPct(55)
-        if (!records || !Array.isArray(records) || records.length === 0) {
-          throw new Error("No TLE records returned")
+        if (!tleText || tleText.length < 100) {
+          throw new Error("Empty TLE response from server")
         }
 
-        // 3. Parse TLEs → satrecs
+        // 3. Parse TLE text → satrecs
         setStatus("propagating")
-        setTleEpoch(records[0]?.EPOCH?.split("T")[0] ?? "")
+        const entries = parseTLEText(tleText)
+        if (entries.length === 0) throw new Error("No valid TLE entries parsed")
+        setTleEpoch(new Date().toISOString().split("T")[0])
         const parsed: ParsedSat[] = []
-        let i = 0
-        for (const rec of records) {
-          if (!rec.TLE_LINE1 || !rec.TLE_LINE2) continue
+        for (let i = 0; i < entries.length; i++) {
+          const rec = entries[i]
           try {
-            const satrec = sLib.twoline2satrec(rec.TLE_LINE1, rec.TLE_LINE2)
+            const satrec = sLib.twoline2satrec(rec.tle1, rec.tle2)
             if (!satrec || satrec.error !== 0) continue
-            const noradId = String(rec.NORAD_CAT_ID)
-            const shell   = getShell(Number(rec.INCLINATION))
-            const gen     = getGeneration(Number(noradId))
+            const shell = getShell(rec.inclination)
+            const gen   = getGeneration(Number(rec.noradId))
             parsed.push({
-              name: rec.OBJECT_NAME,
-              noradId,
-              inclination: Number(rec.INCLINATION),
+              name:        rec.name,
+              noradId:     rec.noradId,
+              inclination: rec.inclination,
               shell,
-              generation: gen,
+              generation:  gen,
               satrec,
             })
           } catch { /* skip bad TLE */ }
-          i++
-          if (i % 500 === 0) setLoadPct(55 + Math.round((i / records.length) * 30))
+          if (i % 500 === 0) setLoadPct(55 + Math.round((i / entries.length) * 30))
         }
         parsedSats.current = parsed
         setLoadPct(90)
