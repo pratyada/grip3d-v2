@@ -16,18 +16,15 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
+            <Link href="/" className="inline-flex mb-4">
               <Image
                 src="/img/grip3d-logo-trans-128.png"
                 alt="GRIP 3D"
-                width={40}
-                height={40}
+                width={56}
+                height={56}
                 unoptimized
                 className="rounded"
               />
-              <span className="font-bold text-lg" style={{ color: "var(--text)" }}>
-                GRIP 3D
-              </span>
             </Link>
             <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--muted)" }}>
               Layer-first interactive globe platform for enterprise data visualization and operational intelligence.
