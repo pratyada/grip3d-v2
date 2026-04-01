@@ -13,7 +13,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "GRIP 3D — Interactive Globe Platform",
   description:
-    "Layer-first interactive 3D globe platform for enterprise data visualization and operational intelligence. Satellite NTN, maritime, aviation, weather, demographics and more.",
+    "Layer-first interactive 3D globe platform: NTN satellite service assurance, maritime tracking, world job market, AI inference grid, weather, demographics, earthquakes, energy, radio and more — real-time 3D for enterprise teams.",
   icons: {
     icon: [
       { url: "/img/favicon-grip3d-16.png", sizes: "16x16" },

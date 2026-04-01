@@ -1,1534 +1,525 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Link from "next/link"
 import {
-  getDataCenters,
+  getCities,
+  getCitiesGeoJSON,
   getGlobalStats,
-  getProviderComparison,
-  getTimeSeriesForDC,
+  getMonthlyTrend,
+  getTopCitiesByCategory,
+  JOB_CATEGORIES,
+  CATEGORY_COLORS,
+  CATEGORY_ICONS,
+  type JobCategory,
+  type CityJobData,
 } from "@/lib/uc14-data"
-import type { DataCenter, ClusterStatus, Provider } from "@/lib/uc14-data"
 import {
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  ComposedChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  LineChart, Line, CartesianGrid, Legend,
 } from "recharts"
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : String(n)
 
-const PROVIDER_COLORS: Record<string, string> = {
-  AWS: "#FF9900",
-  Azure: "#0078D4",
-  GCP: "#4285F4",
-  CoreWeave: "#7C3AED",
-  Lambda: "#10B981",
-  Together: "#F59E0B",
-  Groq: "#EF4444",
-  Cerebras: "#8B5CF6",
-}
+const salaryFmt = (n: number) =>
+  `$${(n / 1000).toFixed(0)}K`
 
-const STATUS_COLORS: Record<ClusterStatus, string> = {
-  HEALTHY: "#22c55e",
-  DEGRADED: "#eab308",
-  OVERLOADED: "#ef4444",
-  OFFLINE: "#6b7280",
-}
+// ── Map tile style (CARTO dark matter — free, no API key) ─────────────────────
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
 
-// ─── Arc generator ───────────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function UC14Page() {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+  const popupRef = useRef<any>(null)
 
-function generateArcs(dcs: DataCenter[]) {
-  const healthyDCs = dcs.filter((dc) => dc.status !== "OFFLINE")
-  const arcs: Array<{
-    srcLat: number
-    srcLng: number
-    dstLat: number
-    dstLng: number
-    color: [string, string]
-  }> = []
-  const pairs = [
-    [0, 3], [1, 4], [2, 7], [3, 8], [5, 9], [6, 11], [7, 12], [0, 15], [2, 18], [4, 20],
-    [1, 6], [8, 13], [9, 14], [10, 16], [11, 17], [3, 19], [5, 21], [7, 22], [12, 23], [0, 24],
-  ]
-  for (const [i, j] of pairs) {
-    const src = healthyDCs[i % healthyDCs.length]
-    const dst = healthyDCs[j % healthyDCs.length]
-    if (src && dst) {
-      arcs.push({
-        srcLat: src.lat,
-        srcLng: src.lng,
-        dstLat: dst.lat,
-        dstLng: dst.lng,
-        color: ["rgba(51,204,221,0.6)", "rgba(51,204,221,0.0)"],
+  const [selectedCategory, setSelectedCategory] = useState<JobCategory | null>(null)
+  const [selectedCity, setSelectedCity] = useState<CityJobData | null>(null)
+  const [mapReady, setMapReady] = useState(false)
+  const [activeTab, setActiveTab] = useState<"trend" | "breakdown">("breakdown")
+
+  const stats = getGlobalStats()
+
+  // ── Init MapLibre GL ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return
+
+    let map: any
+    import("maplibre-gl").then(({ Map, NavigationControl, Popup }) => {
+      map = new Map({
+        container: mapContainerRef.current!,
+        style: MAP_STYLE,
+        center: [15, 25],
+        zoom: 2,
+        minZoom: 1.5,
+        maxZoom: 10,
+        attributionControl: false,
       })
+      mapRef.current = map
+
+      map.addControl(new NavigationControl({ showCompass: false }), "bottom-right")
+
+      map.on("load", () => {
+        // ── GeoJSON source ──
+        map.addSource("cities", {
+          type: "geojson",
+          data: getCitiesGeoJSON(),
+        })
+
+        // ── Glow halo ──
+        map.addLayer({
+          id: "city-glow",
+          type: "circle",
+          source: "cities",
+          paint: {
+            "circle-radius": [
+              "interpolate", ["linear"], ["get", "displayJobs"],
+              0, 12, 20000, 28, 50000, 48,
+            ],
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.15,
+            "circle-blur": 1,
+          },
+        })
+
+        // ── Main circles ──
+        map.addLayer({
+          id: "city-circles",
+          type: "circle",
+          source: "cities",
+          paint: {
+            "circle-radius": [
+              "interpolate", ["linear"], ["get", "displayJobs"],
+              0, 5, 20000, 14, 50000, 24,
+            ],
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.85,
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#fff",
+            "circle-stroke-opacity": 0.25,
+          },
+        })
+
+        // ── City labels ──
+        map.addLayer({
+          id: "city-labels",
+          type: "symbol",
+          source: "cities",
+          minzoom: 3,
+          layout: {
+            "text-field": ["get", "city"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 11,
+            "text-offset": [0, 1.6],
+            "text-anchor": "top",
+          },
+          paint: {
+            "text-color": "#e2e8f0",
+            "text-halo-color": "#000",
+            "text-halo-width": 1,
+          },
+        })
+
+        setMapReady(true)
+      })
+
+      // ── Hover cursor ──
+      map.on("mouseenter", "city-circles", () => { map.getCanvas().style.cursor = "pointer" })
+      map.on("mouseleave", "city-circles", () => { map.getCanvas().style.cursor = "" })
+
+      // ── Click → select city ──
+      map.on("click", "city-circles", (e: any) => {
+        const props = e.features?.[0]?.properties
+        if (!props) return
+        const city = getCities().find(c => c.id === props.id)
+        if (city) setSelectedCity(city)
+      })
+
+      // ── Click empty → deselect ──
+      map.on("click", (e: any) => {
+        const features = map.queryRenderedFeatures(e.point, { layers: ["city-circles"] })
+        if (!features.length) setSelectedCity(null)
+      })
+    })
+
+    return () => {
+      map?.remove()
+      mapRef.current = null
     }
-  }
-  return arcs
-}
+  }, [])
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+  // ── Update map data when category filter changes ──────────────────────────
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return
+    const map = mapRef.current
+    const src = map.getSource("cities") as any
+    if (src) src.setData(getCitiesGeoJSON(selectedCategory ?? undefined))
+  }, [selectedCategory, mapReady])
 
-function ProviderBadge({ provider }: { provider: string }) {
-  const color = PROVIDER_COLORS[provider] ?? "#aaa"
-  return (
-    <span
-      style={{
-        fontSize: "10px",
-        fontWeight: 700,
-        padding: "2px 7px",
-        borderRadius: "4px",
-        background: color + "22",
-        color,
-        border: `1px solid ${color}44`,
-        letterSpacing: "0.04em",
-      }}
-    >
-      {provider}
-    </span>
-  )
-}
+  // ── Fly to selected city ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedCity || !mapRef.current) return
+    mapRef.current.flyTo({
+      center: [selectedCity.lng, selectedCity.lat],
+      zoom: Math.max(mapRef.current.getZoom(), 4),
+      duration: 800,
+    })
+  }, [selectedCity])
 
-function StatusBadge({ status }: { status: ClusterStatus }) {
-  const color = STATUS_COLORS[status]
-  return (
-    <span
-      style={{
-        fontSize: "10px",
-        fontWeight: 700,
-        padding: "2px 7px",
-        borderRadius: "4px",
-        background: color + "22",
-        color,
-        border: `1px solid ${color}44`,
-        letterSpacing: "0.04em",
-      }}
-    >
-      {status}
-    </span>
-  )
-}
+  const catBreakdown = selectedCity
+    ? JOB_CATEGORIES.map(cat => ({
+        name: cat.split(" ")[0],
+        jobs: selectedCity.jobsByCategory[cat],
+        color: CATEGORY_COLORS[cat],
+      })).sort((a, b) => b.jobs - a.jobs)
+    : []
 
-function GreenScoreBadge({ score }: { score: number }) {
-  const color = score >= 60 ? "#22c55e" : score >= 35 ? "#eab308" : "#ef4444"
-  return (
-    <span
-      style={{
-        fontSize: "11px",
-        fontWeight: 700,
-        padding: "2px 8px",
-        borderRadius: "4px",
-        background: color + "22",
-        color,
-        border: `1px solid ${color}44`,
-      }}
-    >
-      {score}/100
-    </span>
-  )
-}
-
-// ─── Selected DC Detail Overlay ──────────────────────────────────────────────
-
-function SelectedDCPanel({
-  dc,
-  onClose,
-  onScrollToDashboard,
-}: {
-  dc: DataCenter
-  onClose: () => void
-  onScrollToDashboard: () => void
-}) {
-  const series = getTimeSeriesForDC(dc.id)
-  const utilColor =
-    dc.gpuUtilization > 85
-      ? "#ef4444"
-      : dc.gpuUtilization > 70
-      ? "#eab308"
-      : "#22c55e"
-  const providerColor = PROVIDER_COLORS[dc.provider] ?? "#aaa"
-  const greenColor =
-    dc.greenScore >= 60 ? "#22c55e" : dc.greenScore >= 35 ? "#eab308" : "#ef4444"
+  const trend = selectedCity ? getMonthlyTrend(selectedCity.id) : []
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 20,
-        left: 20,
-        width: 300,
-        zIndex: 20,
-        background: "rgba(5,13,18,0.95)",
-        border: "1px solid rgba(51,204,221,0.35)",
-        borderRadius: 14,
-        padding: "16px",
-        backdropFilter: "blur(12px)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginBottom: 10,
-        }}
-      >
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+      {/* ── Header ── */}
+      <div style={{
+        padding: "clamp(16px,3vw,24px) clamp(16px,4vw,48px) 0",
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+      }}>
         <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
-              flexWrap: "wrap",
-            }}
-          >
-            <ProviderBadge provider={dc.provider} />
-            <StatusBadge status={dc.status} />
+          <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+            <Link href="/use-cases" style={{ fontSize:12, color:"var(--muted)", textDecoration:"none" }}>← Use Cases</Link>
+            <span style={{ color:"var(--border)" }}>·</span>
+            <span style={{ fontSize:12, color:"var(--muted)" }}>UC14</span>
           </div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: "#fff",
-              lineHeight: 1.2,
-            }}
-          >
-            {dc.name}
-          </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-            {dc.city}, {dc.country}
-          </div>
+          <h1 style={{ fontSize:"clamp(20px,3vw,28px)", fontWeight:800, margin:0, letterSpacing:"-0.02em" }}>
+            🌍 World Job Market
+          </h1>
+          <p style={{ fontSize:13, color:"var(--muted)", margin:"4px 0 0" }}>
+            {fmt(stats.totalJobs)}+ active listings · {stats.totalCities} cities · {stats.remoteAvg}% remote avg
+          </p>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: 6,
-            color: "rgba(255,255,255,0.6)",
-            fontSize: 12,
-            cursor: "pointer",
-            padding: "3px 8px",
-            flexShrink: 0,
-          }}
-        >
-          ✕
-        </button>
+        <Link href="/uc14/details" style={{
+          fontSize:13, fontWeight:600, color:"var(--accent)",
+          border:"1px solid var(--accent)", borderRadius:10,
+          padding:"8px 16px", textDecoration:"none",
+        }}>View Details →</Link>
       </div>
 
-      {/* Key metrics 2x2 */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          marginBottom: 10,
-        }}
-      >
-        {[
-          { label: "GPU Util", value: `${dc.gpuUtilization}%`, color: utilColor },
-          {
-            label: "P50 Latency",
-            value: `${dc.inferenceLatencyP50}ms`,
-            color: "#33ccdd",
-          },
-          {
-            label: "Power Draw",
-            value: `${dc.powerDrawMW} MW`,
-            color: "#f59e0b",
-          },
-          {
-            label: "Carbon",
-            value: `${dc.carbonIntensity}`,
-            color:
-              dc.carbonIntensity > 400
-                ? "#ef4444"
-                : dc.carbonIntensity > 200
-                ? "#eab308"
-                : "#22c55e",
-          },
-        ].map((m) => (
-          <div
-            key={m.label}
+      {/* ── Category filter chips ── */}
+      <div style={{
+        padding: "14px clamp(16px,4vw,48px)",
+        display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
+      }}>
+        <button
+          onClick={() => setSelectedCategory(null)}
+          style={{
+            padding: "6px 14px", borderRadius: 100, fontSize: 12, fontWeight: 600,
+            background: !selectedCategory ? "var(--accent)" : "var(--surface)",
+            color: !selectedCategory ? "#000" : "var(--muted)",
+            border: `1px solid ${!selectedCategory ? "var(--accent)" : "var(--border)"}`,
+            cursor: "pointer",
+          }}
+        >All Jobs</button>
+        {JOB_CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
             style={{
-              background: "rgba(255,255,255,0.05)",
-              borderRadius: 8,
-              padding: "8px 10px",
+              padding: "6px 12px", borderRadius: 100, fontSize: 12, fontWeight: 600,
+              background: selectedCategory === cat ? CATEGORY_COLORS[cat] + "22" : "var(--surface)",
+              color: selectedCategory === cat ? CATEGORY_COLORS[cat] : "var(--muted)",
+              border: `1px solid ${selectedCategory === cat ? CATEGORY_COLORS[cat] : "var(--border)"}`,
+              cursor: "pointer",
             }}
           >
-            <div
-              style={{
-                fontSize: 9,
-                color: "rgba(255,255,255,0.45)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 3,
-              }}
-            >
-              {m.label}
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: m.color, lineHeight: 1 }}>
-              {m.value}
-            </div>
-          </div>
+            {CATEGORY_ICONS[cat]} {cat}
+          </button>
         ))}
       </div>
 
-      {/* Green score bar */}
-      <div style={{ marginBottom: 10 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            fontSize: 10,
-            color: "rgba(255,255,255,0.45)",
-            marginBottom: 4,
-          }}
-        >
-          <span>Green Score</span>
-          <span style={{ color: greenColor, fontWeight: 700 }}>
-            {dc.greenScore}/100
-          </span>
-        </div>
-        <div
-          style={{
-            height: 5,
-            borderRadius: 3,
-            background: "rgba(255,255,255,0.1)",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: `${dc.greenScore}%`,
-              background: greenColor,
-              borderRadius: 3,
-            }}
-          />
-        </div>
-      </div>
+      {/* ── Map + Panel ── */}
+      <div style={{ display: "flex", gap: 0, height: "clamp(420px,58vh,680px)", position: "relative" }}>
+        {/* Map */}
+        <div ref={mapContainerRef} style={{ flex: 1, minWidth: 0 }} />
 
-      {/* GPU util mini chart */}
-      <div style={{ marginBottom: 10 }}>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            color: "rgba(255,255,255,0.4)",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 4,
-          }}
-        >
-          GPU Util (24h)
-        </div>
-        <ResponsiveContainer width="100%" height={60}>
-          <AreaChart data={series} margin={{ top: 2, right: 2, left: -30, bottom: 0 }}>
-            <XAxis dataKey="hour" hide />
-            <YAxis domain={[0, 100]} hide />
-            <Area
-              type="monotone"
-              dataKey="gpuUtilization"
-              stroke="#33ccdd"
-              fill="rgba(51,204,221,0.15)"
-              strokeWidth={1.5}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Models */}
-      <div style={{ marginBottom: 12 }}>
-        <div
-          style={{
-            fontSize: 9,
-            color: "rgba(255,255,255,0.4)",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 5,
-          }}
-        >
-          Serving Models
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {dc.models.slice(0, 4).map((m) => (
-            <span
-              key={m}
-              style={{
-                fontSize: "9px",
-                fontWeight: 600,
-                padding: "2px 6px",
-                borderRadius: 4,
-                background: "rgba(255,255,255,0.07)",
-                color: "rgba(255,255,255,0.55)",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              {m}
-            </span>
-          ))}
-          {dc.models.length > 4 && (
-            <span
-              style={{
-                fontSize: "9px",
-                fontWeight: 600,
-                padding: "2px 6px",
-                borderRadius: 4,
-                background: "rgba(51,204,221,0.1)",
-                color: "#33ccdd",
-              }}
-            >
-              +{dc.models.length - 4} more
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Scroll to dashboard */}
-      <button
-        onClick={onScrollToDashboard}
-        style={{
-          width: "100%",
-          padding: "8px",
-          borderRadius: 8,
-          background: "rgba(51,204,221,0.12)",
-          border: "1px solid rgba(51,204,221,0.3)",
-          color: "#33ccdd",
-          fontSize: 11,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        View in Dashboard ↓
-      </button>
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function UC14GlobePage() {
-  const globeRef = useRef<HTMLDivElement>(null)
-  const globeInstanceRef = useRef<any>(null)
-  const dashboardRef = useRef<HTMLDivElement>(null)
-
-  const [selectedDC, setSelectedDC] = useState<DataCenter | null>(null)
-  const [colorMode, setColorMode] = useState<"provider" | "utilization" | "carbon">(
-    "provider"
-  )
-  const [showArcs, setShowArcs] = useState(true)
-  const [showLabels, setShowLabels] = useState(false)
-  const [globeReady, setGlobeReady] = useState(false)
-
-  const dataCenters = getDataCenters()
-  const globalStats = getGlobalStats()
-  const providerComparison = getProviderComparison()
-  const top5Green = [...dataCenters]
-    .sort((a, b) => b.greenScore - a.greenScore)
-    .slice(0, 5)
-
-  // ── Globe init ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!globeRef.current || typeof window === "undefined") return
-
-    // @ts-ignore
-    import("globe.gl").then((GlobeModule) => {
-      const Globe = GlobeModule.default
-
-      // Destroy previous instance
-      if (globeInstanceRef.current) {
-        globeInstanceRef.current._destructor?.()
-      }
-      if (globeRef.current) {
-        globeRef.current.innerHTML = ""
-      }
-
-      const globe = new Globe(globeRef.current!)
-
-      const arcData = showArcs ? generateArcs(dataCenters) : []
-
-      globe
-        .width(globeRef.current!.clientWidth)
-        .height(globeRef.current!.clientHeight)
-        .backgroundColor("rgba(0,0,0,0)")
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-dark.jpg")
-        .atmosphereColor("#33ccdd")
-        .atmosphereAltitude(0.15)
-        // Points
-        .pointsData(dataCenters)
-        .pointLat((d: any) => (d as DataCenter).lat)
-        .pointLng((d: any) => (d as DataCenter).lng)
-        .pointAltitude((d: any) => {
-          const dc = d as DataCenter
-          return colorMode === "utilization" ? dc.gpuUtilization / 1000 : 0.01
-        })
-        .pointRadius((d: any) => {
-          const dc = d as DataCenter
-          return colorMode === "utilization" ? 0.3 + dc.gpuUtilization / 200 : 0.4
-        })
-        .pointColor((d: any) => {
-          const dc = d as DataCenter
-          if (colorMode === "provider") return PROVIDER_COLORS[dc.provider] ?? "#aaa"
-          if (colorMode === "utilization") {
-            if (dc.gpuUtilization > 85) return "#ef4444"
-            if (dc.gpuUtilization > 70) return "#eab308"
-            return "#22c55e"
-          }
-          // carbon mode
-          if (dc.carbonIntensity > 400) return "#ef4444"
-          if (dc.carbonIntensity > 200) return "#eab308"
-          return "#22c55e"
-        })
-        .pointLabel((d: any) => {
-          const dc = d as DataCenter
-          return `<div style="background:rgba(0,0,0,0.85);padding:8px 12px;border-radius:8px;border:1px solid rgba(51,204,221,0.3);font-family:monospace;font-size:12px;color:#fff;min-width:160px">
-            <div style="font-weight:700;color:#33ccdd;margin-bottom:4px">${dc.name}</div>
-            <div style="color:#aaa;font-size:10px">${dc.provider} · ${dc.city}</div>
-            <div style="margin-top:6px;display:flex;gap:12px">
-              <div><span style="color:#aaa;font-size:10px">GPU</span><br/><span style="color:#fff;font-weight:600">${dc.gpuUtilization.toFixed(0)}%</span></div>
-              <div><span style="color:#aaa;font-size:10px">Latency</span><br/><span style="color:#fff;font-weight:600">${dc.inferenceLatencyP50.toFixed(0)}ms</span></div>
-              <div><span style="color:#aaa;font-size:10px">Carbon</span><br/><span style="color:#4ade80;font-weight:600">${dc.carbonIntensity.toFixed(0)}</span></div>
+        {/* City detail panel */}
+        {selectedCity && (
+          <div style={{
+            width: "clamp(280px,30vw,360px)",
+            background: "rgba(10,10,10,0.97)",
+            borderLeft: "1px solid var(--border)",
+            display: "flex", flexDirection: "column",
+            overflowY: "auto",
+          }}>
+            {/* City header */}
+            <div style={{ padding: "20px 20px 12px", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div>
+                  <div style={{ fontSize:18, fontWeight:800 }}>{selectedCity.city}</div>
+                  <div style={{ fontSize:12, color:"var(--muted)" }}>{selectedCity.country} · {selectedCity.region}</div>
+                </div>
+                <button onClick={() => setSelectedCity(null)} style={{
+                  background:"none", border:"none", color:"var(--muted)",
+                  fontSize:18, cursor:"pointer", padding:4,
+                }}>✕</button>
+              </div>
+              {/* KPI row */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:14 }}>
+                {[
+                  { label:"Total Jobs",    value: fmt(selectedCity.totalJobs) },
+                  { label:"Avg Salary",    value: salaryFmt(selectedCity.avgSalaryUSD) },
+                  { label:"Remote",        value: `${selectedCity.remotePercent}%` },
+                  { label:"YoY Growth",    value: `${selectedCity.growthRate > 0 ? "+" : ""}${selectedCity.growthRate}%`,
+                    accent: selectedCity.growthRate >= 0 ? "#22c55e" : "#ef4444" },
+                ].map(kpi => (
+                  <div key={kpi.label} style={{
+                    padding:"10px 12px", borderRadius:10,
+                    background:"var(--surface)", border:"1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize:10, color:"var(--muted)", marginBottom:2 }}>{kpi.label}</div>
+                    <div style={{ fontSize:16, fontWeight:800, color: kpi.accent ?? "var(--accent)" }}>{kpi.value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>`
-        })
-        .onPointClick((point: any) => {
-          setSelectedDC(point as DataCenter)
-        })
-        // Arcs
-        .arcsData(arcData)
-        .arcStartLat((d: any) => d.srcLat)
-        .arcStartLng((d: any) => d.srcLng)
-        .arcEndLat((d: any) => d.dstLat)
-        .arcEndLng((d: any) => d.dstLng)
-        .arcColor((d: any) => d.color)
-        .arcAltitude(0.2)
-        .arcStroke(0.5)
-        .arcDashLength(0.4)
-        .arcDashGap(0.2)
-        .arcDashAnimateTime(2000)
 
-      // Labels
-      if (showLabels) {
-        globe
-          .labelsData(dataCenters)
-          .labelLat((d: any) => (d as DataCenter).lat)
-          .labelLng((d: any) => (d as DataCenter).lng)
-          .labelText((d: any) => (d as DataCenter).city)
-          .labelSize(0.4)
-          .labelColor(() => "rgba(255,255,255,0.7)")
-          .labelDotRadius(0.3)
-          .labelAltitude(0.02)
-      }
+            {/* Tabs */}
+            <div style={{ display:"flex", borderBottom:"1px solid var(--border)" }}>
+              {(["breakdown","trend"] as const).map(t => (
+                <button key={t} onClick={() => setActiveTab(t)} style={{
+                  flex:1, padding:"10px 8px", fontSize:12, fontWeight:600,
+                  background:"none", border:"none", cursor:"pointer",
+                  borderBottom: activeTab===t ? `2px solid var(--accent)` : "2px solid transparent",
+                  color: activeTab===t ? "var(--accent)" : "var(--muted)",
+                  textTransform:"capitalize",
+                }}>{t === "breakdown" ? "By Category" : "Monthly Trend"}</button>
+              ))}
+            </div>
 
-      globe.pointOfView({ lat: 30, lng: -40, altitude: 2.2 }, 0)
-      globeInstanceRef.current = globe
-      setGlobeReady(true)
+            {/* Tab content */}
+            <div style={{ padding:"16px 12px", flex:1 }}>
+              {activeTab === "breakdown" ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={catBreakdown} layout="vertical" margin={{ left:8, right:8 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" tick={{ fill:"var(--muted)", fontSize:11 }} width={70} />
+                    <Tooltip
+                      formatter={(v) => [fmt(Number(v)), "Jobs"]}
+                      contentStyle={{ background:"#111", border:"1px solid var(--border)", fontSize:12 }}
+                    />
+                    <Bar dataKey="jobs" radius={[0,4,4,0]}>
+                      {catBreakdown.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={trend} margin={{ left:0, right:8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="month" tick={{ fill:"var(--muted)", fontSize:10 }} />
+                    <YAxis tickFormatter={fmt} tick={{ fill:"var(--muted)", fontSize:10 }} />
+                    <Tooltip
+                      formatter={(v) => [fmt(Number(v)), "Listings"]}
+                      contentStyle={{ background:"#111", border:"1px solid var(--border)", fontSize:12 }}
+                    />
+                    <Line type="monotone" dataKey="jobs" stroke="var(--accent)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
 
-      const handleResize = () => {
-        if (globeRef.current && globeInstanceRef.current) {
-          globeInstanceRef.current.width(globeRef.current.clientWidth)
-          globeInstanceRef.current.height(globeRef.current.clientHeight)
-        }
-      }
-      window.addEventListener("resize", handleResize)
-      return () => window.removeEventListener("resize", handleResize)
-    })
-  }, [colorMode, showArcs, showLabels])
-
-  const scrollToDashboard = () => {
-    dashboardRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  return (
-    <>
-      {/* ── GLOBE SECTION ── */}
-      <div
-        style={{
-          position: "relative",
-          height: "100vh",
-          overflow: "hidden",
-          background: "#050d12",
-        }}
-      >
-        {/* Globe canvas */}
-        <div
-          ref={globeRef}
-          style={{ position: "absolute", inset: 0 }}
-        />
-
-        {/* Loading overlay */}
-        {!globeReady && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 5,
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  border: "3px solid rgba(51,204,221,0.2)",
-                  borderTopColor: "#33ccdd",
-                  animation: "spin 0.8s linear infinite",
-                  margin: "0 auto 12px",
-                }}
-              />
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                Initializing globe...
+            {/* Top category badge */}
+            <div style={{ padding:"0 16px 16px" }}>
+              <div style={{
+                padding:"10px 14px", borderRadius:10,
+                background: CATEGORY_COLORS[selectedCity.topCategory] + "18",
+                border: `1px solid ${CATEGORY_COLORS[selectedCity.topCategory]}44`,
+                fontSize:12,
+              }}>
+                <span style={{ color:"var(--muted)" }}>Top category: </span>
+                <span style={{ fontWeight:700, color: CATEGORY_COLORS[selectedCity.topCategory] }}>
+                  {CATEGORY_ICONS[selectedCity.topCategory]} {selectedCity.topCategory}
+                </span>
               </div>
             </div>
           </div>
         )}
+      </div>
 
-        {/* ── Top-left: Header badge ── */}
-        <div style={{ position: "absolute", top: 20, left: 20, zIndex: 10 }}>
-          <Link
-            href="/use-cases"
-            style={{
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 12,
-              textDecoration: "none",
-            }}
-          >
-            ← Use Cases
-          </Link>
-          <div
-            style={{
-              marginTop: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                padding: "3px 10px",
-                borderRadius: 4,
-                background: "rgba(51,204,221,0.15)",
-                color: "#33ccdd",
-                border: "1px solid rgba(51,204,221,0.3)",
-              }}
-            >
-              UC14 · AI INFERENCE GRID
-            </span>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#22c55e",
-                boxShadow: "0 0 8px #22c55e",
-                display: "inline-block",
-              }}
-            />
-            <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700 }}>
-              LIVE SIM
-            </span>
-          </div>
-          <div
-            style={{ marginTop: 6, fontSize: 18, fontWeight: 800, color: "#fff" }}
-          >
-            Global AI Inference Grid
-          </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-            25 GPU clusters · 8 hyperscalers · rotate to explore
-          </div>
-        </div>
-
-        {/* ── Top-right: Layer control panel ── */}
-        <div
-          style={{
-            position: "absolute",
-            top: 20,
-            right: 20,
-            width: 210,
-            zIndex: 10,
-            background: "rgba(5,13,18,0.92)",
-            border: "1px solid rgba(51,204,221,0.25)",
-            borderRadius: 12,
-            padding: "14px 16px",
-            backdropFilter: "blur(12px)",
-          }}
-        >
-          {/* Color mode */}
-          <div
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.4)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 8,
-            }}
-          >
-            Color Mode
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
-            {(["provider", "utilization", "carbon"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setColorMode(mode)}
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: 6,
-                  border: `1px solid ${
-                    colorMode === mode
-                      ? "rgba(51,204,221,0.5)"
-                      : "rgba(255,255,255,0.1)"
-                  }`,
-                  background:
-                    colorMode === mode
-                      ? "rgba(51,204,221,0.12)"
-                      : "transparent",
-                  color:
-                    colorMode === mode
-                      ? "#33ccdd"
-                      : "rgba(255,255,255,0.5)",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  textTransform: "capitalize",
-                }}
-              >
-                {mode === "provider"
-                  ? "Provider"
-                  : mode === "utilization"
-                  ? "Utilization"
-                  : "Carbon Intensity"}
-              </button>
-            ))}
-          </div>
-
-          {/* Toggles */}
-          <div
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.4)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 8,
-            }}
-          >
-            Layers
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-            {[
-              {
-                label: "Request Arcs",
-                value: showArcs,
-                set: setShowArcs,
-              },
-              {
-                label: "City Labels",
-                value: showLabels,
-                set: setShowLabels,
-              },
-            ].map(({ label, value, set }) => (
-              <label
-                key={label}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: "pointer",
-                  fontSize: 11,
-                  color: "rgba(255,255,255,0.6)",
-                }}
-              >
-                <div
-                  onClick={() => set(!value)}
-                  style={{
-                    width: 28,
-                    height: 16,
-                    borderRadius: 8,
-                    background: value
-                      ? "rgba(51,204,221,0.8)"
-                      : "rgba(255,255,255,0.15)",
-                    position: "relative",
-                    cursor: "pointer",
-                    transition: "background 0.2s",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      left: value ? 14 : 2,
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: "#fff",
-                      transition: "left 0.2s",
-                    }}
-                  />
-                </div>
-                {label}
-              </label>
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.4)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 8,
-            }}
-          >
-            Legend
-          </div>
-          {colorMode === "provider" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {Object.entries(PROVIDER_COLORS).map(([name, color]) => (
-                <div
-                  key={name}
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
-                    {name}
-                  </span>
-                </div>
-              ))}
+      {/* ── Global stats strip ── */}
+      <div style={{
+        borderTop:"1px solid var(--border)", borderBottom:"1px solid var(--border)",
+        background:"var(--surface)",
+      }}>
+        <div style={{
+          maxWidth:1280, margin:"0 auto",
+          padding:"clamp(20px,3vw,32px) clamp(16px,4vw,48px)",
+          display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:24,
+        }}>
+          {[
+            { label:"Total Listings",     value: fmt(stats.totalJobs),       sub:"across all cities" },
+            { label:"Cities Tracked",     value: String(stats.totalCities),   sub:"on the live map" },
+            { label:"Fastest Growing",    value: stats.fastestGrowing,        sub:"city by YoY %" },
+            { label:"Most Listings",      value: stats.topCity,               sub:"by total volume" },
+            { label:"Remote Average",     value: `${stats.remoteAvg}%`,       sub:"of listed roles" },
+            { label:"Highest Remote",     value: stats.highestRemote,         sub:"city for remote" },
+          ].map(({ label, value, sub }) => (
+            <div key={label}>
+              <div style={{ fontSize:"clamp(18px,2vw,26px)", fontWeight:900, color:"var(--accent)", lineHeight:1 }}>{value}</div>
+              <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", marginTop:3 }}>{label}</div>
+              <div style={{ fontSize:11, color:"var(--muted)" }}>{sub}</div>
             </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {[
-                { color: "#22c55e", label: colorMode === "utilization" ? "< 70% util" : "< 200 gCO₂" },
-                { color: "#eab308", label: colorMode === "utilization" ? "70–85% util" : "200–400 gCO₂" },
-                { color: "#ef4444", label: colorMode === "utilization" ? "> 85% util" : "> 400 gCO₂" },
-              ].map(({ color, label }) => (
-                <div
-                  key={label}
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
-                    {label}
-                  </span>
-                </div>
-              ))}
+          ))}
+        </div>
+      </div>
+
+      {/* ── Top cities by selected category ── */}
+      <div style={{ maxWidth:1280, margin:"0 auto", padding:"clamp(32px,4vw,56px) clamp(16px,4vw,48px)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:8 }}>
+          <h2 style={{ fontSize:"clamp(18px,2.5vw,26px)", fontWeight:800, margin:0, letterSpacing:"-0.02em" }}>
+            {selectedCategory ? `Top Cities — ${selectedCategory}` : "Top Cities by Total Jobs"}
+          </h2>
+          {selectedCategory && (
+            <div style={{
+              padding:"4px 12px", borderRadius:100, fontSize:12, fontWeight:600,
+              background: CATEGORY_COLORS[selectedCategory] + "22",
+              color: CATEGORY_COLORS[selectedCategory],
+              border: `1px solid ${CATEGORY_COLORS[selectedCategory]}44`,
+            }}>
+              {CATEGORY_ICONS[selectedCategory]} {selectedCategory}
             </div>
           )}
         </div>
 
-        {/* ── Bottom-right: Global stats strip ── */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            right: 20,
-            zIndex: 10,
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-          }}
-        >
-          {[
-            {
-              label: "Total GPUs",
-              value: globalStats.totalGPUs.toLocaleString(),
-              color: "#33ccdd",
-            },
-            {
-              label: "Avg Util",
-              value: `${globalStats.avgUtilization.toFixed(1)}%`,
-              color:
-                globalStats.avgUtilization > 80
-                  ? "#ef4444"
-                  : globalStats.avgUtilization > 65
-                  ? "#eab308"
-                  : "#22c55e",
-            },
-            {
-              label: "Power",
-              value: `${globalStats.totalPowerMW.toFixed(0)} MW`,
-              color: "#f59e0b",
-            },
-            {
-              label: "Avg CO₂",
-              value: `${globalStats.avgCarbonIntensity.toFixed(0)} gCO₂/kWh`,
-              color:
-                globalStats.avgCarbonIntensity < 200
-                  ? "#22c55e"
-                  : globalStats.avgCarbonIntensity < 400
-                  ? "#eab308"
-                  : "#ef4444",
-            },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              style={{
-                background: "rgba(5,13,18,0.85)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                padding: "6px 12px",
-                backdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                minWidth: 170,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "rgba(255,255,255,0.4)",
-                  flex: 1,
-                }}
-              >
-                {stat.label}
-              </span>
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: stat.color,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {stat.value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Bottom-left: Selected DC panel ── */}
-        {selectedDC && (
-          <SelectedDCPanel
-            dc={selectedDC}
-            onClose={() => setSelectedDC(null)}
-            onScrollToDashboard={scrollToDashboard}
-          />
-        )}
-
-        {/* Scroll hint */}
-        <div
-          onClick={scrollToDashboard}
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer",
-            opacity: selectedDC ? 0 : 1,
-            transition: "opacity 0.3s",
-          }}
-        >
-          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
-            scroll for dashboard
-          </span>
-          <span style={{ fontSize: 16, color: "rgba(255,255,255,0.2)", animation: "bounce 2s ease-in-out infinite" }}>
-            ↓
-          </span>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", minWidth:600 }}>
+            <thead>
+              <tr style={{ borderBottom:"1px solid var(--border)" }}>
+                {["#","City","Country","Jobs","Avg Salary","Remote %","YoY Growth","Top Category"].map(h => (
+                  <th key={h} style={{
+                    textAlign:"left", padding:"8px 12px", fontSize:11, fontWeight:700,
+                    color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.05em",
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(selectedCategory
+                ? getTopCitiesByCategory(selectedCategory)
+                : [...getCities()].sort((a, b) => b.totalJobs - a.totalJobs).slice(0, 8)
+              ).map((city, i) => (
+                <tr
+                  key={city.id}
+                  onClick={() => setSelectedCity(city)}
+                  style={{
+                    borderBottom:"1px solid var(--border)",
+                    cursor:"pointer",
+                    background: selectedCity?.id === city.id ? "var(--surface)" : "transparent",
+                    transition:"background 0.15s",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = selectedCity?.id === city.id ? "var(--surface)" : "transparent")}
+                >
+                  <td style={{ padding:"12px 12px", fontSize:12, color:"var(--muted)", fontWeight:700 }}>{i+1}</td>
+                  <td style={{ padding:"12px 12px", fontWeight:700 }}>{city.city}</td>
+                  <td style={{ padding:"12px 12px", fontSize:13, color:"var(--muted)" }}>{city.country}</td>
+                  <td style={{ padding:"12px 12px", fontWeight:700, color:"var(--accent)" }}>
+                    {fmt(selectedCategory ? city.jobsByCategory[selectedCategory] : city.totalJobs)}
+                  </td>
+                  <td style={{ padding:"12px 12px", fontSize:13 }}>{salaryFmt(city.avgSalaryUSD)}</td>
+                  <td style={{ padding:"12px 12px", fontSize:13 }}>{city.remotePercent}%</td>
+                  <td style={{ padding:"12px 12px", fontSize:13, fontWeight:700,
+                    color: city.growthRate >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {city.growthRate > 0 ? "+" : ""}{city.growthRate}%
+                  </td>
+                  <td style={{ padding:"12px 12px" }}>
+                    <span style={{
+                      padding:"3px 8px", borderRadius:6, fontSize:11, fontWeight:600,
+                      background: CATEGORY_COLORS[city.topCategory] + "22",
+                      color: CATEGORY_COLORS[city.topCategory],
+                    }}>
+                      {CATEGORY_ICONS[city.topCategory]} {city.topCategory}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* ── DASHBOARD SECTION ── */}
-      <div
-        ref={dashboardRef}
-        style={{
-          background: "var(--bg)",
-          padding: "clamp(24px, 4vw, 48px) clamp(12px, 3vw, 32px) 64px",
-          maxWidth: 1440,
-          margin: "0 auto",
-        }}
-      >
-        {/* Section header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 32,
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                fontSize: "clamp(20px, 3vw, 28px)",
-                fontWeight: 800,
-                color: "var(--text)",
-                margin: "0 0 6px",
-              }}
-            >
-              Infrastructure Dashboard
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-              25 clusters across 8 hyperscalers · click globe points to select
-            </p>
-          </div>
-          <button
-            onClick={scrollToTop}
-            style={{
-              padding: "8px 18px",
-              borderRadius: 8,
-              background: "transparent",
-              border: "1px solid rgba(51,204,221,0.35)",
-              color: "#33ccdd",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            ↑ Back to Globe
-          </button>
-        </div>
-
-        {/* Top 5 greenest clusters */}
-        <div style={{ marginBottom: 40 }}>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "var(--text)",
-              marginBottom: 14,
-            }}
-          >
-            Top 5 Greenest Clusters
-          </h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {top5Green.map((dc, idx) => {
-              const color = PROVIDER_COLORS[dc.provider] ?? "#aaa"
-              return (
-                <div
-                  key={dc.id}
-                  style={{
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderLeft: `4px solid ${color}`,
-                    borderRadius: 10,
-                    padding: "12px 14px",
-                  }}
+      {/* ── Global category breakdown ── */}
+      <div style={{ background:"var(--surface)", borderTop:"1px solid var(--border)", padding:"clamp(32px,4vw,56px) 0" }}>
+        <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 clamp(16px,4vw,48px)" }}>
+          <h2 style={{ fontSize:"clamp(18px,2.5vw,26px)", fontWeight:800, margin:"0 0 24px", letterSpacing:"-0.02em" }}>
+            Global Job Distribution by Sector
+          </h2>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:24 }}>
+            {/* Bar chart */}
+            <div style={{ background:"var(--bg)", borderRadius:16, border:"1px solid var(--border)", padding:20 }}>
+              <div style={{ fontSize:13, fontWeight:700, marginBottom:16, color:"var(--muted)" }}>Jobs by Sector (all cities)</div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart
+                  data={JOB_CATEGORIES.map(cat => ({
+                    name: cat.replace(" & "," &\n"),
+                    jobs: stats.categoryBreakdown[cat],
+                    color: CATEGORY_COLORS[cat],
+                  })).sort((a,b) => b.jobs - a.jobs)}
+                  layout="vertical"
+                  margin={{ left:12, right:16 }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      marginBottom: 6,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: "rgba(255,255,255,0.25)",
-                      }}
-                    >
-                      #{idx + 1}
-                    </span>
-                    <ProviderBadge provider={dc.provider} />
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "var(--text)",
-                      marginBottom: 2,
-                    }}
-                  >
-                    {dc.city}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--muted)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {dc.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 22,
-                      fontWeight: 800,
-                      color: "#22c55e",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {dc.greenScore}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "var(--muted)",
-                        marginLeft: 2,
-                      }}
-                    >
-                      /100
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--muted)",
-                      marginTop: 4,
-                    }}
-                  >
-                    {dc.carbonIntensity} gCO₂/kWh
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Provider comparison table */}
-        <div style={{ marginBottom: 40 }}>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "var(--text)",
-              marginBottom: 14,
-            }}
-          >
-            Provider Comparison
-          </h3>
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  minWidth: 600,
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      borderBottom: "1px solid var(--border)",
-                      background: "var(--surface-2)",
-                    }}
-                  >
-                    {[
-                      "Provider",
-                      "Clusters",
-                      "Total GPUs",
-                      "Avg Utilization",
-                      "Avg Latency P50",
-                      "Green Score",
-                    ].map((col) => (
-                      <th
-                        key={col}
-                        style={{
-                          padding: "10px 14px",
-                          textAlign: "left",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "var(--muted)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.07em",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {col}
-                      </th>
+                  <XAxis type="number" tickFormatter={fmt} tick={{ fill:"var(--muted)", fontSize:10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fill:"var(--muted)", fontSize:10 }} width={100} />
+                  <Tooltip
+                    formatter={(v) => [fmt(Number(v)), "Jobs"]}
+                    contentStyle={{ background:"#111", border:"1px solid var(--border)", fontSize:12 }}
+                  />
+                  <Bar dataKey="jobs" radius={[0,4,4,0]}>
+                    {JOB_CATEGORIES.map((cat, i) => (
+                      <Cell key={i} fill={CATEGORY_COLORS[cat]} />
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {providerComparison.map((row, idx) => {
-                    const utilColor =
-                      row.avgUtilization > 85
-                        ? "#ef4444"
-                        : row.avgUtilization > 70
-                        ? "#eab308"
-                        : "#22c55e"
-                    return (
-                      <tr
-                        key={row.provider}
-                        style={{
-                          borderBottom:
-                            idx < providerComparison.length - 1
-                              ? "1px solid var(--border)"
-                              : "none",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background =
-                            "var(--surface-2)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <td style={{ padding: "10px 14px" }}>
-                          <ProviderBadge provider={row.provider} />
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 14px",
-                            fontSize: 13,
-                            color: "var(--text)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {row.clusters}
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 14px",
-                            fontSize: 13,
-                            color: "var(--text)",
-                          }}
-                        >
-                          {row.totalGPUs.toLocaleString()}
-                        </td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <div>
-                            <span
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: utilColor,
-                              }}
-                            >
-                              {row.avgUtilization}%
-                            </span>
-                            <div
-                              style={{
-                                height: 4,
-                                borderRadius: 2,
-                                background: "var(--surface-2)",
-                                marginTop: 4,
-                                overflow: "hidden",
-                                width: 80,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  height: "100%",
-                                  width: `${row.avgUtilization}%`,
-                                  background: utilColor,
-                                  borderRadius: 2,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td
-                          style={{
-                            padding: "10px 14px",
-                            fontSize: 13,
-                            color: "var(--text)",
-                            fontFamily: "monospace",
-                          }}
-                        >
-                          {row.avgLatencyP50} ms
-                        </td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <GreenScoreBadge score={row.avgGreenScore} />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Category cards */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, alignContent:"start" }}>
+              {JOB_CATEGORIES.map(cat => {
+                const count = stats.categoryBreakdown[cat]
+                const pct = ((count / stats.totalJobs) * 100).toFixed(1)
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
+                    style={{
+                      padding:"12px 14px", borderRadius:12,
+                      background: selectedCategory === cat ? CATEGORY_COLORS[cat] + "22" : "var(--bg)",
+                      border:`1px solid ${selectedCategory === cat ? CATEGORY_COLORS[cat] : "var(--border)"}`,
+                      textAlign:"left", cursor:"pointer",
+                    }}
+                  >
+                    <div style={{ fontSize:18, marginBottom:4 }}>{CATEGORY_ICONS[cat]}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:"var(--text)", lineHeight:1.3 }}>{cat}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:CATEGORY_COLORS[cat], marginTop:4 }}>{fmt(count)}</div>
+                    <div style={{ fontSize:10, color:"var(--muted)" }}>{pct}% of total</div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
-
-        {/* Cluster health grid */}
-        <div style={{ marginBottom: 40 }}>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "var(--text)",
-              marginBottom: 14,
-            }}
-          >
-            All 25 Clusters
-          </h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 14,
-            }}
-          >
-            {dataCenters.map((dc) => {
-              const providerColor = PROVIDER_COLORS[dc.provider] ?? "#aaa"
-              const utilColor =
-                dc.gpuUtilization > 85
-                  ? "#ef4444"
-                  : dc.gpuUtilization > 70
-                  ? "#eab308"
-                  : "#33ccdd"
-              const isSelected = selectedDC?.id === dc.id
-
-              return (
-                <div
-                  key={dc.id}
-                  onClick={() =>
-                    setSelectedDC((prev) =>
-                      prev?.id === dc.id ? null : dc
-                    )
-                  }
-                  style={{
-                    background: "var(--surface)",
-                    border: `1px solid ${
-                      isSelected ? "rgba(51,204,221,0.6)" : "var(--border)"
-                    }`,
-                    borderLeft: `4px solid ${providerColor}`,
-                    borderRadius: 10,
-                    padding: "14px 16px",
-                    cursor: "pointer",
-                    transition: "border-color 0.15s, box-shadow 0.15s",
-                    boxShadow: isSelected
-                      ? "0 0 0 2px rgba(51,204,221,0.15)"
-                      : "none",
-                  }}
-                >
-                  {/* Header */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 8,
-                      gap: 6,
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "var(--text)",
-                          marginBottom: 2,
-                        }}
-                      >
-                        {dc.city}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontFamily: "monospace",
-                          color: "var(--muted)",
-                        }}
-                      >
-                        {dc.name}
-                      </div>
-                    </div>
-                    <StatusBadge status={dc.status} />
-                  </div>
-
-                  {/* GPU util */}
-                  <div style={{ marginBottom: 10 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: 4,
-                      }}
-                    >
-                      <span style={{ fontSize: 10, color: "var(--muted)" }}>
-                        GPU Utilization
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 20,
-                          fontWeight: 800,
-                          color: utilColor,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {dc.gpuUtilization}%
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        height: 5,
-                        borderRadius: 3,
-                        background: "var(--surface-2)",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${dc.gpuUtilization}%`,
-                          background: utilColor,
-                          borderRadius: 3,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Metrics row */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr 1fr",
-                      gap: 6,
-                      marginBottom: 10,
-                    }}
-                  >
-                    {[
-                      {
-                        label: "Power",
-                        value: `${dc.powerDrawMW}MW`,
-                        color: "#f59e0b",
-                      },
-                      {
-                        label: "Carbon",
-                        value: `${dc.carbonIntensity}`,
-                        color:
-                          dc.carbonIntensity > 400
-                            ? "#ef4444"
-                            : dc.carbonIntensity > 200
-                            ? "#eab308"
-                            : "#22c55e",
-                      },
-                      {
-                        label: "P50",
-                        value: `${dc.inferenceLatencyP50}ms`,
-                        color: "var(--text)",
-                      },
-                    ].map((m) => (
-                      <div key={m.label} style={{ textAlign: "center" }}>
-                        <div
-                          style={{
-                            fontSize: 9,
-                            color: "var(--muted)",
-                            marginBottom: 2,
-                          }}
-                        >
-                          {m.label}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: m.color,
-                          }}
-                        >
-                          {m.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer badges */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <ProviderBadge provider={dc.provider} />
-                    <GreenScoreBadge score={dc.greenScore} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Details link */}
-        <div style={{ textAlign: "center" }}>
-          <Link
-            href="/uc14/details"
-            style={{
-              display: "inline-block",
-              background: "transparent",
-              color: "var(--accent)",
-              border: "1px solid rgba(51,204,221,0.4)",
-              borderRadius: 8,
-              padding: "10px 28px",
-              fontSize: 13,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            View Architecture Details →
-          </Link>
-        </div>
       </div>
 
+      {/* maplibre-gl CSS */}
       <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(6px); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.85); }
-        }
+        .maplibregl-canvas { display: block; }
+        .maplibregl-ctrl-bottom-right { bottom: 12px; right: 12px; }
+        .maplibregl-ctrl-group { background: rgba(20,20,20,0.9) !important; border: 1px solid var(--border) !important; }
+        .maplibregl-ctrl-group button { background: transparent !important; color: var(--muted) !important; }
+        .maplibregl-ctrl-group button:hover { background: var(--surface) !important; }
       `}</style>
-    </>
+    </div>
   )
 }
