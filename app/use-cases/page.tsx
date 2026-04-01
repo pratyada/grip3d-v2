@@ -43,7 +43,7 @@ export default function UseCasesPage() {
           Explore all globe scenarios.
         </h1>
         <p className="text-lg" style={{ color: "var(--muted)" }}>
-          Ten industry-specific interactive demos. Filter by category or search by tag.
+          Industry-specific interactive globe demos. Filter by category or search by tag.
         </p>
 
         {/* Search */}
