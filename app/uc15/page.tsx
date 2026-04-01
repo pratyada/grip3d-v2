@@ -82,7 +82,7 @@ function getGeneration(noradId: number): GenKey {
 function propagateSat(satrec: any, satLib: any, now: Date): { lat: number; lng: number; alt: number; vel: number } | null {
   try {
     const pv = satLib.propagate(satrec, now)
-    // satellite.js v7: sgp4 returns null on propagation error
+    // satellite.js v5: position is `false` on decay; v7 returns null
     if (!pv || typeof pv !== "object") return null
     const posEci = pv.position
     if (!posEci || typeof posEci !== "object") return null
