@@ -1,4 +1,17 @@
+import type { Metadata } from "next"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "Integration & APIs — GRIP 3D",
+  description:
+    "Connect GRIP 3D to your stack: OSS/BSS, NMS, GIS, CRM, live telemetry streams, and partner APIs. White-label globe embeds, REST and WebSocket data feeds, and enterprise platform integration.",
+  openGraph: {
+    title: "GRIP 3D Integration & Partner APIs",
+    description:
+      "Plug your data into the globe: live telemetry, OSS, NMS, GIS, CRM integrations. White-label embed options and REST/WebSocket APIs for enterprise teams.",
+    siteName: "GRIP 3D",
+  },
+}
 
 const platformCards = [
   {

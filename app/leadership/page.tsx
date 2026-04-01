@@ -1,7 +1,20 @@
+import type { Metadata } from "next"
 import Image from "next/image"
 import { leaders } from "@/lib/data"
 import type { Leader } from "@/lib/data"
 import OpportunityForm from "./OpportunityForm"
+
+export const metadata: Metadata = {
+  title: "Leadership Team — GRIP 3D",
+  description:
+    "Meet the GRIP 3D leadership team: CVO, CTO, C3DO, Program Director, and CDO — builders of the world's leading interactive 3D globe intelligence platform.",
+  openGraph: {
+    title: "GRIP 3D Leadership Team",
+    description:
+      "The team behind GRIP 3D: vision, engineering, 3D data strategy, program execution, and UI/UX design driving the next generation of operational intelligence.",
+    siteName: "GRIP 3D",
+  },
+}
 
 function LeaderCard({ leader }: { leader: Leader }) {
   if (leader.isSpecial) {

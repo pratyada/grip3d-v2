@@ -1,4 +1,17 @@
+import type { Metadata } from "next"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "UC14 Architecture — Global AI Inference Grid — GRIP 3D",
+  description:
+    "Architecture deep-dive: 4-layer AI inference stack, carbon-aware routing algorithm, 25 GPU cluster fleet (AWS, Azure, GCP, CoreWeave, Lambda, Together, Groq, Cerebras), green compute scoring, and real-time utilization data sources.",
+  openGraph: {
+    title: "Global AI Inference Grid Architecture — GRIP 3D UC14",
+    description:
+      "How GRIP 3D visualizes 25 global GPU clusters: carbon-aware routing, PUE/MW power draw, P50/P90/P99 latency, and green compute scoring across 8 hyperscalers.",
+    siteName: "GRIP 3D",
+  },
+}
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,18 @@
+import type { Metadata } from "next"
 import Image from "next/image"
 import ContactForm from "./ContactForm"
+
+export const metadata: Metadata = {
+  title: "Contact Us — GRIP 3D",
+  description:
+    "Get in touch with the GRIP 3D team. We design and deploy custom 3D globe applications for telcos, logistics, governments, and tech teams. White-label embeds, data integration, and full platform consulting.",
+  openGraph: {
+    title: "Contact GRIP 3D — Custom Globe Platform Consulting",
+    description:
+      "Talk to us about white-label globe embeds, data integration, or full platform consulting. Reach out at connect@grip3d.com.",
+    siteName: "GRIP 3D",
+  },
+}
 
 export default function ContactPage() {
   return (

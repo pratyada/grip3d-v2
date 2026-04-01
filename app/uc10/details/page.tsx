@@ -1,4 +1,17 @@
+import type { Metadata } from "next"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "UC10 Architecture — NTN E2E Service Assurance — GRIP 3D",
+  description:
+    "Deep-dive into the 4-domain NTN architecture: Kuiper LEO fleet, 5 Canadian ground stations (ACU/Beacon/Signal Analyzer/BPMS), 18 3GPP RAN KPIs, EPC Core, and the RTPM C/C++ → PostgreSQL → Grafana micro KPI pipeline with decentralized mesh replication.",
+  openGraph: {
+    title: "NTN E2E Service Assurance Architecture — GRIP 3D UC10",
+    description:
+      "Technical architecture: Kuiper LEO satellites, 5-site Canadian ground station mesh, 18 eNB 3GPP KPIs, EPC Core domains, and real-time 1-min RTPM pipeline.",
+    siteName: "GRIP 3D",
+  },
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
