@@ -322,7 +322,7 @@ export const leaders: Leader[] = [
   {
     name: "Bill Robbins",
     role: "CVO",
-    image: "/img/leader-bill.png",
+    image: "/img/leader-bill.jpg",
     bio: "Driving vision, strategic direction, partnerships, and long-range positioning for GRIP 3D.",
     tags: ["Vision", "Strategy", "Growth"],
   },
