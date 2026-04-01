@@ -67,18 +67,15 @@ export function Navbar() {
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Link href="/" className="flex items-center shrink-0">
             <Image
               src="/img/grip3d-logo-trans-128.png"
               alt="GRIP 3D"
-              width={36}
-              height={36}
+              width={40}
+              height={40}
               unoptimized
               className="rounded"
             />
-            <span className="font-bold text-lg tracking-tight" style={{ color: "var(--text)" }}>
-              GRIP 3D
-            </span>
           </Link>
 
           {/* Desktop links */}
