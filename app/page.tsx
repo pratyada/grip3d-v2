@@ -1,12 +1,42 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { ConsultingForm } from "@/components/ConsultingForm"
-import { FocusRail, type FocusRailItem } from "@/components/ui/focus-rail"
 import { useCases } from "@/lib/data"
 import ScrollExpandMedia from "@/components/ui/scroll-expansion-hero"
-import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect"
 import { GridBeam } from "@/components/ui/background-grid-beam"
+
+// Lazy-load the WebGL shader effect — keeps Three.js out of the initial JS bundle
+const CanvasRevealEffect = dynamic(
+  () => import("@/components/ui/canvas-reveal-effect").then((m) => ({ default: m.CanvasRevealEffect })),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-black" />,
+  }
+)
+
+// Lazy-load the 3D carousel so framer-motion animations don't block first paint
+const FocusRail = dynamic(
+  () => import("@/components/ui/focus-rail").then((m) => ({ default: m.FocusRail })),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{ height: 600, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "var(--muted)", fontSize: 14 }}>Loading demos…</span>
+      </div>
+    ),
+  }
+)
+
+type FocusRailItem = {
+  id: string | number
+  title: string
+  description?: string
+  imageSrc: string
+  href?: string
+  meta?: string
+}
 
 const railItems: FocusRailItem[] = useCases
   .filter((uc) => uc.status === "live")

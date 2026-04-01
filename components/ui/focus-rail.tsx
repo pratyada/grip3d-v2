@@ -132,6 +132,7 @@ export function FocusRail({
             <img
               src={activeItem.imageSrc}
               alt=""
+              loading="lazy"
               className="h-full w-full object-cover blur-3xl saturate-200"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-transparent" />
@@ -191,6 +192,7 @@ export function FocusRail({
                 <img
                   src={item.imageSrc}
                   alt={item.title}
+                  loading={isCenter ? "eager" : "lazy"}
                   className="h-full w-full rounded-2xl object-cover pointer-events-none"
                 />
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />

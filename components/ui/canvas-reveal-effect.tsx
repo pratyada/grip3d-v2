@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
@@ -18,11 +18,17 @@ interface ShaderProps {
 const ShaderMaterial = ({ source, uniforms }: { source: string; uniforms: Uniforms }) => {
   const { size } = useThree();
   const ref = useRef<any>(null);
+  const lastFrameTime = useRef(0);
+  // Cap at 20 FPS on mobile to save battery — full 60fps on desktop
+  const fpsLimit = useRef(typeof window !== "undefined" && window.innerWidth < 768 ? 1 / 20 : 1 / 60);
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
+    const elapsed = clock.getElapsedTime();
+    if (elapsed - lastFrameTime.current < fpsLimit.current) return;
+    lastFrameTime.current = elapsed;
     const material = ref.current.material as THREE.ShaderMaterial & { uniforms: Record<string, THREE.IUniform> };
-    material.uniforms.u_time.value = clock.getElapsedTime();
+    material.uniforms.u_time.value = elapsed;
   });
 
   const material = useMemo(() => {
@@ -170,13 +176,30 @@ export const CanvasRevealEffect = ({
   dotSize?: number;
   opacities?: number[];
   containerClassName?: string;
-}) => (
-  <div className={cn("h-full relative w-full", containerClassName)}>
-    <div className="h-full w-full">
-      <DotMatrix colors={colors} dotSize={dotSize} opacities={opacities} center={["x", "y"]} />
+}) => {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  return (
+    <div className={cn("h-full relative w-full", containerClassName)}>
+      <div className="h-full w-full">
+        {reducedMotion ? (
+          // Static fallback for reduced-motion / accessibility
+          <div className="absolute inset-0 bg-black" />
+        ) : (
+          <DotMatrix colors={colors} dotSize={dotSize} opacities={opacities} center={["x", "y"]} />
+        )}
+      </div>
+      {/* Radial fade: dark center so the video/text stands out */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.4)_60%,transparent_100%)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
     </div>
-    {/* Radial fade: dark center so the video/text stands out */}
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.4)_60%,transparent_100%)]" />
-    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
-  </div>
-);
+  );
+};

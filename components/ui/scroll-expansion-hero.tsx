@@ -75,6 +75,9 @@ const ScrollExpandMedia = ({
 
     const handleTouchMove = (e: Event) => {
       if (!touchStartY) return;
+      // Don't intercept touches on the sticky navbar — let hamburger menu work
+      const target = (e as any).target as Element | null;
+      if (target?.closest?.('header')) return;
       const te = e as unknown as { touches: { clientY: number }[]; preventDefault: () => void };
       const touchY = te.touches[0].clientY;
       const deltaY = touchStartY - touchY;
@@ -191,7 +194,7 @@ const ScrollExpandMedia = ({
                       muted
                       loop
                       playsInline
-                      preload="auto"
+                      preload="metadata"
                       className="w-full h-full object-cover rounded-2xl"
                       controls={false}
                     />
