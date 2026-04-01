@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useCases } from "@/lib/data"
+import { VERSION_STRING, RELEASE_DATE_LABEL, RELEASE_LABEL } from "@/lib/version"
 
 const liveUseCases = useCases.filter((uc) => uc.status === "live")
 const col1 = liveUseCases.slice(0, Math.ceil(liveUseCases.length / 2))
@@ -118,10 +119,40 @@ export function Footer() {
         className="border-t"
         style={{ borderColor: "var(--border)" }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs" style={{ color: "var(--muted)" }}>
             © 2026 GRIP 3D
           </p>
+
+          {/* Version badge — center */}
+          <div
+            className="flex items-center gap-2"
+            title={RELEASE_LABEL}
+            style={{
+              padding: "3px 10px",
+              borderRadius: 100,
+              background: "var(--accent-dim)",
+              border: "1px solid rgba(51,204,221,0.2)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <span style={{
+              fontSize: 11,
+              fontWeight: 800,
+              fontFamily: "monospace",
+              color: "var(--accent)",
+              letterSpacing: "0.04em",
+            }}>
+              {VERSION_STRING}
+            </span>
+            <span style={{ color: "var(--border)", fontSize: 10 }}>·</span>
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>
+              {RELEASE_DATE_LABEL}
+            </span>
+          </div>
+
           <p className="text-xs" style={{ color: "var(--muted)" }}>
             Built for partners • APIs available
           </p>
