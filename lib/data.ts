@@ -316,6 +316,32 @@ export const useCases: UseCase[] = [
     demoUrl: "/uc14",
     detailsUrl: "/uc14/details",
   },
+  {
+    id: "UC15",
+    slug: "uc15",
+    title: "Starlinks Spacemap",
+    category: "telecom",
+    image: "/img/tile-15.jpg",
+    emoji: "🛰️",
+    tags: ["Starlink", "Satellites", "TLE", "SGP4", "Orbital", "Real-time", "WebGL", "SpaceX"],
+    description:
+      "Real-time tracking of 6,000+ Starlink satellites on a WebGL globe — live TLE orbital data, SGP4 propagation, orbital shell filters, and ground track visualization.",
+    longDescription:
+      "The complete Starlink mega-constellation tracked in real time. Live Two-Line Element (TLE) data from CelesTrak feeds satellite.js SGP4 propagation, computing geodetic positions for every active Starlink satellite every 5 seconds. Rendered on a globe.gl WebGL globe with NASA Earth-Night texture, orbital shell color coding, generation filters, and 90-minute animated ground tracks.",
+    highlights: [
+      "6,000+ Starlink satellites tracked in real time via CelesTrak TLE feed",
+      "SGP4/SDP4 orbital propagation using satellite.js — positions updated every 5 s",
+      "5 orbital shells color-coded: 53°, 53.2°, 70°, 97.6°, 43° inclination",
+      "Click any satellite for altitude, velocity, inclination, and orbital period",
+      "90-minute animated ground track with dashed orbital path",
+      "Generation filter: Gen 1 (v1.0), Gen 1.5, Gen 2 Mini",
+      "globe.gl WebGL rendering — NASA Earth Night texture, topology bump map",
+    ],
+    status: "live",
+    featured: true,
+    demoUrl: "/uc15",
+    detailsUrl: "/uc15/details",
+  },
 ]
 
 export const leaders: Leader[] = [

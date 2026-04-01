@@ -15,7 +15,7 @@
 
 export const VERSION = {
   major: 1,
-  minor: 4,
+  minor: 5,
   patch: 0,
 } as const
 
@@ -23,18 +23,21 @@ export const VERSION = {
 export const VERSION_STRING = `v${VERSION.major}.${VERSION.minor}.${VERSION.patch}`
 
 /** ISO date of the release (YYYY-MM-DD) */
-export const RELEASE_DATE = "2026-04-01"
+export const RELEASE_DATE = "2026-04-02"
 
 /** Short human-readable date, e.g. "1 Apr 2026" */
 export const RELEASE_DATE_LABEL = new Date(RELEASE_DATE + "T00:00:00")
   .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 
 /** One-liner describing what this release contains */
-export const RELEASE_LABEL = "UC14 World Job Market globe · mobile perf · per-page meta"
+export const RELEASE_LABEL = "UC15 Starlinks Spacemap · real-time TLE · SGP4 · WebGL globe"
 
 // =============================================================================
 // CHANGELOG
 // =============================================================================
+// v1.5.0  2026-04-02  UC15 Starlinks Spacemap — live CelesTrak TLE feed,
+//                     satellite.js SGP4 propagation, 6000+ satellites on
+//                     globe.gl WebGL globe, orbital shell filters, ground tracks
 // v1.4.0  2026-04-01  UC14 World Job Market — globe.gl 3D globe, 52 cities,
 //                     10 sectors, MapLibre replaced; per-page OG meta tags;
 //                     mobile hamburger fix; lazy-load WebGL; logo-only navbar
