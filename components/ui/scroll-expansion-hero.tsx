@@ -1,6 +1,6 @@
 'use client';
 
-import {
+import React, {
   useEffect,
   useRef,
   useState,
@@ -13,7 +13,8 @@ interface ScrollExpandMediaProps {
   mediaType?: 'video' | 'image';
   mediaSrc: string;
   posterSrc?: string;
-  bgImageSrc: string;
+  bgImageSrc?: string;           // now optional
+  bgComponent?: React.ReactNode; // NEW — renders instead of bgImageSrc when provided
   title?: string;
   date?: string;
   scrollToExpand?: string;
@@ -26,6 +27,7 @@ const ScrollExpandMedia = ({
   mediaSrc,
   posterSrc,
   bgImageSrc,
+  bgComponent,
   title,
   date,
   scrollToExpand,
@@ -143,20 +145,28 @@ const ScrollExpandMedia = ({
           <motion.div
             className="absolute inset-0 z-0 h-full"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 - scrollProgress }}
+            animate={{ opacity: bgComponent ? 1 : 1 - scrollProgress }}
             transition={{ duration: 0.1 }}
           >
-            <Image
-              src={bgImageSrc}
-              alt="Background"
-              width={1920}
-              height={1080}
-              className="w-screen h-screen"
-              style={{ objectFit: 'cover', objectPosition: 'center' }}
-              priority
-              unoptimized
-            />
-            <div className="absolute inset-0 bg-black/40" />
+            {bgComponent ? (
+              <div className="absolute inset-0">{bgComponent}</div>
+            ) : bgImageSrc ? (
+              <>
+                <Image
+                  src={bgImageSrc}
+                  alt="Background"
+                  width={1920}
+                  height={1080}
+                  className="w-screen h-screen"
+                  style={{ objectFit: 'cover', objectPosition: 'center' }}
+                  priority
+                  unoptimized
+                />
+                <div className="absolute inset-0 bg-black/40" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-black" />
+            )}
           </motion.div>
 
           <div className="container mx-auto flex flex-col items-center justify-start relative z-10">
