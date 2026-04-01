@@ -122,6 +122,7 @@ export default function UC15Page() {
   const satLib      = useRef<any>(null)        // satellite.js module
   const parsedSats  = useRef<ParsedSat[]>([])  // stable parsed satrecs
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const filteredRef = useRef<SatPoint[]>([])   // always-current filtered list
 
   const [status,     setStatus]     = useState<StatusT>("loading")
   const [errorMsg,   setErrorMsg]   = useState("")
@@ -272,14 +273,14 @@ export default function UC15Page() {
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .atmosphereColor("#33ccdd")
         .atmosphereAltitude(0.15)
-        .pointOfView({ lat: 20, lng: 0, altitude: 2.2 })
+        .pointOfView({ lat: 20, lng: 0, altitude: 2.0 })
         // Points — satellites
-        .pointsData([])
+        .pointsData(filteredRef.current)   // apply any data already ready
         .pointLat("lat")
         .pointLng("lng")
         .pointAltitude((d: any) => d.alt / 6371)
         .pointColor("color")
-        .pointRadius(0.18)
+        .pointRadius(0.25)
         .pointsMerge(false)
         .onPointClick((pt: any) => setSelected(pt))
         .onPointHover((pt: any) => {
@@ -312,10 +313,12 @@ export default function UC15Page() {
     }
   }, [status])
 
-  // ── Update globe points when filtered set changes ─────────────────────────
+  // ── Keep filteredRef current & push to globe whenever filtered changes ─────
   useEffect(() => {
-    if (!globeInst.current) return
-    globeInst.current.pointsData(filtered)
+    filteredRef.current = filtered
+    if (globeInst.current) {
+      globeInst.current.pointsData(filtered)
+    }
   }, [filtered])
 
   // ── Update ground track when selection changes ───────────────────────────
