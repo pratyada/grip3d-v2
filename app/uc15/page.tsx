@@ -140,6 +140,68 @@ function buildGroundTrack(satrec: any, satLib: any, now: Date) {
   return points
 }
 
+// ── Three.js satellite particle helpers ──────────────────────────────────────
+
+// Draw a 2D satellite icon on a canvas — body + solar wings + glow
+function makeSatTexture(THREE: any): any {
+  const sz = 64
+  const cv = document.createElement("canvas")
+  cv.width = cv.height = sz
+  const ctx = cv.getContext("2d")!
+  const cx = sz / 2
+  // outer glow
+  const grd = ctx.createRadialGradient(cx, cx, 0, cx, cx, sz / 2)
+  grd.addColorStop(0,   "rgba(255,255,255,0.9)")
+  grd.addColorStop(0.25,"rgba(255,255,255,0.6)")
+  grd.addColorStop(0.55,"rgba(255,255,255,0.15)")
+  grd.addColorStop(1,   "rgba(255,255,255,0)")
+  ctx.fillStyle = grd
+  ctx.fillRect(0, 0, sz, sz)
+  // satellite body
+  ctx.fillStyle = "rgba(255,255,255,1)"
+  ctx.fillRect(cx - 3, cx - 3, 6, 6)
+  // solar panels (left & right wings)
+  ctx.fillStyle = "rgba(255,255,255,0.85)"
+  ctx.fillRect(cx - 16, cx - 1.5, 11, 3)  // left
+  ctx.fillRect(cx + 5,  cx - 1.5, 11, 3)  // right
+  // antenna stub (top)
+  ctx.fillRect(cx - 0.5, cx - 8, 1, 5)
+  return new THREE.CanvasTexture(cv)
+}
+
+// Globe radius in Three.js space (three-globe constant)
+const GLOBE_R = 100
+
+function latLngAltToXYZ(lat: number, lng: number, altKm: number): [number, number, number] {
+  const r   = GLOBE_R * (1 + altKm / 6371)
+  const phi = (90 - lat)  * (Math.PI / 180)
+  const th  = (lng + 180) * (Math.PI / 180)
+  return [
+    -r * Math.sin(phi) * Math.cos(th),
+     r * Math.cos(phi),
+     r * Math.sin(phi) * Math.sin(th),
+  ]
+}
+
+function updateSatBuffer(data: SatPoint[], THREE: any, points: any) {
+  if (!points) return
+  const n = data.length
+  const pos  = new Float32Array(n * 3)
+  const cols = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) {
+    const d = data[i]
+    const [x, y, z] = latLngAltToXYZ(d.lat, d.lng, d.alt)
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z
+    const c = new THREE.Color(d.color)
+    cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b
+  }
+  const geo = points.geometry
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,  3))
+  geo.setAttribute("color",    new THREE.BufferAttribute(cols, 3))
+  geo.setDrawRange(0, n)
+  geo.computeBoundingSphere()
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 type StatusT = "loading" | "propagating" | "ready" | "error"
@@ -147,10 +209,13 @@ type StatusT = "loading" | "propagating" | "ready" | "error"
 export default function UC15Page() {
   const globeRef    = useRef<HTMLDivElement>(null)
   const globeInst   = useRef<any>(null)
-  const satLib      = useRef<any>(null)        // satellite.js module
-  const parsedSats  = useRef<ParsedSat[]>([])  // stable parsed satrecs
+  const satLib      = useRef<any>(null)
+  const parsedSats  = useRef<ParsedSat[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const filteredRef = useRef<SatPoint[]>([])   // always-current filtered list
+  const filteredRef = useRef<SatPoint[]>([])
+  const satPointsRef= useRef<any>(null)   // THREE.Points particle system
+  const threeRef    = useRef<any>(null)   // THREE module
+  const blinkRef    = useRef<number>(0)   // blink animation frame
 
   const [status,     setStatus]     = useState<StatusT>("loading")
   const [errorMsg,   setErrorMsg]   = useState("")
@@ -282,14 +347,17 @@ export default function UC15Page() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [status, propagateAll])
 
-  // ── Init globe.gl ─────────────────────────────────────────────────────────
+  // ── Init globe.gl + Three.js satellite particle system ────────────────────
   useEffect(() => {
     if (status !== "ready" || !globeRef.current || globeInst.current) return
     let globe: any
+    let animId: number
 
-    import("globe.gl").then(mod => {
+    Promise.all([import("globe.gl"), import("three")]).then(([globeMod, THREE]) => {
       if (!globeRef.current) return
-      const GlobeGL = (mod.default ?? mod) as any
+      threeRef.current = THREE
+
+      const GlobeGL = (globeMod.default ?? globeMod) as any
       globe = new GlobeGL()
 
       globe(globeRef.current)
@@ -301,26 +369,14 @@ export default function UC15Page() {
         .atmosphereColor("#33ccdd")
         .atmosphereAltitude(0.15)
         .pointOfView({ lat: 20, lng: 0, altitude: 2.0 })
-        // Points — satellites
-        .pointsData(filteredRef.current)   // apply any data already ready
-        .pointLat("lat")
-        .pointLng("lng")
-        .pointAltitude((d: any) => d.alt / 6371)
-        .pointColor("color")
-        .pointRadius(0.25)
-        .pointsMerge(false)
-        .onPointClick((pt: any) => setSelected(pt))
-        .onPointHover((pt: any) => {
-          if (globeRef.current) globeRef.current.style.cursor = pt ? "pointer" : "default"
-        })
-        // Paths — ground track
+        // Paths — ground track only (no pointsData — we use Three.js particles)
         .pathsData([])
         .pathPoints((d: any) => d.points)
         .pathPointLat((p: any) => p.lat)
         .pathPointLng((p: any) => p.lng)
         .pathPointAlt((p: any) => p.alt)
         .pathColor((d: any) => d.color)
-        .pathStroke(1.2)
+        .pathStroke(1.5)
         .pathDashLength(0.4)
         .pathDashGap(0.2)
         .pathDashAnimateTime(8000)
@@ -332,19 +388,86 @@ export default function UC15Page() {
       ctrl.dampingFactor = 0.1
 
       globeInst.current = globe
+
+      // ── Build satellite particle system ────────────────────────────────────
+      const satTexture = makeSatTexture(THREE)
+      const geo = new THREE.BufferGeometry()
+      const mat = new THREE.PointsMaterial({
+        size: 5,
+        map: satTexture,
+        vertexColors: true,
+        transparent: true,
+        alphaTest: 0.01,
+        sizeAttenuation: false,
+        depthWrite: false,
+      })
+      const satPoints = new THREE.Points(geo, mat)
+      satPoints.renderOrder = 999
+      globe.scene().add(satPoints)
+      satPointsRef.current = satPoints
+
+      // Populate with current data
+      updateSatBuffer(filteredRef.current, THREE, satPoints)
+
+      // ── Blinking animation — pulse the opacity ─────────────────────────────
+      let t = 0
+      const blink = () => {
+        animId = requestAnimationFrame(blink)
+        t += 0.05
+        mat.opacity = 0.65 + 0.35 * Math.abs(Math.sin(t))
+        mat.needsUpdate = true
+      }
+      animId = requestAnimationFrame(blink)
+      blinkRef.current = animId
+
+      // ── Click → raycast into particle system ──────────────────────────────
+      const canvas = globeRef.current!
+      const onCanvasClick = (e: MouseEvent) => {
+        if (!satPointsRef.current) return
+        const rect = canvas.getBoundingClientRect()
+        const mouse = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+          -((e.clientY - rect.top)  / rect.height) *  2 + 1
+        )
+        const raycaster = new THREE.Raycaster()
+        raycaster.params.Points = { threshold: 2.5 }
+        raycaster.setFromCamera(mouse, globe.camera())
+        const hits = raycaster.intersectObject(satPointsRef.current)
+        if (hits.length > 0 && hits[0].index != null) {
+          const sat = filteredRef.current[hits[0].index]
+          if (sat) {
+            setSelected(sat)
+            setIsSpinning(false)
+            globe.pointOfView({ lat: sat.lat, lng: sat.lng, altitude: 1.8 }, 700)
+          }
+        }
+      }
+      canvas.addEventListener("click", onCanvasClick)
+      // store cleanup ref on element
+      ;(canvas as any)._satClick = onCanvasClick
     })
 
     return () => {
+      cancelAnimationFrame(animId)
+      const canvas = globeRef.current
+      if (canvas && (canvas as any)._satClick) {
+        canvas.removeEventListener("click", (canvas as any)._satClick)
+      }
+      if (satPointsRef.current) {
+        satPointsRef.current.geometry.dispose()
+        satPointsRef.current.material.dispose()
+        satPointsRef.current = null
+      }
       globe?.controls()?.dispose?.()
       globeInst.current = null
     }
   }, [status])
 
-  // ── Keep filteredRef current & push to globe whenever filtered changes ─────
+  // ── Keep filteredRef current & update Three.js buffer ─────────────────────
   useEffect(() => {
     filteredRef.current = filtered
-    if (globeInst.current) {
-      globeInst.current.pointsData(filtered)
+    if (satPointsRef.current && threeRef.current) {
+      updateSatBuffer(filtered, threeRef.current, satPointsRef.current)
     }
   }, [filtered])
 
@@ -360,8 +483,6 @@ export default function UC15Page() {
       points: pts,
       color: [selected.color + "cc", selected.color + "22"],
     }])
-    // Fly to satellite
-    globeInst.current.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: 1.8 }, 800)
   }, [selected, showTrack])
 
   // ── Spin toggle ──────────────────────────────────────────────────────────
