@@ -50,6 +50,7 @@ export default function UC14Page() {
   const [selectedCity, setSelectedCity] = useState<CityJobData | null>(null)
   const [activeTab, setActiveTab] = useState<"breakdown" | "trend">("breakdown")
   const [globeReady, setGlobeReady] = useState(false)
+  const [isSpinning, setIsSpinning] = useState(true)
 
   const stats = getGlobalStats()
 
@@ -74,8 +75,8 @@ export default function UC14Page() {
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .atmosphereColor("#33ccdd")
         .atmosphereAltitude(0.18)
-        // ── Initial view ──
-        .pointOfView({ lat: 25, lng: 10, altitude: 2.0 })
+        // ── Initial view (altitude ~1.5 ≈ zoom 8-9, fills the viewport) ──
+        .pointOfView({ lat: 25, lng: 10, altitude: 1.5 })
         // ── Ring glow for emphasis ──
         .ringsData(getCities().slice(0, 8).map(c => ({
           lat: c.lat, lng: c.lng,
@@ -137,6 +138,12 @@ export default function UC14Page() {
       .pointColor("color")
   }, [selectedCategory, globeReady])
 
+  // ── Spin toggle ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeInstance.current) return
+    globeInstance.current.controls().autoRotate = isSpinning && !selectedCity
+  }, [isSpinning, selectedCity])
+
   // ── Stop auto-rotate when city is selected ────────────────────────────────
   useEffect(() => {
     if (!globeInstance.current) return
@@ -148,9 +155,9 @@ export default function UC14Page() {
         800
       )
     } else {
-      ctrl.autoRotate = true
+      ctrl.autoRotate = isSpinning
     }
-  }, [selectedCity])
+  }, [selectedCity, isSpinning])
 
   const catBreakdown = selectedCity
     ? JOB_CATEGORIES.map(cat => ({
@@ -187,6 +194,23 @@ export default function UC14Page() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Spin toggle */}
+          <button
+            onClick={() => setIsSpinning(v => !v)}
+            title={isSpinning ? "Stop rotation" : "Start rotation"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+              cursor: "pointer",
+              background: isSpinning ? "rgba(51,204,221,0.12)" : "var(--surface)",
+              color: isSpinning ? "var(--accent)" : "var(--muted)",
+              border: `1px solid ${isSpinning ? "var(--accent)" : "var(--border)"}`,
+              transition: "all 0.2s",
+            }}
+          >
+            <span style={{ fontSize: 14 }}>{isSpinning ? "⏸" : "▶"}</span>
+            {isSpinning ? "Stop" : "Spin"}
+          </button>
           <Link href="/uc14/details" style={{
             fontSize: 12, fontWeight: 600, color: "var(--accent)",
             border: "1px solid var(--accent)", borderRadius: 8,
