@@ -106,6 +106,7 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           display: "flex",
           alignItems: "center",
           gap: "8px",
+          width: "max-content",
           minWidth: "900px",
           padding: "16px",
           background: "var(--surface)",
@@ -270,13 +271,13 @@ export function E2EFlowDiagram({ pass, kpis }: E2EFlowDiagramProps) {
           </div>
 
           {/* Arrow */}
-          <Arrow label1="Internet" />
+          <Arrow label1="SGi / Gi" label2="Breakout" />
 
-          {/* 11. Web / Internet */}
+          {/* 11. Internet / iPerf */}
           <div style={blockStyle("PASS")}>
             <div style={blockIcon("🖥️")}>🖥️</div>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>Internet</div>
-            <div style={{ fontSize: "9px", color: "var(--muted)" }}>DPI · Content</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>Internet/iPerf</div>
+            <div style={{ fontSize: "9px", color: "var(--muted)" }}>DPI · iPerf3 · Content</div>
             <div style={{
               fontSize: "9px",
               padding: "2px 6px",
