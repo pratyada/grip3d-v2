@@ -292,6 +292,30 @@ export const useCases: UseCase[] = [
     demoUrl: "/demo/uc13/index.html",
     detailsUrl: "/demo/uc13/details/index.html",
   },
+  {
+    id: "UC14",
+    slug: "uc14",
+    title: "Global AI Inference Grid",
+    category: "ai-compute",
+    image: "/img/tile-01.jpg",
+    emoji: "🧠",
+    tags: ["AI", "GPU Clusters", "Inference", "Data Centers", "Carbon", "Latency"],
+    description: "25 GPU clusters, 8 hyperscalers, live utilization, carbon intensity, and inference latency on a single globe.",
+    longDescription: "Visualize the world's AI compute infrastructure in real-time. GPU cluster utilization, inference request routing, power draw, PUE, and carbon intensity across 25 hyperscaler data centers — built for ML platform teams and enterprise AI buyers.",
+    highlights: [
+      "25 global GPU clusters across AWS, Azure, GCP, CoreWeave, Lambda, Together, Groq, Cerebras",
+      "Real-time GPU utilization % and cluster health scoring",
+      "Inference latency by region — P50/P90/P99 in milliseconds",
+      "Power draw (MW) and PUE per data center",
+      "Carbon intensity (gCO2/kWh) with green compute scoring",
+      "Request routing simulation: nearest-lowest-carbon cluster selection",
+      "Model availability map: which clusters run which frontier models",
+    ],
+    status: "live",
+    featured: true,
+    demoUrl: "/uc14",
+    detailsUrl: "/uc14/details",
+  },
 ]
 
 export const leaders: Leader[] = [
@@ -344,6 +368,7 @@ export function getCategoryLabel(cat: string): string {
   const overrides: Record<string, string> = {
     "telecom": "Telecom / NTN",
     "human-civilization": "Human Civilization",
+    "ai-compute": "AI / Compute",
   }
   return overrides[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1).replace(/-/g, " ")
 }
