@@ -71,8 +71,8 @@ export function Navbar() {
             <Image
               src="/img/grip3d-logo-trans-128.png"
               alt="GRIP 3D"
-              width={56}
-              height={56}
+              width={72}
+              height={72}
               unoptimized
               className="rounded"
             />
