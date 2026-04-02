@@ -84,6 +84,13 @@ async function queryHorizons(nowISO: string, stopISO: string) {
   const vy = parseFloat(cols[6])
   const vz = parseFloat(cols[7])
   if (isNaN(x)) return null
+
+  // Sanity check: Orion must be within Earth-Moon system (< 700 000 km from Earth).
+  // If Horizons matched a wrong catalogue entry (asteroid etc.) the distance will be
+  // millions of km — we reject it and fall through to MET interpolation.
+  const dist = Math.sqrt(x*x + y*y + z*z)
+  if (dist > 700_000) return null
+
   return { x, y, z, vx, vy, vz }
 }
 
@@ -120,21 +127,14 @@ export async function GET() {
   }
 
   // ── Fallback: physics-based MET interpolation ──────────────────────────────
+  // Do NOT return x/y/z here — the page will use the trajectory spline (which is
+  // aligned to the real Moon position from Horizons) for visual placement.
+  // We only supply distEarth + velKms for the telemetry panel.
   const { distEarth, velKms, phase } = interpolateMet(elapsedH)
-
-  // Place craft on outbound/return vector: use Moon direction for outbound, opposite for return
-  // Simplified: put craft along X axis at interpolated distance, scaled by mission arc
-  const isReturn = elapsedH > 96
-  const sign     = isReturn ? -1 : 1
-  const moonDir  = { x: sign, y: 0.1, z: 0.05 }  // approximate Earth→Moon direction
-  const mag      = Math.sqrt(moonDir.x**2 + moonDir.y**2 + moonDir.z**2)
-  const x = (moonDir.x / mag) * distEarth
-  const y = (moonDir.y / mag) * distEarth
-  const z = (moonDir.z / mag) * distEarth
 
   return new Response(JSON.stringify({
     source: "interpolated",
-    x, y, z, vx: 0, vy: 0, vz: 0,
+    x: null, y: null, z: null,
     distEarth, velKms,
     elapsedH,
     phase,

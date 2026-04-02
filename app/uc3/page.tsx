@@ -40,7 +40,7 @@ const CRAFT_RADIUS = 1.8                            // visual size in scene (int
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MoonPos   { x: number; y: number; z: number; distKm: number; fallback?: boolean }
-interface OrionPos  { x: number; y: number; z: number; distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string }
+interface OrionPos  { x: number | null; y: number | null; z: number | null; distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string }
 interface NewsItem  { title: string; description: string; date: string; thumb: string }
 
 // ── Trajectory helpers ────────────────────────────────────────────────────────
@@ -448,28 +448,64 @@ export default function UC3Page() {
         const liveOrion = sceneRef.current?.orionPos
         const trajPts2  = sceneRef.current?.trajPts
 
-        if (liveOrion && (liveOrion.x !== 0 || liveOrion.y !== 0 || liveOrion.z !== 0)) {
-          // Real position from NASA Horizons or MET interpolation API
+        // Use real Horizons x/y/z ONLY when source is "horizons" and coordinates are present.
+        // Interpolated data omits x/y/z (null) so the trajectory spline is used instead —
+        // spline IS aligned to the real Moon position so the craft stays in the correct corridor.
+        const useRealPos = liveOrion?.source === "horizons" && liveOrion.x != null && liveOrion.y != null
+
+        if (useRealPos) {
           craftMesh.position.set(
             liveOrion.x / KM_PER_UNIT,
             liveOrion.y / KM_PER_UNIT,
             liveOrion.z / KM_PER_UNIT,
           )
-          const moonScPos = moonMesh.position
-          const dM = craftMesh.position.distanceTo(moonScPos) * KM_PER_UNIT
+          const dM = craftMesh.position.distanceTo(moonMesh.position) * KM_PER_UNIT
           setDistMoon(dM)
         } else if (trajPts2 && trajPts2.length > 0) {
-          // Trajectory preview animation (pre-launch or no API data)
+          // Trajectory spline: for MET interpolation use distEarth to pick the spline index,
+          // for pre-launch loop the full path for preview
           const totalH   = PHASES[PHASES.length - 1].hoursFromL
           const elapsedH = (Date.now() - LAUNCH_DATE.getTime()) / 3_600_000
-          const t        = elapsedH < 0 ? (frame % 600) / 600 : Math.min(1, elapsedH / totalH)
-          const idx      = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
+          let t: number
+          if (elapsedH < 0) {
+            t = (frame % 600) / 600  // preview loop
+          } else if (liveOrion?.distEarth) {
+            // Pin to trajectory point whose Earth distance matches MET estimate
+            const moonDistKm = moonMesh.position.length() * KM_PER_UNIT
+            // Outbound: t in [0, 0.5], return: [0.5, 1]
+            const isReturn = elapsedH > 96
+            const halfPts  = Math.floor(trajPts2.length / 2)
+            if (!isReturn) {
+              // Find outbound point closest in Earth distance
+              let best = 0, bestDiff = Infinity
+              for (let i = 0; i < halfPts; i++) {
+                const p = trajPts2[i]
+                const d = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT
+                const diff = Math.abs(d - liveOrion.distEarth)
+                if (diff < bestDiff) { bestDiff = diff; best = i }
+              }
+              t = best / (trajPts2.length - 1)
+            } else {
+              // Return half
+              let best = halfPts, bestDiff = Infinity
+              for (let i = halfPts; i < trajPts2.length; i++) {
+                const p = trajPts2[i]
+                const d = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT
+                const diff = Math.abs(d - liveOrion.distEarth)
+                if (diff < bestDiff) { bestDiff = diff; best = i }
+              }
+              t = best / (trajPts2.length - 1)
+            }
+          } else {
+            t = Math.min(1, elapsedH / totalH)
+          }
+
+          const idx = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
           craftMesh.position.copy(trajPts2[idx])
 
           const p = craftMesh.position
-          const moonScPos = moonMesh.position
           setDistEarth(Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT)
-          setDistMoon(p.distanceTo(moonScPos) * KM_PER_UNIT)
+          setDistMoon(p.distanceTo(moonMesh.position) * KM_PER_UNIT)
         }
 
         // Camera orbit
