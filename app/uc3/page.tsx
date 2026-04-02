@@ -117,8 +117,11 @@ export default function UC3Page() {
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [distMoon,  setDistMoon]  = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
-  const [dataSource, setDataSource] = useState("interpolated")
-  const [showNews,  setShowNews]  = useState(false)
+  const [dataSource,   setDataSource]   = useState("interpolated")
+  const [showNews,     setShowNews]     = useState(false)
+  const [activePanel,  setActivePanel]  = useState<string | null>(null)
+
+  const togglePanel = (id: string) => setActivePanel(p => p === id ? null : id)
 
   // ── Fetch moon position ───────────────────────────────────────────────────
   useEffect(() => {
@@ -541,122 +544,158 @@ export default function UC3Page() {
 
   const currentPhase = PHASES[phase]
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Icon button helper ─────────────────────────────────────────────────────
+  const iconBtn = (id: string, icon: string, label: string, activeColor: string) => (
+    <button
+      key={id}
+      onClick={() => togglePanel(id)}
+      title={label}
+      className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all select-none"
+      style={{
+        width: 44, height: 44,
+        background:  activePanel === id ? `${activeColor}30` : "rgba(0,5,20,0.85)",
+        border:      activePanel === id ? `1.5px solid ${activeColor}` : "1px solid rgba(255,255,255,0.14)",
+        backdropFilter: "blur(10px)",
+        boxShadow: activePanel === id ? `0 0 10px ${activeColor}40` : "none",
+      }}
+    >
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
+    </button>
+  )
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full" style={{ height: "calc(100vh - 64px)", background: "#000008" }}>
 
       {/* Three.js canvas mount */}
       <div ref={mountRef} className="absolute inset-0" />
 
-      {/* Top header bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2"
-        style={{ background: "rgba(0,0,10,0.75)", borderBottom: "1px solid rgba(255,150,50,0.3)" }}>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🚀</span>
+      {/* ── Compact top bar ────────────────────────────────────────────────── */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2"
+        style={{ background: "rgba(0,0,10,0.80)", borderBottom: "1px solid rgba(255,150,50,0.25)" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🚀</span>
           <div>
-            <div className="text-sm font-bold tracking-widest text-orange-300">ARTEMIS II</div>
-            <div className="text-xs text-gray-400">NASA Lunar Flyby Mission · Orion MPCV</div>
+            <div className="text-xs font-bold tracking-widest text-orange-300">ARTEMIS II</div>
+            <div className="text-xs text-gray-500 hidden sm:block">NASA Lunar Flyby · Orion MPCV</div>
           </div>
         </div>
 
-        {/* Mission status badge */}
+        {/* Mission status — compact */}
         {!launched ? (
-          <div className="flex flex-col items-end gap-0.5">
+          <div className="flex flex-col items-center gap-0.5">
             <div className="text-xs font-mono text-orange-400 bg-orange-900/30 border border-orange-600/40 px-2 py-0.5 rounded">
               PRE-LAUNCH
             </div>
-            <div className="text-xs font-mono text-yellow-300 tabular-nums">{countdown}</div>
+            <div className="text-xs font-mono text-yellow-300 tabular-nums hidden sm:block">{countdown}</div>
           </div>
         ) : (
-          <div className="flex flex-col items-end gap-0.5">
+          <div className="flex flex-col items-center gap-0.5">
             <div className="text-xs font-mono text-green-400 bg-green-900/30 border border-green-600/40 px-2 py-0.5 rounded">
               MISSION ACTIVE
             </div>
-            <div className="text-xs text-gray-400">MET: {Math.floor(missionT)}h {Math.floor((missionT % 1) * 60)}m</div>
+            <div className="text-xs text-gray-400 tabular-nums">MET {Math.floor(missionT)}h {Math.floor((missionT % 1) * 60)}m</div>
           </div>
         )}
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowNews(v => !v)}
-            className="text-xs px-3 py-1 rounded border border-blue-500/50 text-blue-300 hover:bg-blue-900/30 transition-colors"
-          >
-            {showNews ? "Hide News" : "NASA News"}
-          </button>
-          <Link href="/" className="text-xs px-3 py-1 rounded border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">
-            ← Home
-          </Link>
-        </div>
+        <Link href="/uc3/details"
+          className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors hidden sm:block">
+          Details →
+        </Link>
       </div>
 
-      {/* Data source indicator */}
+      {/* ── Data source pill (only when live) ─────────────────────────────── */}
       {launched && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide"
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full text-xs font-semibold tracking-wide whitespace-nowrap"
           style={{
             background: dataSource === "horizons" ? "rgba(0,80,0,0.85)" : "rgba(80,60,0,0.85)",
-            border: `1px solid ${dataSource === "horizons" ? "rgba(0,255,100,0.4)" : "rgba(255,200,0,0.4)"}`,
+            border: `1px solid ${dataSource === "horizons" ? "rgba(0,255,100,0.35)" : "rgba(255,200,0,0.35)"}`,
             color: dataSource === "horizons" ? "#86efac" : "#fde68a",
           }}>
-          {dataSource === "horizons"
-            ? "✓ LIVE — NASA JPL Horizons real-time Orion trajectory"
-            : "~ MET INTERPOLATION — Mission-elapsed-time estimate (Horizons data pending)"}
+          {dataSource === "horizons" ? "✓ JPL Horizons — Live" : "~ MET interpolation"}
         </div>
       )}
 
-      {/* Left panel — crew + mission info */}
-      <div className="absolute left-3 top-16 z-10 flex flex-col gap-2" style={{ width: 230 }}>
+      {/* ── LEFT icon toolbar ─────────────────────────────────────────────── */}
+      <div className="absolute left-3 z-20 flex flex-col gap-2" style={{ top: launched ? 72 : 56 }}>
+        {iconBtn("phase",     "🎯", "Mission Phase",   "#f97316")}
+        {iconBtn("telemetry", "📡", "Orion Telemetry", "#3b82f6")}
+        {iconBtn("crew",      "👨‍🚀", "Crew",            "#22c55e")}
+      </div>
 
-        {/* Current phase */}
-        <div className="rounded-lg p-3" style={{ background: "rgba(0,5,20,0.85)", border: "1px solid rgba(255,140,0,0.3)" }}>
-          <div className="text-xs text-orange-400 font-semibold mb-1 tracking-widest">MISSION PHASE</div>
+      {/* ── RIGHT icon toolbar ────────────────────────────────────────────── */}
+      <div className="absolute right-3 z-20 flex flex-col gap-2" style={{ top: launched ? 72 : 56 }}>
+        {iconBtn("timeline", "📅", "Mission Timeline", "#a855f7")}
+        {iconBtn("facts",    "ℹ️",  "Mission Facts",    "#eab308")}
+        {iconBtn("news",     "📰", "NASA News",        "#60a5fa")}
+      </div>
+
+      {/* ── PANELS — shown only when their icon is active ─────────────────── */}
+
+      {/* Mission Phase panel */}
+      {activePanel === "phase" && (
+        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
+          style={{ top: launched ? 72 : 56, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,140,0,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-orange-400 font-semibold tracking-widest">MISSION PHASE</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
           <div className="text-sm font-bold text-white mb-1">{currentPhase.label}</div>
-          <div className="text-xs text-gray-400 leading-snug">{currentPhase.desc}</div>
-          {/* Phase progress dots */}
-          <div className="flex gap-1 mt-2 flex-wrap">
+          <div className="text-xs text-gray-400 leading-snug mb-2">{currentPhase.desc}</div>
+          <div className="flex gap-1 flex-wrap">
             {PHASES.map((p, i) => (
               <div key={i} className="w-2 h-2 rounded-full transition-colors"
                 style={{ background: i <= phase ? "#f97316" : "#334" }} title={p.label} />
             ))}
           </div>
         </div>
+      )}
 
-        {/* Telemetry */}
-        <div className="rounded-lg p-3" style={{ background: "rgba(0,5,20,0.85)", border: "1px solid rgba(50,150,255,0.3)" }}>
-          <div className="text-xs text-blue-400 font-semibold mb-2 tracking-widest">ORION TELEMETRY</div>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Dist. Earth</span>
-              <span className="text-white font-mono tabular-nums">{fmt(distEarth, "km")}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Dist. Moon</span>
-              <span className="text-white font-mono tabular-nums">{fmt(distMoon, "km")}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Velocity</span>
-              <span className="text-white font-mono tabular-nums">{velKms != null ? `${velKms} km/s` : "—"}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Moon dist.</span>
-              <span className="text-white font-mono tabular-nums">{moonData ? `${Math.round(moonData.distKm).toLocaleString()} km` : "—"}</span>
-            </div>
+      {/* Telemetry panel */}
+      {activePanel === "telemetry" && (
+        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
+          style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(50,150,255,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-blue-400 font-semibold tracking-widest">ORION TELEMETRY</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: "Dist. Earth", val: fmt(distEarth, "km") },
+              { label: "Dist. Moon",  val: fmt(distMoon, "km") },
+              { label: "Velocity",    val: velKms != null ? `${velKms} km/s` : "—" },
+              { label: "Moon–Earth",  val: moonData ? `${Math.round(moonData.distKm).toLocaleString()} km` : "—" },
+            ].map(m => (
+              <div key={m.label} className="flex justify-between items-center text-xs rounded px-2 py-1.5"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span className="text-gray-400">{m.label}</span>
+                <span className="text-white font-mono tabular-nums">{m.val}</span>
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Crew */}
-        <div className="rounded-lg p-3" style={{ background: "rgba(0,5,20,0.85)", border: "1px solid rgba(100,200,100,0.25)" }}>
-          <div className="text-xs text-green-400 font-semibold mb-2 tracking-widest">CREW — 4 ASTRONAUTS</div>
-          <div className="space-y-2">
+      {/* Crew panel */}
+      {activePanel === "crew" && (
+        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
+          style={{ top: launched ? 164 : 148, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(100,200,100,0.3)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-green-400 font-semibold tracking-widest">CREW — 4 ASTRONAUTS</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="space-y-1.5">
             {CREW.map(c => (
               <div key={c.name}
-                className="cursor-pointer rounded p-1.5 transition-colors hover:bg-white/5"
+                className="cursor-pointer rounded-lg p-2 transition-colors"
+                style={{ background: selected === c.name ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
                 onClick={() => setSelected(selected === c.name ? null : c.name)}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base">{c.flag}</span>
-                  <div>
-                    <div className="text-xs font-semibold text-white">{c.name}</div>
-                    <div className="text-xs text-gray-400">{c.role} · {c.agency}</div>
+                  <span className="text-base leading-none">{c.flag}</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white truncate">{c.name}</div>
+                    <div className="text-xs text-gray-500">{c.role} · {c.agency}</div>
                   </div>
                 </div>
                 {selected === c.name && (
@@ -666,125 +705,107 @@ export default function UC3Page() {
             ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Right panel — timeline */}
-      <div className="absolute right-3 top-16 z-10" style={{ width: 210 }}>
-        <div className="rounded-lg p-3" style={{ background: "rgba(0,5,20,0.85)", border: "1px solid rgba(180,100,255,0.3)" }}>
-          <div className="text-xs text-purple-400 font-semibold mb-2 tracking-widest">MISSION TIMELINE</div>
+      {/* Mission Timeline panel */}
+      {activePanel === "timeline" && (
+        <div className="absolute right-14 z-10 w-60 rounded-xl p-3"
+          style={{ top: launched ? 72 : 56, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(180,100,255,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-purple-400 font-semibold tracking-widest">TIMELINE</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
           <div className="space-y-2">
             {PHASES.map((p, i) => (
               <div key={i} className="flex gap-2 items-start">
                 <div className="mt-0.5 w-2 h-2 rounded-full flex-shrink-0"
                   style={{ background: i < phase ? "#86efac" : i === phase ? "#fb923c" : "#334" }} />
                 <div>
-                  <div className="text-xs font-semibold" style={{ color: i === phase ? "#fb923c" : i < phase ? "#86efac" : "#888" }}>
+                  <div className="text-xs font-semibold" style={{ color: i === phase ? "#fb923c" : i < phase ? "#86efac" : "#666" }}>
                     {p.label}
                   </div>
-                  <div className="text-xs text-gray-500">L+{p.hoursFromL < 1 ? `${p.hoursFromL * 60}min` : `${p.hoursFromL}h`}</div>
+                  <div className="text-xs text-gray-600">L+{p.hoursFromL < 1 ? `${p.hoursFromL * 60}min` : `${p.hoursFromL}h`}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
 
-        {/* Mission facts */}
-        <div className="rounded-lg p-3 mt-2" style={{ background: "rgba(0,5,20,0.85)", border: "1px solid rgba(255,200,50,0.25)" }}>
-          <div className="text-xs text-yellow-400 font-semibold mb-2 tracking-widest">MISSION FACTS</div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Vehicle</span>
-              <span className="text-white">SLS Block 1</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Spacecraft</span>
-              <span className="text-white">Orion MPCV</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Launch pad</span>
-              <span className="text-white">LC-39B, KSC</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Duration</span>
-              <span className="text-white">~10 days</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Closest Moon</span>
-              <span className="text-white">~8,900 km</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Trajectory</span>
-              <span className="text-white">Free-return</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Splashdown</span>
-              <span className="text-white">Pacific Ocean</span>
-            </div>
+      {/* Mission Facts panel */}
+      {activePanel === "facts" && (
+        <div className="absolute right-14 z-10 w-60 rounded-xl p-3"
+          style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,200,50,0.3)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-yellow-400 font-semibold tracking-widest">MISSION FACTS</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
-        </div>
-      </div>
-
-      {/* Bottom legend */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-4 text-xs text-gray-400 px-4 py-2 rounded-lg"
-        style={{ background: "rgba(0,5,20,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-blue-400 opacity-70" /> Earth
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-gray-400 opacity-70" /> Moon
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-yellow-400 opacity-70" /> Orion
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-0.5 bg-orange-400 opacity-70" style={{ width: 12 }} /> Trajectory
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-orange-600" /> KSC
-        </div>
-        <span className="text-gray-600">|</span>
-        <span>Drag to rotate · Scroll to zoom</span>
-      </div>
-
-      {/* NASA News drawer */}
-      {showNews && (
-        <div className="absolute inset-y-14 right-0 z-20 overflow-y-auto"
-          style={{ width: 340, background: "rgba(0,5,25,0.97)", borderLeft: "1px solid rgba(100,150,255,0.2)" }}>
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-sm font-bold text-blue-300">NASA Artemis II — Latest</div>
-              <button onClick={() => setShowNews(false)} className="text-gray-400 hover:text-white">✕</button>
-            </div>
-            {news.length === 0 && (
-              <div className="text-xs text-gray-500">Loading NASA imagery…</div>
-            )}
-            <div className="space-y-4">
-              {news.map((item, i) => (
-                <div key={i} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
-                  {item.thumb && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.thumb} alt={item.title} className="w-full h-32 object-cover" loading="lazy" />
-                  )}
-                  <div className="p-2">
-                    <div className="text-xs font-semibold text-white leading-snug mb-1">{item.title}</div>
-                    {item.date && <div className="text-xs text-gray-500 mb-1">{item.date}</div>}
-                    <div className="text-xs text-gray-400 leading-snug line-clamp-3">
-                      {item.description?.slice(0, 160)}{item.description?.length > 160 ? "…" : ""}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 text-xs text-gray-600 text-center">
-              Source: NASA Image and Video Library
-            </div>
+          <div className="space-y-1.5 text-xs">
+            {[
+              ["Vehicle",       "SLS Block 1"],
+              ["Spacecraft",    "Orion MPCV"],
+              ["Launch pad",    "LC-39B, KSC"],
+              ["Duration",      "~10 days"],
+              ["Closest Moon",  "~8,900 km"],
+              ["Trajectory",    "Free-return"],
+              ["Splashdown",    "Pacific Ocean"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between rounded px-2 py-1"
+                style={{ background: "rgba(255,255,255,0.03)" }}>
+                <span className="text-gray-400">{k}</span>
+                <span className="text-white font-medium">{v}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Data source attribution */}
-      <div className="absolute bottom-3 right-3 z-10 text-xs text-gray-600">
-        Orion: {dataSource === "horizons" ? "NASA JPL Horizons -1032" : "MET interpolation"} · Moon: JPL Horizons · News: NASA Images
+      {/* NASA News drawer */}
+      {activePanel === "news" && (
+        <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
+          style={{ top: launched ? 164 : 148, maxHeight: "calc(100vh - 220px)", background: "rgba(0,5,25,0.96)", border: "1px solid rgba(100,150,255,0.25)", backdropFilter: "blur(14px)" }}>
+          <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="text-xs font-bold text-blue-300 tracking-wide">NASA ARTEMIS II — LATEST</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="overflow-y-auto p-3 space-y-3" style={{ maxHeight: "calc(100vh - 280px)" }}>
+            {news.length === 0 && (
+              <div className="text-xs text-gray-500">Loading NASA imagery…</div>
+            )}
+            {news.map((item, i) => (
+              <div key={i} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
+                {item.thumb && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.thumb} alt={item.title} className="w-full h-28 object-cover" loading="lazy" />
+                )}
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-white leading-snug mb-0.5">{item.title}</div>
+                  {item.date && <div className="text-xs text-gray-600 mb-1">{item.date}</div>}
+                  <div className="text-xs text-gray-400 leading-snug line-clamp-3">
+                    {item.description?.slice(0, 140)}{item.description?.length > 140 ? "…" : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="text-xs text-gray-600 text-center pt-1">NASA Image and Video Library</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom legend bar ─────────────────────────────────────────────── */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-400 px-4 py-2 rounded-lg"
+        style={{ background: "rgba(0,5,20,0.75)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 opacity-70 inline-block" /> Earth</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-400 opacity-70 inline-block" /> Moon</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-400 opacity-70 inline-block" /> Orion</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-orange-400 opacity-70" style={{ width: 12 }} /> Trajectory</span>
+        <span className="text-gray-600 hidden sm:inline">|</span>
+        <span className="hidden sm:inline">Drag · Scroll to zoom</span>
+      </div>
+
+      {/* ── Attribution ───────────────────────────────────────────────────── */}
+      <div className="absolute bottom-3 right-3 z-10 text-xs text-gray-700 hidden sm:block">
+        {dataSource === "horizons" ? "JPL Horizons -1032" : "MET interp."} · Moon: JPL · News: NASA
       </div>
     </div>
   )
