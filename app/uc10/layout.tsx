@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     description:
       "Monitor 60 LEO satellite passes across 4 network domains — Satellite, Ground Station, RAN, and Core — with live KPI scoring and RTPM micro KPI charts.",
     siteName: "GRIP 3D",
+    images: [{ url: "/img/tile-10.jpg", width: 1200, height: 630 }],
   },
 }
 

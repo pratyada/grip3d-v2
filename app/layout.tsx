@@ -11,9 +11,17 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://test.grip3d.com")
+  ),
   title: "GRIP 3D — Interactive Globe Platform",
   description:
     "Layer-first interactive 3D globe platform: NTN satellite service assurance, maritime tracking, world job market, AI inference grid, weather, demographics, earthquakes, energy, radio and more — real-time 3D for enterprise teams.",
+  openGraph: {
+    siteName: "GRIP 3D",
+    type: "website",
+  },
   icons: {
     icon: [
       { url: "/img/favicon-grip3d-16.png", sizes: "16x16" },

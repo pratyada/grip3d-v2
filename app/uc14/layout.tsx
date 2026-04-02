@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     description:
       "50+ cities · 10 sectors · live job listings on an interactive map. Filter by Technology, Healthcare, Finance and more. Click any city for hiring trends and salary data.",
     siteName: "GRIP 3D",
+    images: [{ url: "/img/tile-14.jpg", width: 1200, height: 630 }],
   },
 }
 
