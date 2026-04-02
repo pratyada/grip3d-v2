@@ -197,11 +197,15 @@ function latLngAltToXYZ(lat: number, lng: number, altKm: number): [number, numbe
   ]
 }
 
+// Pixel size per altitude band — LEO is closest & most dangerous so largest
+const BAND_PX: Record<AltBandKey, number> = { leo: 6, meo: 4, geo: 3, deep: 2 }
+
 function updateDebrisBuffer(data: DebrisPoint[], THREE: any, points: any) {
   if (!points) return
-  const n    = data.length
-  const pos  = new Float32Array(n * 3)
-  const cols = new Float32Array(n * 3)
+  const n     = data.length
+  const pos   = new Float32Array(n * 3)
+  const cols  = new Float32Array(n * 3)
+  const sizes = new Float32Array(n)
   for (let i = 0; i < n; i++) {
     const d        = data[i]
     const [x, y, z] = latLngAltToXYZ(d.lat, d.lng, d.alt)
@@ -212,10 +216,12 @@ function updateDebrisBuffer(data: DebrisPoint[], THREE: any, points: any) {
     cols[i * 3]     = c.r
     cols[i * 3 + 1] = c.g
     cols[i * 3 + 2] = c.b
+    sizes[i]        = BAND_PX[d.altBand]
   }
   const geo = points.geometry
-  geo.setAttribute("position", new THREE.BufferAttribute(pos,  3))
-  geo.setAttribute("color",    new THREE.BufferAttribute(cols, 3))
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,   3))
+  geo.setAttribute("color",    new THREE.BufferAttribute(cols,  3))
+  geo.setAttribute("aSize",    new THREE.BufferAttribute(sizes, 1))
   geo.setDrawRange(0, n)
   geo.computeBoundingSphere()
 }
@@ -389,17 +395,36 @@ export default function UC16Page() {
 
       globeInst.current = globe
 
-      // ── Particle system ───────────────────────────────────────────────────
+      // ── Particle system (ShaderMaterial for per-point size) ──────────────
       const debrisTexture = makeDebrisTexture(THREE)
       const geo = new THREE.BufferGeometry()
-      const mat = new THREE.PointsMaterial({
-        size:            4,
-        map:             debrisTexture,
-        vertexColors:    true,
-        transparent:     true,
-        alphaTest:       0.01,
-        sizeAttenuation: false,
-        depthWrite:      false,
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture: { value: debrisTexture },
+          uOpacity: { value: 1.0 },
+        },
+        vertexShader: `
+          attribute vec3 color;
+          attribute float aSize;
+          varying vec3 vColor;
+          void main() {
+            vColor = color;
+            gl_PointSize = aSize;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D uTexture;
+          uniform float uOpacity;
+          varying vec3 vColor;
+          void main() {
+            vec4 tex = texture2D(uTexture, gl_PointCoord);
+            if (tex.a < 0.01) discard;
+            gl_FragColor = vec4(vColor * tex.rgb, tex.a * uOpacity);
+          }
+        `,
+        transparent: true,
+        depthWrite:  false,
       })
       const debrisPoints = new THREE.Points(geo, mat)
       debrisPoints.renderOrder = 999
@@ -414,8 +439,7 @@ export default function UC16Page() {
       const pulse = () => {
         animId = requestAnimationFrame(pulse)
         t += 0.04
-        mat.opacity    = 0.45 + 0.55 * Math.abs(Math.sin(t))
-        mat.needsUpdate = true
+        mat.uniforms.uOpacity.value = 0.45 + 0.55 * Math.abs(Math.sin(t))
       }
       animId = requestAnimationFrame(pulse)
 
@@ -453,7 +477,9 @@ export default function UC16Page() {
       }
       if (debrisPointsRef.current) {
         debrisPointsRef.current.geometry?.dispose?.()
-        debrisPointsRef.current.material?.dispose?.()
+        const m = debrisPointsRef.current.material
+        m?.uniforms?.uTexture?.value?.dispose?.()
+        m?.dispose?.()
         debrisPointsRef.current = null
       }
       if (orbitLineRef.current) {
