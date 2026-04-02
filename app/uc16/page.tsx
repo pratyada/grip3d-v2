@@ -189,11 +189,11 @@ const GLOBE_R = 100
 function latLngAltToXYZ(lat: number, lng: number, altKm: number): [number, number, number] {
   const r   = GLOBE_R * (1 + altKm / 6371)
   const phi = (90 - lat)  * (Math.PI / 180)
-  const th  = (lng + 180) * (Math.PI / 180)
+  const theta = (90 - lng) * (Math.PI / 180)
   return [
-    -r * Math.sin(phi) * Math.cos(th),
+     r * Math.sin(phi) * Math.cos(theta),
      r * Math.cos(phi),
-     r * Math.sin(phi) * Math.sin(th),
+     r * Math.sin(phi) * Math.sin(theta),
   ]
 }
 
