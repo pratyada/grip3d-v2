@@ -15,7 +15,7 @@
 
 export const VERSION = {
   major: 1,
-  minor: 5,
+  minor: 6,
   patch: 0,
 } as const
 
@@ -23,18 +23,21 @@ export const VERSION = {
 export const VERSION_STRING = `v${VERSION.major}.${VERSION.minor}.${VERSION.patch}`
 
 /** ISO date of the release (YYYY-MM-DD) */
-export const RELEASE_DATE = "2026-04-02"
+export const RELEASE_DATE = "2026-04-03"
 
 /** Short human-readable date, e.g. "1 Apr 2026" */
 export const RELEASE_DATE_LABEL = new Date(RELEASE_DATE + "T00:00:00")
   .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 
 /** One-liner describing what this release contains */
-export const RELEASE_LABEL = "UC15 Starlinks Spacemap · real-time TLE · SGP4 · WebGL globe"
+export const RELEASE_LABEL = "UC16 Space Debris Tracker · CelesTrak multi-group TLE · SGP4 · WebGL globe"
 
 // =============================================================================
 // CHANGELOG
 // =============================================================================
+// v1.6.0  2026-04-03  UC16 Space Debris Tracker — CelesTrak 3-group TLE feed,
+//                     Cosmos 2251 + FenYun-1C + Iridium 33 debris clouds,
+//                     SGP4 propagation, origin + altitude-band filters
 // v1.5.0  2026-04-02  UC15 Starlinks Spacemap — live CelesTrak TLE feed,
 //                     satellite.js SGP4 propagation, 6000+ satellites on
 //                     globe.gl WebGL globe, orbital shell filters, ground tracks

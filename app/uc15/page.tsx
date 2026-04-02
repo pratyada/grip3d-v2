@@ -435,13 +435,14 @@ export default function UC15Page() {
         canvas.removeEventListener("click", (canvas as any)._satClick)
       }
       if (satPointsRef.current) {
-        satPointsRef.current.geometry.dispose()
-        satPointsRef.current.material.dispose()
+        satPointsRef.current.geometry?.dispose?.()
+        satPointsRef.current.material?.dispose?.()
         satPointsRef.current = null
       }
       if (orbitLineRef.current) {
-        orbitLineRef.current.traverse((c: any) => {
-          c.geometry?.dispose(); c.material?.dispose()
+        globeInst.current?.scene?.().remove(orbitLineRef.current)
+        orbitLineRef.current.traverse?.((c: any) => {
+          c.geometry?.dispose?.(); c.material?.dispose?.()
         })
         orbitLineRef.current = null
       }
@@ -467,8 +468,9 @@ export default function UC15Page() {
     // Clear previous orbit line
     if (orbitLineRef.current) {
       globe.scene().remove(orbitLineRef.current)
-      orbitLineRef.current.geometry.dispose()
-      orbitLineRef.current.material.dispose()
+      orbitLineRef.current.traverse?.((c: any) => {
+        c.geometry?.dispose?.(); c.material?.dispose?.()
+      })
       orbitLineRef.current = null
     }
 
