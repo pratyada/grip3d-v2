@@ -11,6 +11,7 @@ export const metadata: Metadata = {
     siteName: "GRIP 3D",
     images: [{ url: "/img/tile-10.jpg", width: 1200, height: 630 }],
   },
+  twitter: { card: "summary_large_image" },
 }
 
 export default function UC10Layout({ children }: { children: React.ReactNode }) {

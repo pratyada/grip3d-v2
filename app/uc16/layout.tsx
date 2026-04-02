@@ -10,6 +10,7 @@ export const metadata: Metadata = {
       "Track thousands of space debris pieces in real time on a 3D WebGL globe. Filter by origin event (Cosmos, FenYun, Iridium) and altitude band. Click any object for altitude, velocity, and orbital track.",
     images: [{ url: "/img/tile-16.jpg", width: 1200, height: 630 }],
   },
+  twitter: { card: "summary_large_image" },
 }
 
 export default function UC16Layout({ children }: { children: React.ReactNode }) {

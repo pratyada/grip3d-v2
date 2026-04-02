@@ -10,6 +10,7 @@ export const metadata: Metadata = {
       "Follow NASA's first crewed lunar mission since Apollo in real time. Track the Orion spacecraft on a 3D Earth-Moon visualization with live trajectory, Kp data, crew profiles, and mission phase.",
     images: [{ url: "/img/tile-03.jpg", width: 1200, height: 630 }],
   },
+  twitter: { card: "summary_large_image" },
 }
 
 export default function UC3Layout({ children }: { children: React.ReactNode }) {

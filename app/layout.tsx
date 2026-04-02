@@ -11,16 +11,21 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://test.grip3d.com")
-  ),
+  // NEXT_PUBLIC_SITE_URL must be set in Vercel env vars to your canonical domain.
+  // e.g. https://test.grip3d.com  — this is what resolves relative OG image paths.
+  // VERCEL_URL is the auto-generated domain and does NOT match custom domains.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://test.grip3d.com"),
   title: "GRIP 3D — Interactive Globe Platform",
   description:
     "Layer-first interactive 3D globe platform: NTN satellite service assurance, maritime tracking, world job market, AI inference grid, weather, demographics, earthquakes, energy, radio and more — real-time 3D for enterprise teams.",
   openGraph: {
     siteName: "GRIP 3D",
     type: "website",
+    images: [{ url: "/img/favicon-grip3d-64.png", width: 64, height: 64 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@grip3d",
   },
   icons: {
     icon: [
