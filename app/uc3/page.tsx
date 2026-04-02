@@ -35,7 +35,7 @@ const MOON_R_KM    = 1737
 const EARTH_R      = EARTH_R_KM  / KM_PER_UNIT     // ~1.27
 const MOON_R       = MOON_R_KM   / KM_PER_UNIT     // ~0.35
 const MEAN_DIST    = 384400      / KM_PER_UNIT     // ~76.9 units
-const CRAFT_RADIUS = 0.25                           // visual size in scene
+const CRAFT_RADIUS = 1.8                            // visual size in scene (intentionally large — craft is tiny IRL but must be visible)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export default function UC3Page() {
     let starField: any
     let animId = 0
     let isDragging = false, prevMouse = { x: 0, y: 0 }
-    let spherical = { theta: 0.4, phi: 1.1, r: 180 }
+    let spherical = { theta: 0.4, phi: 1.1, r: 110 }
 
     async function init() {
       const mod = await import("three")
@@ -282,12 +282,73 @@ export default function UC3Page() {
       moonOrbitLine = new THREE.Line(orbitGeo, new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.35 }))
       scene.add(moonOrbitLine)
 
-      // ── Orion spacecraft ─────────────────────────────────────────────
-      const craftGeo = new THREE.OctahedronGeometry(CRAFT_RADIUS, 0)
-      const craftMat = new THREE.MeshPhongMaterial({ color: 0xffdd44, emissive: 0x884400, shininess: 120 })
-      craftMesh = new THREE.Mesh(craftGeo, craftMat)
-      // Start at KSC
+      // ── Orion spacecraft — built from primitives to resemble the real vehicle ──
+      // Orion consists of: Crew Module (cone) + Service Module (cylinder) + 4 solar panels
+      craftMesh = new THREE.Group()
       craftMesh.position.copy(kscPos)
+
+      const CR = CRAFT_RADIUS  // base radius reference
+
+      // Crew Module: truncated cone (wider base, narrow top — heat-shield down)
+      const cmGeo = new THREE.CylinderGeometry(CR * 0.55, CR, CR * 1.1, 16)
+      const cmMat = new THREE.MeshPhongMaterial({ color: 0xd4a843, emissive: 0x443300, shininess: 80 })
+      const cmMesh = new THREE.Mesh(cmGeo, cmMat)
+      cmMesh.position.y = CR * 0.8
+      craftMesh.add(cmMesh)
+
+      // Heat shield: flat dark disc at base of crew module
+      const hsGeo = new THREE.CylinderGeometry(CR, CR * 1.02, CR * 0.12, 16)
+      const hsMat = new THREE.MeshPhongMaterial({ color: 0x222222, emissive: 0x110000, shininess: 10 })
+      const hsMesh = new THREE.Mesh(hsGeo, hsMat)
+      hsMesh.position.y = CR * 0.18
+      craftMesh.add(hsMesh)
+
+      // Service Module: cylinder below crew module
+      const smGeo = new THREE.CylinderGeometry(CR * 0.75, CR * 0.75, CR * 1.4, 16)
+      const smMat = new THREE.MeshPhongMaterial({ color: 0x888899, emissive: 0x111122, shininess: 120 })
+      const smMesh = new THREE.Mesh(smGeo, smMat)
+      smMesh.position.y = -CR * 0.58
+      craftMesh.add(smMesh)
+
+      // Service Module engine nozzle
+      const nozzleGeo = new THREE.CylinderGeometry(CR * 0.18, CR * 0.3, CR * 0.4, 12)
+      const nozzleMat = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 160 })
+      const nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat)
+      nozzleMesh.position.y = -CR * 1.5
+      craftMesh.add(nozzleMesh)
+
+      // 4 solar panels — two pairs extending left/right and front/back from SM
+      const panelMat = new THREE.MeshPhongMaterial({ color: 0x1144cc, emissive: 0x001133, shininess: 200, side: THREE.DoubleSide })
+      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+      for (const angle of angles) {
+        const panelGeo = new THREE.BoxGeometry(CR * 2.8, CR * 0.06, CR * 1.0)
+        const panel = new THREE.Mesh(panelGeo, panelMat)
+        // Position panels radially outward from SM
+        panel.position.set(
+          Math.cos(angle) * CR * 2.0,
+          -CR * 0.55,
+          Math.sin(angle) * CR * 2.0,
+        )
+        panel.rotation.y = angle
+        craftMesh.add(panel)
+
+        // Panel strut
+        const strutGeo = new THREE.CylinderGeometry(CR * 0.04, CR * 0.04, CR * 2.0, 6)
+        const strut = new THREE.Mesh(strutGeo, new THREE.MeshPhongMaterial({ color: 0xaaaaaa }))
+        strut.position.set(
+          Math.cos(angle) * CR * 1.0,
+          -CR * 0.55,
+          Math.sin(angle) * CR * 1.0,
+        )
+        strut.rotation.z = angle + Math.PI / 2
+        strut.rotation.x = Math.PI / 2
+        craftMesh.add(strut)
+      }
+
+      // Glow point light travelling with craft
+      const craftLight = new THREE.PointLight(0xff9922, 10, 30)
+      craftMesh.add(craftLight)
+
       scene.add(craftMesh)
 
       // ── Trajectory ──────────────────────────────────────────────────
@@ -357,10 +418,8 @@ export default function UC3Page() {
         // Rotate Earth slowly
         earthMesh.rotation.y += 0.001
 
-        // Pulse craft
-        const pulse = 1 + 0.15 * Math.sin(frame * 0.08)
-        craftMesh.scale.setScalar(pulse)
-        craftMesh.rotation.y += 0.02
+        // Rotate craft slowly so solar panels are visible from all angles
+        craftMesh.rotation.y += 0.008
 
         // Move craft along trajectory
         const trajPts2 = sceneRef.current?.trajPts
@@ -370,8 +429,8 @@ export default function UC3Page() {
           const elapsedH = (now2 - LAUNCH_DATE.getTime()) / 3_600_000
           let t: number
           if (elapsedH < 0) {
-            // Pre-launch: animate slowly back and forth along outbound half for preview
-            t = 0.5 * Math.abs(Math.sin(frame * 0.002))
+            // Pre-launch: animate the full trajectory loop continuously so user can see the path
+            t = (frame % 600) / 600
           } else {
             t = Math.min(1, elapsedH / totalH)
           }
@@ -475,6 +534,14 @@ export default function UC3Page() {
           </Link>
         </div>
       </div>
+
+      {/* Simulated trajectory notice */}
+      {!launched && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full text-xs font-semibold text-yellow-200 tracking-wide"
+          style={{ background: "rgba(120,80,0,0.85)", border: "1px solid rgba(255,200,0,0.4)" }}>
+          ⚠ TRAJECTORY PREVIEW — Artemis II has not launched yet. Spacecraft is at KSC. Animation shows planned mission path.
+        </div>
+      )}
 
       {/* Left panel — crew + mission info */}
       <div className="absolute left-3 top-16 z-10 flex flex-col gap-2" style={{ width: 230 }}>
