@@ -15,7 +15,7 @@
 
 export const VERSION = {
   major: 1,
-  minor: 7,
+  minor: 8,
   patch: 0,
 } as const
 
@@ -23,18 +23,21 @@ export const VERSION = {
 export const VERSION_STRING = `v${VERSION.major}.${VERSION.minor}.${VERSION.patch}`
 
 /** ISO date of the release (YYYY-MM-DD) */
-export const RELEASE_DATE = "2026-04-02"
+export const RELEASE_DATE = "2026-04-03"
 
 /** Short human-readable date, e.g. "1 Apr 2026" */
 export const RELEASE_DATE_LABEL = new Date(RELEASE_DATE + "T00:00:00")
   .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 
 /** One-liner describing what this release contains */
-export const RELEASE_LABEL = "UC17–20: Aircraft · Wildfires · Submarine Cables · Space Weather · Aurora"
+export const RELEASE_LABEL = "UC03: Artemis II Moon Mission Tracker · Coord fix UC15–20"
 
 // =============================================================================
 // CHANGELOG
 // =============================================================================
+// v1.8.0  2026-04-03  UC03 Artemis II Moon Mission Tracker — JPL Horizons Moon
+//                     position, Orion free-return trajectory, crew profiles,
+//                     mission phase timeline, NASA imagery feed, WebGL 3D scene
 // v1.7.0  2026-04-02  UC17 Live Aircraft (OpenSky ADS-B) · UC18 Active Wildfires
 //                     (NASA EONET) · UC19 Submarine Internet Cables (TeleGeography)
 //                     · UC20 Space Weather & Aurora (NOAA SWPC Ovation Prime)
