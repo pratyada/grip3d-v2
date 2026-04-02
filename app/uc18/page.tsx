@@ -186,7 +186,7 @@ export default function UC18Page() {
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .atmosphereColor("#ff6600")
         .atmosphereAltitude(0.12)
-        .pointOfView({ lat: 20, lng: 10, altitude: 2.2 })
+        .pointOfView({ lat: 42, lng: -100, altitude: 2.2 })
 
       const ctrl = globe.controls()
       ctrl.autoRotate = true; ctrl.autoRotateSpeed = 0.2
