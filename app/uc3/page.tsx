@@ -7,8 +7,8 @@ import Link from "next/link"
 
 // Artemis II: first crewed Artemis lunar flyby
 // Crew: Reid Wiseman (CDR), Victor Glover (PLT), Christina Koch (MS1), Jeremy Hansen (MS2)
-// Launch: NET April 2026, LC-39B, KSC  |  Duration: ~10 days  |  Closest approach: ~8 900 km
-const LAUNCH_DATE = new Date("2026-04-07T18:00:00Z") // NET — will be updated when confirmed
+// Launch: April 1 2026, LC-39B, KSC  |  Duration: ~10 days  |  Closest approach: ~8 900 km
+const LAUNCH_DATE = new Date("2026-04-01T18:00:00Z") // Confirmed launch date — update exact T-0 if known
 
 const CREW = [
   { name: "Reid Wiseman",    role: "Commander",          flag: "🇺🇸", agency: "NASA", bio: "USN test pilot, ISS Exp 40/41 veteran, 165 EVA days." },
@@ -39,8 +39,9 @@ const CRAFT_RADIUS = 1.8                            // visual size in scene (int
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface MoonPos { x: number; y: number; z: number; distKm: number; fallback?: boolean }
-interface NewsItem { title: string; description: string; date: string; thumb: string }
+interface MoonPos   { x: number; y: number; z: number; distKm: number; fallback?: boolean }
+interface OrionPos  { x: number; y: number; z: number; distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string }
+interface NewsItem  { title: string; description: string; date: string; thumb: string }
 
 // ── Trajectory helpers ────────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ export default function UC3Page() {
   const animRef     = useRef<number>(0)
 
   const [moonData,  setMoonData]  = useState<MoonPos | null>(null)
+  const [orionData, setOrionData] = useState<OrionPos | null>(null)
   const [news,      setNews]      = useState<NewsItem[]>([])
   const [phase,     setPhase]     = useState(0)          // index into PHASES
   const [missionT,  setMissionT]  = useState(0)          // hours since launch (negative = pre-launch)
@@ -115,6 +117,7 @@ export default function UC3Page() {
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [distMoon,  setDistMoon]  = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
+  const [dataSource, setDataSource] = useState("interpolated")
   const [showNews,  setShowNews]  = useState(false)
 
   // ── Fetch moon position ───────────────────────────────────────────────────
@@ -123,6 +126,26 @@ export default function UC3Page() {
       .then(r => r.json())
       .then(setMoonData)
       .catch(() => setMoonData({ x: 384400, y: 0, z: 0, distKm: 384400 }))
+  }, [])
+
+  // ── Fetch Orion real-time position (polls every 2 min) ───────────────────
+  useEffect(() => {
+    const load = () => {
+      fetch("/api/orion-position")
+        .then(r => r.json())
+        .then((d: OrionPos) => {
+          setOrionData(d)
+          setDataSource(d.source)
+          setDistEarth(d.distEarth)
+          setVelKms(parseFloat(d.velKms.toFixed(2)))
+          // Push into sceneRef so the animation loop picks it up immediately
+          if (sceneRef.current) sceneRef.current.orionPos = d
+        })
+        .catch(() => {})
+    }
+    load()
+    const id = setInterval(load, 120_000)
+    return () => clearInterval(id)
   }, [])
 
   // ── Fetch news ────────────────────────────────────────────────────────────
@@ -360,7 +383,7 @@ export default function UC3Page() {
           new THREE.LineBasicMaterial({ color: 0xff8822, transparent: true, opacity: 0.6 })
         )
         scene.add(trajectoryLine)
-        sceneRef.current = { trajPts }
+        sceneRef.current = { trajPts, orionPos: null }
       }
 
       // ── Mouse controls ───────────────────────────────────────────────
@@ -421,37 +444,32 @@ export default function UC3Page() {
         // Rotate craft slowly so solar panels are visible from all angles
         craftMesh.rotation.y += 0.008
 
-        // Move craft along trajectory
-        const trajPts2 = sceneRef.current?.trajPts
-        if (trajPts2 && trajPts2.length > 0) {
-          const totalH = PHASES[PHASES.length - 1].hoursFromL
-          const now2 = Date.now()
-          const elapsedH = (now2 - LAUNCH_DATE.getTime()) / 3_600_000
-          let t: number
-          if (elapsedH < 0) {
-            // Pre-launch: animate the full trajectory loop continuously so user can see the path
-            t = (frame % 600) / 600
-          } else {
-            t = Math.min(1, elapsedH / totalH)
-          }
-          const idx = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
+        // Move craft: prefer live Orion position from API, fallback to trajectory animation
+        const liveOrion = sceneRef.current?.orionPos
+        const trajPts2  = sceneRef.current?.trajPts
+
+        if (liveOrion && (liveOrion.x !== 0 || liveOrion.y !== 0 || liveOrion.z !== 0)) {
+          // Real position from NASA Horizons or MET interpolation API
+          craftMesh.position.set(
+            liveOrion.x / KM_PER_UNIT,
+            liveOrion.y / KM_PER_UNIT,
+            liveOrion.z / KM_PER_UNIT,
+          )
+          const moonScPos = moonMesh.position
+          const dM = craftMesh.position.distanceTo(moonScPos) * KM_PER_UNIT
+          setDistMoon(dM)
+        } else if (trajPts2 && trajPts2.length > 0) {
+          // Trajectory preview animation (pre-launch or no API data)
+          const totalH   = PHASES[PHASES.length - 1].hoursFromL
+          const elapsedH = (Date.now() - LAUNCH_DATE.getTime()) / 3_600_000
+          const t        = elapsedH < 0 ? (frame % 600) / 600 : Math.min(1, elapsedH / totalH)
+          const idx      = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
           craftMesh.position.copy(trajPts2[idx])
 
-          // Update telemetry state
           const p = craftMesh.position
-          const dE = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT
           const moonScPos = moonMesh.position
-          const dM = p.distanceTo(moonScPos) * KM_PER_UNIT
-          setDistEarth(dE)
-          setDistMoon(dM)
-
-          // Approximate velocity from trajectory tangent
-          if (idx < trajPts2.length - 1) {
-            const p2 = trajPts2[idx + 1]
-            const segKm = p2.distanceTo(craftMesh.position) * KM_PER_UNIT
-            const dtSec = (totalH * 3600) / trajPts2.length
-            setVelKms(parseFloat((segKm / dtSec).toFixed(2)))
-          }
+          setDistEarth(Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT)
+          setDistMoon(p.distanceTo(moonScPos) * KM_PER_UNIT)
         }
 
         // Camera orbit
@@ -535,11 +553,17 @@ export default function UC3Page() {
         </div>
       </div>
 
-      {/* Simulated trajectory notice */}
-      {!launched && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full text-xs font-semibold text-yellow-200 tracking-wide"
-          style={{ background: "rgba(120,80,0,0.85)", border: "1px solid rgba(255,200,0,0.4)" }}>
-          ⚠ TRAJECTORY PREVIEW — Artemis II has not launched yet. Spacecraft is at KSC. Animation shows planned mission path.
+      {/* Data source indicator */}
+      {launched && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide"
+          style={{
+            background: dataSource === "horizons" ? "rgba(0,80,0,0.85)" : "rgba(80,60,0,0.85)",
+            border: `1px solid ${dataSource === "horizons" ? "rgba(0,255,100,0.4)" : "rgba(255,200,0,0.4)"}`,
+            color: dataSource === "horizons" ? "#86efac" : "#fde68a",
+          }}>
+          {dataSource === "horizons"
+            ? "✓ LIVE — NASA JPL Horizons real-time Orion trajectory"
+            : "~ MET INTERPOLATION — Mission-elapsed-time estimate (Horizons data pending)"}
         </div>
       )}
 
@@ -724,7 +748,7 @@ export default function UC3Page() {
 
       {/* Data source attribution */}
       <div className="absolute bottom-3 right-3 z-10 text-xs text-gray-600">
-        Moon position: NASA JPL Horizons · News: NASA Images API
+        Orion: {dataSource === "horizons" ? "NASA JPL Horizons -1032" : "MET interpolation"} · Moon: JPL Horizons · News: NASA Images
       </div>
     </div>
   )
