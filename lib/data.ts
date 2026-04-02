@@ -59,7 +59,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc1/index.html",
-    detailsUrl: "/demo/uc1/details/index.html",
+    detailsUrl: "/uc1/details",
   },
   {
     id: "UC02",
@@ -83,7 +83,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc2/index.html",
-    detailsUrl: "/demo/uc2/details/index.html",
+    detailsUrl: "/uc2/details",
   },
   {
     id: "UC03",
@@ -132,7 +132,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc4/index.html",
-    detailsUrl: "/demo/uc4/details/index.html",
+    detailsUrl: "/uc4/details",
   },
   {
     id: "UC05",
@@ -156,7 +156,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc5/index.html",
-    detailsUrl: "/demo/uc5/details/index.html",
+    detailsUrl: "/uc5/details",
   },
   {
     id: "UC07",
@@ -180,7 +180,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc7/index.html",
-    detailsUrl: "/demo/uc7/details/index.html",
+    detailsUrl: "/uc7/details",
   },
   {
     id: "UC08",
@@ -204,7 +204,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc8/index.html",
-    detailsUrl: "/demo/uc8/details/index.html",
+    detailsUrl: "/uc8/details",
   },
   {
     id: "UC10",
@@ -253,7 +253,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc11/index.html",
-    detailsUrl: "/demo/uc11/details/index.html",
+    detailsUrl: "/uc11/details",
   },
   {
     id: "UC12",
@@ -277,7 +277,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc12/index.html",
-    detailsUrl: "/demo/uc12/details/index.html",
+    detailsUrl: "/uc12/details",
   },
   {
     id: "UC13",
@@ -301,7 +301,7 @@ export const useCases: UseCase[] = [
     status: "live",
     featured: true,
     demoUrl: "/demo/uc13/index.html",
-    detailsUrl: "/demo/uc13/details/index.html",
+    detailsUrl: "/uc13/details",
   },
   {
     id: "UC14",
