@@ -129,36 +129,6 @@ function propagateSat(satrec: any, satLib: any, now: Date): { lat: number; lng: 
   }
 }
 
-// Build ~100-minute ground track and split at anti-meridian crossings
-// so globe.gl never draws a line shooting across the globe.
-function buildGroundTrackSegments(
-  satrec: any, satLib: any, now: Date, color: string
-): { points: { lat: number; lng: number; alt: number }[]; color: string[] }[] {
-  const allPts: { lat: number; lng: number; alt: number }[] = []
-  // 240 points × 25 s = 100 minutes, ~1.1 full orbits, smooth curve
-  for (let i = 0; i <= 240; i++) {
-    const t = new Date(now.getTime() + i * 25_000)
-    const pos = propagateSat(satrec, satLib, t)
-    if (pos) allPts.push({ lat: pos.lat, lng: pos.lng, alt: pos.alt / 6371 })
-  }
-
-  // Split whenever longitude jumps > 180° (anti-meridian crossing)
-  const segments: { lat: number; lng: number; alt: number }[][] = []
-  let seg: typeof allPts = []
-  for (let i = 0; i < allPts.length; i++) {
-    if (i > 0 && Math.abs(allPts[i].lng - allPts[i - 1].lng) > 180) {
-      if (seg.length > 1) segments.push(seg)
-      seg = []
-    }
-    seg.push(allPts[i])
-  }
-  if (seg.length > 1) segments.push(seg)
-
-  return segments.map(pts => ({
-    points: pts,
-    color: [color + "ff", color + "55"],   // bright → fade gradient
-  }))
-}
 
 // ── Three.js satellite particle helpers ──────────────────────────────────────
 
@@ -234,6 +204,7 @@ export default function UC15Page() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const filteredRef = useRef<SatPoint[]>([])
   const satPointsRef= useRef<any>(null)   // THREE.Points particle system
+  const orbitLineRef= useRef<any>(null)   // THREE.Line for orbit track
   const threeRef    = useRef<any>(null)   // THREE module
   const blinkRef    = useRef<number>(0)   // blink animation frame
 
@@ -389,17 +360,7 @@ export default function UC15Page() {
         .atmosphereColor("#33ccdd")
         .atmosphereAltitude(0.15)
         .pointOfView({ lat: 20, lng: 0, altitude: 2.0 })
-        // Paths — ground track only (no pointsData — we use Three.js particles)
-        .pathsData([])
-        .pathPoints((d: any) => d.points)
-        .pathPointLat((p: any) => p.lat)
-        .pathPointLng((p: any) => p.lng)
-        .pathPointAlt((p: any) => p.alt)
-        .pathColor((d: any) => d.color)
-        .pathStroke(1.8)
-        .pathDashLength(1)      // solid line — no gaps
-        .pathDashGap(0)
-        .pathDashAnimateTime(0)
+        // No globe.gl paths — orbit track drawn directly in Three.js scene
 
       const ctrl = globe.controls()
       ctrl.autoRotate = true
@@ -478,6 +439,12 @@ export default function UC15Page() {
         satPointsRef.current.material.dispose()
         satPointsRef.current = null
       }
+      if (orbitLineRef.current) {
+        orbitLineRef.current.traverse((c: any) => {
+          c.geometry?.dispose(); c.material?.dispose()
+        })
+        orbitLineRef.current = null
+      }
       globe?.controls()?.dispose?.()
       globeInst.current = null
     }
@@ -491,17 +458,53 @@ export default function UC15Page() {
     }
   }, [filtered])
 
-  // ── Update ground track when selection changes ───────────────────────────
+  // ── Draw orbit track as Three.js Line directly in the scene ──────────────
   useEffect(() => {
-    if (!globeInst.current) return
-    if (!selected || !showTrack || !satLib.current) {
-      globeInst.current.pathsData([])
-      return
+    const THREE = threeRef.current
+    const globe  = globeInst.current
+    if (!THREE || !globe) return
+
+    // Clear previous orbit line
+    if (orbitLineRef.current) {
+      globe.scene().remove(orbitLineRef.current)
+      orbitLineRef.current.geometry.dispose()
+      orbitLineRef.current.material.dispose()
+      orbitLineRef.current = null
     }
-    const segments = buildGroundTrackSegments(
-      selected.satrec, satLib.current, new Date(), selected.color
+
+    if (!selected || !showTrack || !satLib.current) return
+
+    // Build 3D XYZ positions for one full orbit (~100 min, 300 points)
+    const positions: number[] = []
+    const now = new Date()
+    for (let i = 0; i <= 300; i++) {
+      const t   = new Date(now.getTime() + i * 20_000) // every 20 s
+      const pos = propagateSat(selected.satrec, satLib.current, t)
+      if (!pos) continue
+      const [x, y, z] = latLngAltToXYZ(pos.lat, pos.lng, pos.alt)
+      positions.push(x, y, z)
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+
+    // Two overlapping lines: bright core + wide glow
+    const core = new THREE.Line(geo,
+      new THREE.LineBasicMaterial({ color: selected.color, transparent: true, opacity: 1, depthWrite: false })
     )
-    globeInst.current.pathsData(segments)
+    core.renderOrder = 998
+
+    // Glow layer — slightly brighter/white tinted
+    const glow = new THREE.Line(geo,
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })
+    )
+    glow.renderOrder = 997
+
+    const group = new THREE.Group()
+    group.add(glow)
+    group.add(core)
+    globe.scene().add(group)
+    orbitLineRef.current = group
   }, [selected, showTrack])
 
   // ── Spin toggle ──────────────────────────────────────────────────────────
