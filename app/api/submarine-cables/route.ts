@@ -3,9 +3,9 @@
 export const revalidate = 86400
 
 const CABLES_URL =
-  "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/web/public/api/v3/cable/cable-geo.json"
+  "https://www.submarinecablemap.com/api/v3/cable/cable-geo.json"
 const STATIONS_URL =
-  "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/web/public/api/v3/landing-point/landing-point-geo.json"
+  "https://www.submarinecablemap.com/api/v3/landing-point/landing-point-geo.json"
 
 export async function GET() {
   try {

@@ -145,7 +145,7 @@ export default function UC18Page() {
           id:        f.id ?? f.properties?.id ?? "",
           title:     f.properties?.title ?? "Active Wildfire",
           lat, lng,
-          date:      f.properties?.geometry?.[0]?.date?.slice(0, 10) ?? "",
+          date:      (f.properties?.date ?? "").slice(0, 10),
           sourceUrl: sources[0]?.url ?? "",
           region,
           color:     REGIONS[region].color,

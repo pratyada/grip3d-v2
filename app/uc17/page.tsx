@@ -131,15 +131,13 @@ export default function UC17Page() {
 
   const fetchAircraft = useCallback(async () => {
     try {
-      // Fetch directly from OpenSky — supports CORS; uses visitor's IP quota, not Vercel's shared IPs
-      const res  = await fetch("https://opensky-network.org/api/states/all", {
-        headers: { "Accept": "application/json" },
-      })
-      if (!res.ok) { setApiNote(`OpenSky ${res.status} — retrying in 60 s`); return }
+      // Server proxy handles OpenSky fetch — avoids CORS restriction (OpenSky blocks cross-origin browser requests)
+      const res  = await fetch("/api/aircraft")
+      if (!res.ok) { setApiNote(`Aircraft API error ${res.status} — retrying in 60 s`); return }
       const data = await res.json()
-      if (!data.states) { setApiNote("OpenSky rate limited — retrying in 60 s"); return }
+      if (data.error) { setApiNote("OpenSky rate limited — retrying in 60 s"); return }
       setApiNote("")
-      const states: any[] = data.states
+      const states: any[] = data.states ?? []
       const pts: AircraftPoint[] = []
       for (const s of states) {
         const lng    = s[5]
