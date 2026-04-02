@@ -15,7 +15,7 @@
 
 export const VERSION = {
   major: 1,
-  minor: 8,
+  minor: 9,
   patch: 0,
 } as const
 
@@ -23,18 +23,22 @@ export const VERSION = {
 export const VERSION_STRING = `v${VERSION.major}.${VERSION.minor}.${VERSION.patch}`
 
 /** ISO date of the release (YYYY-MM-DD) */
-export const RELEASE_DATE = "2026-04-03"
+export const RELEASE_DATE = "2026-04-02"
 
 /** Short human-readable date, e.g. "1 Apr 2026" */
 export const RELEASE_DATE_LABEL = new Date(RELEASE_DATE + "T00:00:00")
   .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 
 /** One-liner describing what this release contains */
-export const RELEASE_LABEL = "UC03: Artemis II Moon Mission Tracker · Coord fix UC15–20"
+export const RELEASE_LABEL = "UC06 Cell Towers · UC09 EV Charging · UC21 Financial Globe · UC22 Agriculture"
 
 // =============================================================================
 // CHANGELOG
 // =============================================================================
+// v1.9.0  2026-04-02  UC06 Cell Tower Density (OpenCelliD, 2G/3G/LTE/5G) ·
+//                     UC09 EV Charging & Gas Stations (Open Charge Map/NREL) ·
+//                     UC21 Financial Globe (World Bank GDP, Frankfurter FX) ·
+//                     UC22 Global Crops & Agriculture (FAO STAT 2022, 8 crops)
 // v1.8.0  2026-04-03  UC03 Artemis II Moon Mission Tracker — JPL Horizons Moon
 //                     position, Orion free-return trajectory, crew profiles,
 //                     mission phase timeline, NASA imagery feed, WebGL 3D scene
