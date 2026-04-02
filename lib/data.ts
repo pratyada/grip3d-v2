@@ -317,32 +317,6 @@ export const useCases: UseCase[] = [
     detailsUrl: "/uc14/details",
   },
   {
-    id: "UC16",
-    slug: "uc16",
-    title: "Space Debris Tracker",
-    category: "telecom",
-    image: "/img/tile-16.jpg",
-    emoji: "☄️",
-    tags: ["Space Debris", "Kessler", "TLE", "SGP4", "Orbital", "Real-time", "WebGL", "NORAD", "CelesTrak"],
-    description:
-      "Real-time tracking of 5,000+ space debris objects on a WebGL globe — CelesTrak TLE data, SGP4 propagation, origin-event filters (Cosmos, FenYun, Iridium), and per-object orbital telemetry.",
-    longDescription:
-      "The complete tracked orbital debris population rendered in real time. Three CelesTrak debris groups (Cosmos 2251, FenYun-1C, Iridium 33) are fetched and deduplicated, then propagated via SGP4 every 5 seconds. Objects are colour-coded by origin event and altitude band on a globe.gl WebGL globe. Click any debris piece for altitude, velocity, inclination, orbital period, and a full-orbit track drawn directly in 3D space.",
-    highlights: [
-      "5,000+ debris objects from 3 major origin events tracked in real time",
-      "CelesTrak multi-group TLE feed: Cosmos 2251 · FenYun-1C · Iridium 33",
-      "SGP4/SDP4 propagation via satellite.js — positions updated every 5 s",
-      "Colour-coded by origin event: Cosmos (red) · FenYun (orange) · Iridium (yellow)",
-      "Altitude band filter: LEO / MEO / GEO / Deep orbit",
-      "Click any debris for NORAD ID, altitude, velocity, period, and orbit track",
-      "Kessler Syndrome context — density risk by altitude band",
-    ],
-    status: "live",
-    featured: true,
-    demoUrl: "/uc16",
-    detailsUrl: "/uc16/details",
-  },
-  {
     id: "UC15",
     slug: "uc15",
     title: "Starlinks Spacemap",
@@ -367,6 +341,32 @@ export const useCases: UseCase[] = [
     featured: true,
     demoUrl: "/uc15",
     detailsUrl: "/uc15/details",
+  },
+  {
+    id: "UC16",
+    slug: "uc16",
+    title: "Space Debris Tracker",
+    category: "telecom",
+    image: "/img/tile-16.jpg",
+    emoji: "☄️",
+    tags: ["Space Debris", "Kessler", "TLE", "SGP4", "Orbital", "Real-time", "WebGL", "NORAD", "CelesTrak"],
+    description:
+      "Real-time tracking of 5,000+ space debris objects on a WebGL globe — CelesTrak TLE data, SGP4 propagation, origin-event filters (Cosmos, FenYun, Iridium), and per-object orbital telemetry.",
+    longDescription:
+      "The complete tracked orbital debris population rendered in real time. Three CelesTrak debris groups (Cosmos 2251, FenYun-1C, Iridium 33) are fetched and deduplicated, then propagated via SGP4 every 5 seconds. Objects are colour-coded by origin event and altitude band on a globe.gl WebGL globe. Click any debris piece for altitude, velocity, inclination, orbital period, and a full-orbit track drawn directly in 3D space.",
+    highlights: [
+      "5,000+ debris objects from 3 major origin events tracked in real time",
+      "CelesTrak multi-group TLE feed: Cosmos 2251 · FenYun-1C · Iridium 33",
+      "SGP4/SDP4 propagation via satellite.js — positions updated every 5 s",
+      "Colour-coded by origin event: Cosmos (red) · FenYun (orange) · Iridium (yellow)",
+      "Altitude band filter: LEO / MEO / GEO / Deep orbit",
+      "Click any debris for NORAD ID, altitude, velocity, period, and orbit track",
+      "Kessler Syndrome context — density risk by altitude band",
+    ],
+    status: "live",
+    featured: true,
+    demoUrl: "/uc16",
+    detailsUrl: "/uc16/details",
   },
 ]
 
