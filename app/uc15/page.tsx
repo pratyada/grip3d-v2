@@ -129,15 +129,35 @@ function propagateSat(satrec: any, satLib: any, now: Date): { lat: number; lng: 
   }
 }
 
-// Build 90-minute ground track (one point per 30 seconds)
-function buildGroundTrack(satrec: any, satLib: any, now: Date) {
-  const points: { lat: number; lng: number; alt: number }[] = []
-  for (let i = 0; i <= 180; i++) {
-    const t = new Date(now.getTime() + i * 30_000)
+// Build ~100-minute ground track and split at anti-meridian crossings
+// so globe.gl never draws a line shooting across the globe.
+function buildGroundTrackSegments(
+  satrec: any, satLib: any, now: Date, color: string
+): { points: { lat: number; lng: number; alt: number }[]; color: string[] }[] {
+  const allPts: { lat: number; lng: number; alt: number }[] = []
+  // 240 points × 25 s = 100 minutes, ~1.1 full orbits, smooth curve
+  for (let i = 0; i <= 240; i++) {
+    const t = new Date(now.getTime() + i * 25_000)
     const pos = propagateSat(satrec, satLib, t)
-    if (pos) points.push({ lat: pos.lat, lng: pos.lng, alt: pos.alt / 6371 })
+    if (pos) allPts.push({ lat: pos.lat, lng: pos.lng, alt: pos.alt / 6371 })
   }
-  return points
+
+  // Split whenever longitude jumps > 180° (anti-meridian crossing)
+  const segments: { lat: number; lng: number; alt: number }[][] = []
+  let seg: typeof allPts = []
+  for (let i = 0; i < allPts.length; i++) {
+    if (i > 0 && Math.abs(allPts[i].lng - allPts[i - 1].lng) > 180) {
+      if (seg.length > 1) segments.push(seg)
+      seg = []
+    }
+    seg.push(allPts[i])
+  }
+  if (seg.length > 1) segments.push(seg)
+
+  return segments.map(pts => ({
+    points: pts,
+    color: [color + "ff", color + "55"],   // bright → fade gradient
+  }))
 }
 
 // ── Three.js satellite particle helpers ──────────────────────────────────────
@@ -376,10 +396,10 @@ export default function UC15Page() {
         .pathPointLng((p: any) => p.lng)
         .pathPointAlt((p: any) => p.alt)
         .pathColor((d: any) => d.color)
-        .pathStroke(1.5)
-        .pathDashLength(0.4)
-        .pathDashGap(0.2)
-        .pathDashAnimateTime(8000)
+        .pathStroke(1.8)
+        .pathDashLength(1)      // solid line — no gaps
+        .pathDashGap(0)
+        .pathDashAnimateTime(0)
 
       const ctrl = globe.controls()
       ctrl.autoRotate = true
@@ -478,11 +498,10 @@ export default function UC15Page() {
       globeInst.current.pathsData([])
       return
     }
-    const pts = buildGroundTrack(selected.satrec, satLib.current, new Date())
-    globeInst.current.pathsData([{
-      points: pts,
-      color: [selected.color + "cc", selected.color + "22"],
-    }])
+    const segments = buildGroundTrackSegments(
+      selected.satrec, satLib.current, new Date(), selected.color
+    )
+    globeInst.current.pathsData(segments)
   }, [selected, showTrack])
 
   // ── Spin toggle ──────────────────────────────────────────────────────────
