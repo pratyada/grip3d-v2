@@ -31,17 +31,9 @@ export function Navbar() {
     }
   }, [])
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
+  // Outside-click is handled by the backdrop div onClick — no document listener needed
+  // (a document mousedown listener fires before the link click event, unmounting the
+  //  menu panel on mobile before navigation can fire)
 
   // Prevent body scroll when menu is open on mobile
   useEffect(() => {
@@ -146,19 +138,21 @@ export function Navbar() {
           style={{ top: `${headerHeight}px` }}
           aria-label="Mobile navigation"
         >
-          {/* Backdrop */}
+          {/* Backdrop — sits behind the panel */}
           <div
             className="absolute inset-0"
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
             onClick={() => setOpen(false)}
           />
-          {/* Menu panel */}
+          {/* Menu panel — z-index ensures it is above the backdrop */}
           <div
             className="relative mx-4 mt-2 rounded-2xl overflow-hidden"
             style={{
               background: "rgba(16,16,16,0.97)",
               border: "1px solid var(--border)",
               boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             <div className="flex flex-col p-3 gap-1">
@@ -173,6 +167,7 @@ export function Navbar() {
                     style={{
                       color: active ? "var(--accent)" : "var(--text)",
                       background: active ? "var(--accent-dim)" : "transparent",
+                      touchAction: "manipulation",
                     }}
                   >
                     {link.label}
@@ -194,6 +189,7 @@ export function Navbar() {
                   color: "var(--accent)",
                   background: "var(--accent-dim)",
                   border: "1px solid rgba(51,204,221,0.3)",
+                  touchAction: "manipulation",
                 }}
               >
                 Contact Us
