@@ -1,519 +1,260 @@
 import { NextResponse } from "next/server"
 
-export const revalidate = 86400 // 24-hour cache — tower locations change slowly
+export const dynamic = "force-dynamic"
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface CellTower {
-  id: string
+export interface DensityPoint {
   lat: number
   lng: number
+  towers: number
   radio: "GSM" | "UMTS" | "LTE" | "NR"
   mcc: number
-  mnc: number
-  range: number
 }
 
-// ── Radio type assignment based on region ─────────────────────────────────────
-// Approximates real-world 2G/3G/4G/5G distribution by development level
+// [lat, lng, towers, mcc, radio]
+type CityEntry = [number, number, number, number, "GSM" | "UMTS" | "LTE" | "NR"]
 
-function assignRadio(lat: number, lng: number): "GSM" | "UMTS" | "LTE" | "NR" {
-  const r = Math.random()
-  // Developed: W.Europe, N.America, Japan/Korea/Aus — heavy LTE + 5G
-  const isDeveloped =
-    (lng >= -130 && lng <= -60  && lat >= 24 && lat <= 55) || // North America
-    (lng >= -12  && lng <= 35   && lat >= 36 && lat <= 62) || // Western Europe
-    (lng >= 120  && lng <= 155  && lat >= 30 && lat <= 46) || // Japan/Korea
-    (lng >= 110  && lng <= 160  && lat >= -45 && lat <= -10)  // Australia
+const CITIES: CityEntry[] = [
+  // ── India (MCC 404/405) — ~2.88M total ──────────────────────────────────────
+  [28.66,  77.23, 280000, 404, "LTE"],   // Delhi NCR
+  [19.08,  72.88, 240000, 404, "LTE"],   // Mumbai Metro
+  [12.97,  77.59, 185000, 404, "LTE"],   // Bangalore
+  [17.38,  78.49, 155000, 404, "LTE"],   // Hyderabad
+  [13.08,  80.27, 148000, 404, "LTE"],   // Chennai
+  [22.57,  88.36, 135000, 404, "LTE"],   // Kolkata
+  [18.52,  73.86, 100000, 404, "LTE"],   // Pune
+  [23.03,  72.58,  90000, 404, "LTE"],   // Ahmedabad
+  [26.91,  75.78,  80000, 404, "LTE"],   // Jaipur
+  [26.85,  80.95,  76000, 404, "LTE"],   // Lucknow
+  [21.17,  72.83,  70000, 404, "LTE"],   // Surat
+  [26.45,  80.35,  64000, 404, "LTE"],   // Kanpur
+  [21.15,  79.09,  60000, 404, "LTE"],   // Nagpur
+  [22.72,  75.86,  56000, 404, "LTE"],   // Indore
+  [17.69,  83.22,  54000, 404, "LTE"],   // Visakhapatnam
+  [23.26,  77.41,  50000, 404, "LTE"],   // Bhopal
+  [25.61,  85.14,  50000, 404, "LTE"],   // Patna
+  [30.90,  75.85,  46000, 404, "LTE"],   // Ludhiana
+  [27.18,  78.01,  44000, 404, "LTE"],   // Agra
+  [22.31,  73.19,  44000, 404, "LTE"],   // Vadodara
+  [11.02,  76.96,  42000, 404, "LTE"],   // Coimbatore
+  [ 9.93,  76.26,  40000, 404, "LTE"],   // Kochi
+  [16.51,  80.62,  40000, 404, "LTE"],   // Vijayawada
+  [ 9.93,  78.12,  38000, 405, "LTE"],   // Madurai
+  [25.32,  83.01,  38000, 405, "LTE"],   // Varanasi
+  [20.00,  73.78,  36000, 404, "LTE"],   // Nashik
+  [22.30,  70.80,  35000, 404, "LTE"],   // Rajkot
+  [28.98,  77.71,  34000, 404, "LTE"],   // Meerut
+  [31.63,  74.87,  32000, 404, "LTE"],   // Amritsar
+  [26.29,  73.02,  30000, 404, "LTE"],   // Jodhpur
+  [30.73,  76.78,  29000, 404, "LTE"],   // Chandigarh
+  [26.14,  91.74,  28000, 404, "LTE"],   // Guwahati
+  [ 8.52,  76.94,  27000, 404, "LTE"],   // Thiruvananthapuram
+  [23.18,  79.95,  26000, 404, "LTE"],   // Jabalpur
+  [26.22,  78.18,  25000, 404, "LTE"],   // Gwalior
+  [21.25,  81.63,  25000, 404, "LTE"],   // Raipur
+  [23.34,  85.31,  24000, 404, "LTE"],   // Ranchi
+  [30.32,  78.03,  23000, 404, "LTE"],   // Dehradun
+  [15.33,  75.13,  22000, 404, "LTE"],   // Hubli-Dharwad
+  [34.08,  74.80,  20000, 404, "NR"],    // Srinagar
+  [32.73,  74.86,  18000, 404, "LTE"],   // Jammu
+  [11.66,  78.15,  17000, 404, "LTE"],   // Salem
+  [16.31,  80.44,  16000, 404, "LTE"],   // Guntur
+  [20.46,  85.88,  16000, 404, "LTE"],   // Bhubaneswar
+  [14.46,  78.82,  15000, 404, "LTE"],   // Kurnool
+  [10.78,  79.13,  14000, 405, "LTE"],   // Thanjavur
+  [19.91,  75.34,  14000, 404, "LTE"],   // Aurangabad
+  [28.63,  77.22, 120000, 404, "NR"],    // Delhi 5G dense
+  // Rural distribution
+  [27.50,  78.50, 110000, 404, "UMTS"], // Rural North India
+  [14.00,  77.00,  95000, 404, "LTE"],  // Rural South India
+  [23.00,  87.00,  85000, 404, "UMTS"], // Rural East India
+  [23.00,  71.50,  80000, 404, "LTE"],  // Rural West India
+  [22.00,  80.00,  72000, 404, "LTE"],  // Rural Central India
+  [25.50,  93.00,  50000, 404, "LTE"],  // Northeast India
+  [33.00,  76.00,  38000, 404, "UMTS"], // J&K/Himachal
 
-  // Emerging: China, India, Brazil, Mexico, E.Europe, Middle East
-  const isEmerging =
-    (lng >= 70  && lng <= 140 && lat >= 8 && lat <= 55 && !isDeveloped) || // China/India
-    (lng >= -85 && lng <= -35 && lat >= -35 && lat <= 25)               || // South America
-    (lng >= 20  && lng <= 70  && lat >= 14 && lat <= 45)                   // Middle East
+  // ── China (MCC 460) — ~2.1M total ───────────────────────────────────────────
+  [39.90, 116.40, 270000, 460, "NR"],   // Beijing
+  [31.23, 121.47, 260000, 460, "NR"],   // Shanghai
+  [23.13, 113.26, 200000, 460, "NR"],   // Guangzhou
+  [22.54, 114.06, 195000, 460, "NR"],   // Shenzhen
+  [30.57, 104.07, 145000, 460, "NR"],   // Chengdu
+  [29.56, 106.55, 140000, 460, "LTE"],  // Chongqing
+  [30.58,  114.27, 130000, 460, "LTE"], // Wuhan
+  [34.27, 108.95, 110000, 460, "LTE"],  // Xi'an
+  [30.25, 120.16, 100000, 460, "LTE"],  // Hangzhou
+  [32.06, 118.78,  95000, 460, "LTE"],  // Nanjing
+  [39.13, 117.20,  90000, 460, "LTE"],  // Tianjin
+  [23.02, 113.75,  80000, 460, "LTE"],  // Dongguan
+  [23.01, 113.10,  78000, 460, "LTE"],  // Foshan
+  [34.76, 113.66,  75000, 460, "LTE"],  // Zhengzhou
+  [28.19, 112.98,  70000, 460, "LTE"],  // Changsha
+  [36.07, 120.38,  65000, 460, "LTE"],  // Qingdao
+  [41.80, 123.42,  60000, 460, "LTE"],  // Shenyang
+  [25.04, 102.71,  55000, 460, "LTE"],  // Kunming
+  [45.75, 126.64,  52000, 460, "LTE"],  // Harbin
+  [31.30, 120.60,  50000, 460, "LTE"],  // Suzhou
+  [36.67, 116.99,  48000, 460, "LTE"],  // Jinan
+  [38.91, 121.61,  45000, 460, "LTE"],  // Dalian
+  [24.48, 118.09,  44000, 460, "LTE"],  // Xiamen
+  [26.07, 119.30,  42000, 460, "LTE"],  // Fuzhou
+  [31.86, 117.28,  40000, 460, "LTE"],  // Hefei
+  [28.68, 115.88,  38000, 460, "LTE"],  // Nanchang
+  [37.87, 112.55,  36000, 460, "LTE"],  // Taiyuan
+  [43.80,  87.60,  32000, 460, "LTE"],  // Urumqi
+  [36.06, 103.79,  28000, 460, "LTE"],  // Lanzhou
+  [26.65, 106.63,  26000, 460, "LTE"],  // Guiyang
+  [22.82, 108.32,  24000, 460, "LTE"],  // Nanning
+  [40.84, 111.75,  22000, 460, "LTE"],  // Hohhot
+  [32.00, 120.00,  80000, 460, "LTE"],  // Rural East China
+  [35.00,  97.00,  50000, 460, "LTE"],  // Rural West China
+  [42.00, 115.00,  45000, 460, "LTE"],  // Rural North China
 
-  if (isDeveloped) {
-    if (r < 0.03) return "GSM"
-    if (r < 0.10) return "UMTS"
-    if (r < 0.75) return "LTE"
-    return "NR"
-  }
-  if (isEmerging) {
-    if (r < 0.08) return "GSM"
-    if (r < 0.22) return "UMTS"
-    if (r < 0.85) return "LTE"
-    return "NR"
-  }
-  // Developing (Africa, SE Asia, Central Asia, rural)
-  if (r < 0.28) return "GSM"
-  if (r < 0.52) return "UMTS"
-  if (r < 0.92) return "LTE"
-  return "NR"
-}
+  // ── USA (MCC 310) — ~450K total ──────────────────────────────────────────────
+  [40.71,  -74.01,  40000, 310, "NR"],  // New York
+  [34.05, -118.24,  36000, 310, "NR"],  // Los Angeles
+  [41.88,  -87.63,  28000, 310, "NR"],  // Chicago
+  [29.76,  -95.37,  22000, 310, "LTE"], // Houston
+  [33.45, -112.07,  18000, 310, "LTE"], // Phoenix
+  [39.95,  -75.17,  16000, 310, "LTE"], // Philadelphia
+  [29.42,  -98.49,  15000, 310, "LTE"], // San Antonio
+  [32.72, -117.16,  14000, 310, "LTE"], // San Diego
+  [32.78,  -96.80,  13000, 310, "LTE"], // Dallas
+  [37.34, -121.89,  12000, 310, "LTE"], // San Jose
+  [30.27,  -97.74,  11000, 310, "LTE"], // Austin
+  [30.33,  -81.66,  10000, 310, "LTE"], // Jacksonville
+  [32.75,  -97.33,   9000, 310, "LTE"], // Fort Worth
+  [39.96,  -82.99,   9000, 310, "LTE"], // Columbus
+  [35.23,  -80.84,   8000, 310, "LTE"], // Charlotte
+  [39.77,  -86.16,   8000, 310, "LTE"], // Indianapolis
+  [37.77, -122.42,   8000, 310, "LTE"], // San Francisco
+  [47.61, -122.33,   7000, 310, "LTE"], // Seattle
+  [39.74, -104.98,   7000, 310, "LTE"], // Denver
+  [36.17,  -86.78,   6000, 310, "LTE"], // Nashville
+  [42.36,  -71.06,   6000, 310, "LTE"], // Boston
+  [36.17, -115.14,   5000, 310, "LTE"], // Las Vegas
+  [45.52, -122.68,   5000, 310, "LTE"], // Portland
+  [35.15,  -90.05,   5000, 310, "LTE"], // Memphis
+  [39.00, -110.00,  28000, 310, "LTE"], // Rural West USA
+  [32.00,  -88.00,  22000, 310, "LTE"], // Rural South USA
+  [41.50,  -93.00,  18000, 310, "LTE"], // Rural Midwest USA
+  [44.00,  -72.00,  14000, 310, "LTE"], // Rural Northeast USA
 
-// MCC approximation from lat/lng (rough)
-function approxMcc(lat: number, lng: number): { mcc: number; mnc: number } {
-  if (lng >= -130 && lng <= -60  && lat >= 24 && lat <= 50) return { mcc: 310, mnc: Math.floor(Math.random() * 10 + 1) }
-  if (lng >= -12  && lng <= 2    && lat >= 50 && lat <= 61) return { mcc: 234, mnc: Math.floor(Math.random() * 5 + 10) }
-  if (lng >= 2    && lng <= 8    && lat >= 42 && lat <= 52) return { mcc: 208, mnc: Math.floor(Math.random() * 5 + 1) }
-  if (lng >= 6    && lng <= 15   && lat >= 47 && lat <= 55) return { mcc: 262, mnc: Math.floor(Math.random() * 5 + 1) }
-  if (lng >= 73   && lng <= 97   && lat >= 8  && lat <= 36) return { mcc: 404, mnc: Math.floor(Math.random() * 40 + 1) }
-  if (lng >= 97   && lng <= 140  && lat >= 18 && lat <= 53) return { mcc: 460, mnc: Math.floor(Math.random() * 10 + 1) }
-  if (lng >= 120  && lng <= 155  && lat >= 30 && lat <= 46) return { mcc: 440, mnc: Math.floor(Math.random() * 80 + 10) }
-  if (lng >= -85  && lng <= -35  && lat >= -35 && lat <= 5) return { mcc: 724, mnc: Math.floor(Math.random() * 10 + 1) }
-  if (lng >= -20  && lng <= 55   && lat >= -35 && lat <= 38) return { mcc: 621, mnc: Math.floor(Math.random() * 10 + 1) }
-  return { mcc: 999, mnc: 1 }
-}
+  // ── Europe — ~600K total ──────────────────────────────────────────────────────
+  [51.51,   -0.13,  38000, 234, "NR"],  // London
+  [48.85,    2.35,  32000, 208, "NR"],  // Paris
+  [52.52,   13.40,  30000, 262, "NR"],  // Berlin
+  [40.42,   -3.70,  25000, 214, "NR"],  // Madrid
+  [41.90,   12.49,  22000, 222, "NR"],  // Rome
+  [50.09,   14.42,  11000, 230, "NR"],  // Prague
+  [52.37,    4.90,  18000, 204, "NR"],  // Amsterdam
+  [50.85,    4.35,  15000, 206, "NR"],  // Brussels
+  [48.21,   16.37,  14000, 232, "NR"],  // Vienna
+  [52.23,   21.01,  18000, 260, "NR"],  // Warsaw
+  [59.33,   18.07,  14000, 240, "LTE"], // Stockholm
+  [59.91,   10.75,  12000, 242, "LTE"], // Oslo
+  [55.68,   12.57,  11000, 238, "LTE"], // Copenhagen
+  [38.72,   -9.14,  12000, 268, "LTE"], // Lisbon
+  [47.38,    8.54,  10000, 228, "LTE"], // Zurich
+  [47.50,   19.04,  10000, 216, "LTE"], // Budapest
+  [37.98,   23.73,   9000, 202, "LTE"], // Athens
+  [44.43,   26.10,  12000, 226, "LTE"], // Bucharest
+  [60.17,   24.94,  10000, 244, "LTE"], // Helsinki
+  [53.33,   -6.25,   9000, 272, "LTE"], // Dublin
+  [50.11,    8.68,  16000, 262, "LTE"], // Frankfurt
+  [48.14,   11.58,  15000, 262, "LTE"], // Munich
+  [53.55,    9.99,  14000, 262, "LTE"], // Hamburg
+  [41.39,    2.15,  14000, 214, "LTE"], // Barcelona
+  [45.46,    9.19,  14000, 222, "LTE"], // Milan
+  [46.00,    8.00,  80000, 208, "LTE"], // Rural Europe spread
 
-// ── OSM Overpass fetch ─────────────────────────────────────────────────────────
-// Queries for communication masts/towers across 8 global regions in parallel.
-// Returns real lat/lng positions; radio type is derived from region heuristic.
+  // ── Southeast Asia ────────────────────────────────────────────────────────────
+  [ -6.21,  106.85,  85000, 510, "LTE"], // Jakarta
+  [14.60,   121.00,  50000, 515, "LTE"], // Manila
+  [13.75,   100.52,  55000, 520, "LTE"], // Bangkok
+  [10.82,   106.63,  40000, 452, "LTE"], // Ho Chi Minh
+  [21.03,   105.85,  35000, 452, "LTE"], // Hanoi
+  [ 3.14,   101.69,  38000, 502, "NR"],  // Kuala Lumpur
+  [ 1.35,   103.82,  22000, 525, "NR"],  // Singapore
+  [16.87,    96.19,  18000, 414, "LTE"], // Yangon
+  [23.72,    90.41,  48000, 470, "LTE"], // Dhaka
+  [ 6.93,    79.85,  20000, 413, "LTE"], // Colombo
 
-const OSM_REGIONS = [
-  { name: "W.Europe",     bbox: "35,-12,62,25"    },
-  { name: "E.Europe/RUS", bbox: "44,25,62,60"     },
-  { name: "N.America",    bbox: "24,-128,52,-60"  },
-  { name: "S.America",    bbox: "-36,-82,12,-34"  },
-  { name: "E.Asia",       bbox: "18,96,52,148"    },
-  { name: "S.Asia",       bbox: "5,64,32,92"      },
-  { name: "SE.Asia",      bbox: "-12,92,26,142"   },
-  { name: "Africa",       bbox: "-36,-20,38,52"   },
-  { name: "M.East/CA",    bbox: "14,34,44,74"     },
-  { name: "Oceania",      bbox: "-48,110,-8,180"  },
+  // ── Japan & Korea ─────────────────────────────────────────────────────────────
+  [35.68,   139.69,  90000, 440, "NR"],  // Tokyo
+  [34.69,   135.50,  55000, 440, "NR"],  // Osaka
+  [37.57,   126.98,  70000, 450, "NR"],  // Seoul
+  [35.18,   129.08,  35000, 450, "NR"],  // Busan
+  [35.18,   136.91,  40000, 440, "NR"],  // Nagoya
+  [33.59,   130.40,  28000, 440, "LTE"], // Fukuoka
+
+  // ── Australia ─────────────────────────────────────────────────────────────────
+  [-33.87,  151.21,  28000, 505, "NR"],  // Sydney
+  [-37.81,  144.96,  25000, 505, "NR"],  // Melbourne
+  [-27.47,  153.03,  18000, 505, "LTE"], // Brisbane
+  [-31.95,  115.86,  14000, 505, "LTE"], // Perth
+  [-25.00,  134.00,  12000, 505, "LTE"], // Rural Australia
+
+  // ── Middle East ───────────────────────────────────────────────────────────────
+  [24.69,    46.72,  30000, 420, "NR"],  // Riyadh
+  [25.20,    55.27,  25000, 424, "NR"],  // Dubai
+  [35.69,    51.39,  35000, 432, "LTE"], // Tehran
+  [41.01,    28.95,  40000, 286, "NR"],  // Istanbul
+  [32.08,    34.78,  18000, 425, "NR"],  // Tel Aviv
+  [30.06,    31.25,  30000, 602, "LTE"], // Cairo
+  [24.86,    67.01,  32000, 410, "LTE"], // Karachi
+  [31.55,    74.35,  28000, 410, "LTE"], // Lahore
+
+  // ── Brazil & Latin America ────────────────────────────────────────────────────
+  [-23.55,  -46.63,  55000, 724, "LTE"], // São Paulo
+  [-22.91,  -43.17,  40000, 724, "LTE"], // Rio de Janeiro
+  [-15.78,  -47.93,  22000, 724, "LTE"], // Brasília
+  [-19.92,  -43.94,  24000, 724, "LTE"], // Belo Horizonte
+  [ -3.72,  -38.54,  18000, 724, "LTE"], // Fortaleza
+  [ -3.12,  -60.02,  12000, 724, "LTE"], // Manaus
+  [19.43,   -99.13,  40000, 334, "LTE"], // Mexico City
+  [ 4.71,   -74.07,  22000, 732, "LTE"], // Bogotá
+  [-12.05,  -77.04,  20000, 716, "LTE"], // Lima
+  [-34.61,  -58.37,  28000, 722, "LTE"], // Buenos Aires
+  [-33.46,  -70.65,  22000, 730, "LTE"], // Santiago
+
+  // ── Russia ────────────────────────────────────────────────────────────────────
+  [55.75,    37.62,  45000, 250, "NR"],  // Moscow
+  [59.95,    30.32,  30000, 250, "NR"],  // St. Petersburg
+  [54.99,    82.90,  18000, 250, "LTE"], // Novosibirsk
+  [56.84,    60.60,  16000, 250, "LTE"], // Yekaterinburg
+  [57.00,    65.00,  40000, 250, "LTE"], // Rural Russia
+
+  // ── Africa ────────────────────────────────────────────────────────────────────
+  [ 6.45,     3.40,  28000, 621, "LTE"], // Lagos
+  [-1.29,    36.82,  18000, 639, "LTE"], // Nairobi
+  [-26.20,   28.04,  22000, 655, "LTE"], // Johannesburg
+  [-33.93,   18.42,  15000, 655, "LTE"], // Cape Town
+  [ -6.80,   39.27,  14000, 640, "LTE"], // Dar es Salaam
+  [ 9.03,    38.74,  12000, 636, "UMTS"],// Addis Ababa
+  [ -4.32,   15.32,  10000, 630, "UMTS"],// Kinshasa
+  [ 5.55,    -0.20,  12000, 620, "LTE"], // Accra
+  [33.59,    -7.62,  14000, 604, "LTE"], // Casablanca
+  [ 5.36,    -4.01,  10000, 612, "LTE"], // Abidjan
+  [10.00,     5.00,  22000, 621, "UMTS"],// Rural West Africa
+  [ 0.00,    35.00,  18000, 639, "UMTS"],// Rural East Africa
+  [-20.00,   26.00,  15000, 655, "LTE"], // Rural South Africa
+
+  // ── Central Asia ──────────────────────────────────────────────────────────────
+  [43.25,    76.96,  14000, 401, "LTE"], // Almaty
+  [41.30,    69.24,  16000, 434, "LTE"], // Tashkent
+  [41.69,    44.83,  10000, 282, "LTE"], // Tbilisi
+  [40.41,    49.87,  12000, 400, "LTE"], // Baku
 ]
-
-const OSM_QUERY = (bbox: string) => `
-[out:json][timeout:20][maxsize:10485760];
-(
-  node["tower:type"="communication"](${bbox});
-  node["man_made"="mast"]["communication:mobile_phone"](${bbox});
-  node["man_made"="tower"]["communication:mobile_phone"="yes"](${bbox});
-  node["telecom"="base_station"](${bbox});
-);
-out 2000;
-`
-
-async function fetchOSMRegion(region: { name: string; bbox: string }): Promise<CellTower[]> {
-  try {
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method:  "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body:    `data=${encodeURIComponent(OSM_QUERY(region.bbox))}`,
-      signal:  AbortSignal.timeout(22000),
-    })
-    if (!res.ok) return []
-    const json = await res.json()
-    const elements: any[] = json.elements ?? []
-    return elements
-      .filter(e => e.type === "node" && typeof e.lat === "number" && typeof e.lon === "number")
-      .map((e, i) => {
-        const { mcc, mnc } = approxMcc(e.lat, e.lon)
-        return {
-          id:    `osm-${e.id ?? i}-${region.name}`,
-          lat:   e.lat,
-          lng:   e.lon,
-          radio: assignRadio(e.lat, e.lon),
-          mcc,
-          mnc,
-          range: 0,
-        }
-      })
-  } catch {
-    return []
-  }
-}
-
-// ── OpenCelliD fetch (when key is set) ────────────────────────────────────────
-
-async function fetchOpenCelliD(): Promise<CellTower[]> {
-  const key = process.env.OPENCELLID_API_KEY
-  if (!key) return []
-
-  const boxes = [
-    { minlat: 25, minlon: -125, maxlat: 50, maxlon: -65 },
-    { minlat: 35, minlon: -12,  maxlat: 60, maxlon: 30  },
-    { minlat: -10, minlon: 100, maxlat: 40, maxlon: 145 },
-    { minlat: 10,  minlon: 68,  maxlat: 35, maxlon: 90  },
-    { minlat: -36, minlon: -20, maxlat: 38, maxlon: 52  },
-  ]
-
-  const results = await Promise.allSettled(boxes.map(async box => {
-    const url = new URL("https://opencellid.org/cell/getInArea")
-    url.searchParams.set("key",    key)
-    url.searchParams.set("BBOX",   `${box.minlat},${box.minlon},${box.maxlat},${box.maxlon}`)
-    url.searchParams.set("format", "json")
-    url.searchParams.set("limit",  "500")
-
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) })
-    if (!res.ok) return [] as CellTower[]
-    const data = await res.json()
-    return ((data.cells ?? []) as any[]).map((c: any) => ({
-      id:    `ocd-${c.radio}-${c.mcc}-${c.net}-${c.area}-${c.cell}`,
-      lat:   parseFloat(c.lat),
-      lng:   parseFloat(c.lon),
-      radio: (c.radio === "NR" ? "NR" : c.radio === "LTE" ? "LTE" : c.radio === "UMTS" ? "UMTS" : "GSM") as CellTower["radio"],
-      mcc:   parseInt(c.mcc,   10),
-      mnc:   parseInt(c.net,   10),
-      range: parseInt(c.range, 10) || 0,
-    })) as CellTower[]
-  }))
-
-  return results.flatMap(r => r.status === "fulfilled" ? r.value : [])
-}
-
-// ── Static fallback dataset ────────────────────────────────────────────────────
-// ~480 representative towers across all continents, all 4 radio types
-
-const STATIC_TOWERS: CellTower[] = [
-  // === EUROPE ===
-  // London, UK (MCC 234)
-  { id:"s001", lat:51.509, lng:-0.118, radio:"LTE",  mcc:234, mnc:30, range:800 },
-  { id:"s002", lat:51.523, lng:-0.086, radio:"NR",   mcc:234, mnc:20, range:300 },
-  { id:"s003", lat:51.495, lng:-0.145, radio:"LTE",  mcc:234, mnc:15, range:1200 },
-  { id:"s004", lat:51.537, lng:-0.102, radio:"UMTS", mcc:234, mnc:30, range:2000 },
-  { id:"s005", lat:51.479, lng:-0.071, radio:"NR",   mcc:234, mnc:20, range:200 },
-  { id:"s006", lat:51.551, lng:-0.134, radio:"LTE",  mcc:234, mnc:15, range:900 },
-  // Paris, France (MCC 208)
-  { id:"s007", lat:48.858, lng:2.294,  radio:"LTE",  mcc:208, mnc:1,  range:700 },
-  { id:"s008", lat:48.873, lng:2.354,  radio:"NR",   mcc:208, mnc:10, range:250 },
-  { id:"s009", lat:48.841, lng:2.315,  radio:"LTE",  mcc:208, mnc:20, range:1100 },
-  { id:"s010", lat:48.890, lng:2.277,  radio:"UMTS", mcc:208, mnc:1,  range:1800 },
-  { id:"s011", lat:48.847, lng:2.391,  radio:"LTE",  mcc:208, mnc:10, range:800 },
-  // Berlin, Germany (MCC 262)
-  { id:"s012", lat:52.520, lng:13.405, radio:"LTE",  mcc:262, mnc:1,  range:900 },
-  { id:"s013", lat:52.537, lng:13.425, radio:"NR",   mcc:262, mnc:2,  range:300 },
-  { id:"s014", lat:52.504, lng:13.381, radio:"LTE",  mcc:262, mnc:7,  range:1000 },
-  { id:"s015", lat:52.553, lng:13.370, radio:"UMTS", mcc:262, mnc:1,  range:2200 },
-  // Madrid, Spain (MCC 214)
-  { id:"s016", lat:40.416, lng:-3.703, radio:"LTE",  mcc:214, mnc:1,  range:1100 },
-  { id:"s017", lat:40.433, lng:-3.681, radio:"NR",   mcc:214, mnc:7,  range:400 },
-  { id:"s018", lat:40.399, lng:-3.722, radio:"LTE",  mcc:214, mnc:3,  range:900 },
-  // Rome, Italy (MCC 222)
-  { id:"s019", lat:41.902, lng:12.496, radio:"LTE",  mcc:222, mnc:10, range:1000 },
-  { id:"s020", lat:41.921, lng:12.519, radio:"UMTS", mcc:222, mnc:1,  range:2500 },
-  // Amsterdam, Netherlands (MCC 204)
-  { id:"s021", lat:52.373, lng:4.893,  radio:"NR",   mcc:204, mnc:8,  range:350 },
-  { id:"s022", lat:52.360, lng:4.912,  radio:"LTE",  mcc:204, mnc:12, range:900 },
-  // Stockholm, Sweden (MCC 240)
-  { id:"s023", lat:59.332, lng:18.065, radio:"NR",   mcc:240, mnc:7,  range:400 },
-  { id:"s024", lat:59.348, lng:18.088, radio:"LTE",  mcc:240, mnc:1,  range:1100 },
-  // Warsaw, Poland (MCC 260)
-  { id:"s025", lat:52.229, lng:21.012, radio:"LTE",  mcc:260, mnc:2,  range:900 },
-  { id:"s026", lat:52.247, lng:20.985, radio:"NR",   mcc:260, mnc:6,  range:300 },
-  // Bucharest, Romania (MCC 226)
-  { id:"s027", lat:44.432, lng:26.103, radio:"LTE",  mcc:226, mnc:10, range:1200 },
-  { id:"s028", lat:44.417, lng:26.127, radio:"UMTS", mcc:226, mnc:1,  range:2000 },
-  // Rural Europe
-  { id:"s029", lat:46.801, lng:8.226,  radio:"LTE",  mcc:228, mnc:1,  range:5000 },
-  { id:"s030", lat:51.028, lng:3.712,  radio:"LTE",  mcc:206, mnc:1,  range:2000 },
-  { id:"s031", lat:55.860, lng:-4.251, radio:"LTE",  mcc:234, mnc:20, range:3000 },
-  { id:"s032", lat:53.480, lng:-2.242, radio:"NR",   mcc:234, mnc:30, range:500 },
-  { id:"s033", lat:48.135, lng:11.582, radio:"NR",   mcc:262, mnc:1,  range:300 },
-  { id:"s034", lat:50.075, lng:14.437, radio:"LTE",  mcc:230, mnc:1,  range:1100 },
-  // === NORTH AMERICA ===
-  // New York (MCC 310/311)
-  { id:"s035", lat:40.712, lng:-74.006, radio:"NR",   mcc:310, mnc:260, range:200 },
-  { id:"s036", lat:40.728, lng:-73.989, radio:"LTE",  mcc:310, mnc:410, range:500 },
-  { id:"s037", lat:40.698, lng:-74.021, radio:"LTE",  mcc:311, mnc:480, range:600 },
-  { id:"s038", lat:40.745, lng:-73.972, radio:"NR",   mcc:310, mnc:120, range:250 },
-  { id:"s039", lat:40.681, lng:-74.003, radio:"UMTS", mcc:310, mnc:260, range:2000 },
-  { id:"s040", lat:40.760, lng:-74.042, radio:"LTE",  mcc:310, mnc:410, range:700 },
-  // Los Angeles
-  { id:"s041", lat:34.052, lng:-118.243, radio:"NR",  mcc:310, mnc:260, range:300 },
-  { id:"s042", lat:34.069, lng:-118.260, radio:"LTE", mcc:310, mnc:410, range:700 },
-  { id:"s043", lat:34.039, lng:-118.222, radio:"LTE", mcc:311, mnc:480, range:800 },
-  { id:"s044", lat:34.085, lng:-118.291, radio:"NR",  mcc:310, mnc:120, range:200 },
-  // Chicago
-  { id:"s045", lat:41.878, lng:-87.630, radio:"NR",   mcc:310, mnc:260, range:250 },
-  { id:"s046", lat:41.895, lng:-87.651, radio:"LTE",  mcc:310, mnc:410, range:600 },
-  { id:"s047", lat:41.862, lng:-87.608, radio:"LTE",  mcc:311, mnc:480, range:700 },
-  // Dallas
-  { id:"s048", lat:32.779, lng:-96.800, radio:"LTE",  mcc:310, mnc:410, range:900 },
-  { id:"s049", lat:32.797, lng:-96.822, radio:"NR",   mcc:310, mnc:260, range:300 },
-  // Miami
-  { id:"s050", lat:25.774, lng:-80.193, radio:"LTE",  mcc:310, mnc:120, range:800 },
-  { id:"s051", lat:25.791, lng:-80.175, radio:"NR",   mcc:310, mnc:260, range:300 },
-  // San Francisco
-  { id:"s052", lat:37.774, lng:-122.419, radio:"NR",  mcc:310, mnc:260, range:200 },
-  { id:"s053", lat:37.791, lng:-122.400, radio:"LTE", mcc:310, mnc:410, range:500 },
-  // Seattle
-  { id:"s054", lat:47.608, lng:-122.335, radio:"NR",  mcc:310, mnc:120, range:300 },
-  { id:"s055", lat:47.621, lng:-122.350, radio:"LTE", mcc:310, mnc:260, range:700 },
-  // Toronto (MCC 302)
-  { id:"s056", lat:43.651, lng:-79.383, radio:"LTE",  mcc:302, mnc:610, range:700 },
-  { id:"s057", lat:43.668, lng:-79.400, radio:"NR",   mcc:302, mnc:720, range:300 },
-  // Mexico City (MCC 334)
-  { id:"s058", lat:19.432, lng:-99.133, radio:"LTE",  mcc:334, mnc:20,  range:1200 },
-  { id:"s059", lat:19.449, lng:-99.151, radio:"UMTS", mcc:334, mnc:30,  range:2500 },
-  { id:"s060", lat:19.415, lng:-99.115, radio:"LTE",  mcc:334, mnc:20,  range:1000 },
-  // Rural USA
-  { id:"s061", lat:41.254, lng:-95.998, radio:"LTE",  mcc:310, mnc:410, range:8000 },
-  { id:"s062", lat:33.749, lng:-84.388, radio:"NR",   mcc:310, mnc:260, range:400 },
-  { id:"s063", lat:29.760, lng:-95.370, radio:"LTE",  mcc:311, mnc:480, range:900 },
-  { id:"s064", lat:47.925, lng:-97.032, radio:"LTE",  mcc:310, mnc:410, range:15000 },
-  { id:"s065", lat:44.980, lng:-93.272, radio:"NR",   mcc:310, mnc:260, range:300 },
-  // === SOUTH AMERICA ===
-  // São Paulo (MCC 724)
-  { id:"s066", lat:-23.550, lng:-46.633, radio:"LTE",  mcc:724, mnc:5,  range:800 },
-  { id:"s067", lat:-23.563, lng:-46.652, radio:"NR",   mcc:724, mnc:6,  range:350 },
-  { id:"s068", lat:-23.537, lng:-46.614, radio:"LTE",  mcc:724, mnc:10, range:1000 },
-  { id:"s069", lat:-23.575, lng:-46.670, radio:"UMTS", mcc:724, mnc:5,  range:2200 },
-  { id:"s070", lat:-23.524, lng:-46.631, radio:"LTE",  mcc:724, mnc:4,  range:900 },
-  // Rio de Janeiro
-  { id:"s071", lat:-22.906, lng:-43.173, radio:"LTE",  mcc:724, mnc:5,  range:900 },
-  { id:"s072", lat:-22.919, lng:-43.195, radio:"UMTS", mcc:724, mnc:10, range:2000 },
-  // Buenos Aires (MCC 722)
-  { id:"s073", lat:-34.604, lng:-58.382, radio:"LTE",  mcc:722, mnc:70, range:800 },
-  { id:"s074", lat:-34.620, lng:-58.400, radio:"UMTS", mcc:722, mnc:10, range:2500 },
-  { id:"s075", lat:-34.588, lng:-58.363, radio:"NR",   mcc:722, mnc:70, range:400 },
-  // Bogotá (MCC 732)
-  { id:"s076", lat:4.710,  lng:-74.072, radio:"LTE",  mcc:732, mnc:101, range:1000 },
-  { id:"s077", lat:4.729,  lng:-74.088, radio:"UMTS", mcc:732, mnc:123, range:2500 },
-  // Lima (MCC 716)
-  { id:"s078", lat:-12.046, lng:-77.043, radio:"LTE",  mcc:716, mnc:10, range:1100 },
-  { id:"s079", lat:-12.062, lng:-77.059, radio:"GSM",  mcc:716, mnc:17, range:5000 },
-  // Santiago (MCC 730)
-  { id:"s080", lat:-33.459, lng:-70.645, radio:"LTE",  mcc:730, mnc:1,  range:900 },
-  { id:"s081", lat:-33.475, lng:-70.664, radio:"NR",   mcc:730, mnc:3,  range:400 },
-  // === AFRICA ===
-  // Lagos, Nigeria (MCC 621)
-  { id:"s082", lat:6.524,  lng:3.379,   radio:"LTE",  mcc:621, mnc:30, range:1200 },
-  { id:"s083", lat:6.541,  lng:3.398,   radio:"UMTS", mcc:621, mnc:20, range:2500 },
-  { id:"s084", lat:6.507,  lng:3.360,   radio:"GSM",  mcc:621, mnc:30, range:8000 },
-  { id:"s085", lat:6.558,  lng:3.420,   radio:"LTE",  mcc:621, mnc:50, range:1500 },
-  // Cairo (MCC 602)
-  { id:"s086", lat:30.064, lng:31.250,  radio:"LTE",  mcc:602, mnc:1,  range:1000 },
-  { id:"s087", lat:30.078, lng:31.268,  radio:"UMTS", mcc:602, mnc:2,  range:2000 },
-  { id:"s088", lat:30.050, lng:31.231,  radio:"GSM",  mcc:602, mnc:3,  range:5000 },
-  // Nairobi (MCC 639)
-  { id:"s089", lat:-1.286, lng:36.817,  radio:"LTE",  mcc:639, mnc:2,  range:1200 },
-  { id:"s090", lat:-1.301, lng:36.835,  radio:"UMTS", mcc:639, mnc:7,  range:3000 },
-  { id:"s091", lat:-1.270, lng:36.799,  radio:"GSM",  mcc:639, mnc:5,  range:8000 },
-  // Johannesburg (MCC 655)
-  { id:"s092", lat:-26.195, lng:28.034, radio:"LTE",  mcc:655, mnc:1,  range:900 },
-  { id:"s093", lat:-26.210, lng:28.052, radio:"NR",   mcc:655, mnc:7,  range:400 },
-  { id:"s094", lat:-26.178, lng:28.016, radio:"UMTS", mcc:655, mnc:10, range:2000 },
-  // Dar es Salaam (MCC 640)
-  { id:"s095", lat:-6.776, lng:39.178,  radio:"LTE",  mcc:640, mnc:2,  range:1500 },
-  { id:"s096", lat:-6.790, lng:39.195,  radio:"GSM",  mcc:640, mnc:4,  range:10000 },
-  // Accra (MCC 620)
-  { id:"s097", lat:5.556,  lng:-0.197,  radio:"LTE",  mcc:620, mnc:1,  range:1500 },
-  { id:"s098", lat:5.571,  lng:-0.213,  radio:"UMTS", mcc:620, mnc:6,  range:3000 },
-  // Addis Ababa (MCC 636)
-  { id:"s099", lat:9.025,  lng:38.747,  radio:"LTE",  mcc:636, mnc:1,  range:2000 },
-  { id:"s100", lat:9.041,  lng:38.765,  radio:"GSM",  mcc:636, mnc:1,  range:8000 },
-  // Kinshasa (MCC 630)
-  { id:"s101", lat:-4.325, lng:15.322,  radio:"UMTS", mcc:630, mnc:5,  range:5000 },
-  { id:"s102", lat:-4.340, lng:15.338,  radio:"GSM",  mcc:630, mnc:10, range:15000 },
-  // Casablanca (MCC 604)
-  { id:"s103", lat:33.589, lng:-7.604,  radio:"LTE",  mcc:604, mnc:1,  range:1500 },
-  { id:"s104", lat:33.605, lng:-7.622,  radio:"UMTS", mcc:604, mnc:2,  range:3000 },
-  // Rural Africa
-  { id:"s105", lat:14.716, lng:-17.467, radio:"GSM",  mcc:608, mnc:1,  range:20000 },
-  { id:"s106", lat:12.364, lng:-1.534,  radio:"GSM",  mcc:613, mnc:3,  range:25000 },
-  { id:"s107", lat:-8.838, lng:13.235,  radio:"UMTS", mcc:631, mnc:2,  range:8000 },
-  { id:"s108", lat:15.552, lng:32.532,  radio:"UMTS", mcc:634, mnc:5,  range:10000 },
-  // === MIDDLE EAST ===
-  // Dubai (MCC 424)
-  { id:"s109", lat:25.204, lng:55.270,  radio:"NR",   mcc:424, mnc:2,  range:300 },
-  { id:"s110", lat:25.219, lng:55.289,  radio:"LTE",  mcc:424, mnc:3,  range:700 },
-  { id:"s111", lat:25.188, lng:55.250,  radio:"LTE",  mcc:424, mnc:2,  range:900 },
-  // Riyadh (MCC 420)
-  { id:"s112", lat:24.688, lng:46.722,  radio:"LTE",  mcc:420, mnc:1,  range:1500 },
-  { id:"s113", lat:24.703, lng:46.740,  radio:"NR",   mcc:420, mnc:7,  range:400 },
-  { id:"s114", lat:24.672, lng:46.703,  radio:"UMTS", mcc:420, mnc:3,  range:5000 },
-  // Tehran (MCC 432)
-  { id:"s115", lat:35.694, lng:51.422,  radio:"LTE",  mcc:432, mnc:11, range:1200 },
-  { id:"s116", lat:35.710, lng:51.440,  radio:"UMTS", mcc:432, mnc:19, range:3000 },
-  // Istanbul (MCC 286)
-  { id:"s117", lat:41.013, lng:28.955,  radio:"LTE",  mcc:286, mnc:1,  range:900 },
-  { id:"s118", lat:41.028, lng:28.975,  radio:"NR",   mcc:286, mnc:2,  range:400 },
-  // Tel Aviv (MCC 425)
-  { id:"s119", lat:32.085, lng:34.782,  radio:"NR",   mcc:425, mnc:1,  range:300 },
-  { id:"s120", lat:32.100, lng:34.799,  radio:"LTE",  mcc:425, mnc:7,  range:700 },
-  // === SOUTH ASIA ===
-  // Mumbai (MCC 404)
-  { id:"s121", lat:19.076, lng:72.878,  radio:"LTE",  mcc:404, mnc:1,  range:800 },
-  { id:"s122", lat:19.092, lng:72.896,  radio:"NR",   mcc:404, mnc:20, range:350 },
-  { id:"s123", lat:19.058, lng:72.860,  radio:"LTE",  mcc:404, mnc:45, range:1000 },
-  { id:"s124", lat:19.108, lng:72.912,  radio:"UMTS", mcc:404, mnc:1,  range:2500 },
-  { id:"s125", lat:19.044, lng:72.841,  radio:"GSM",  mcc:404, mnc:10, range:5000 },
-  // Delhi
-  { id:"s126", lat:28.613, lng:77.209,  radio:"LTE",  mcc:404, mnc:45, range:900 },
-  { id:"s127", lat:28.630, lng:77.228,  radio:"NR",   mcc:404, mnc:20, range:350 },
-  { id:"s128", lat:28.596, lng:77.190,  radio:"LTE",  mcc:404, mnc:1,  range:1100 },
-  { id:"s129", lat:28.647, lng:77.247,  radio:"UMTS", mcc:404, mnc:10, range:2500 },
-  // Bangalore
-  { id:"s130", lat:12.971, lng:77.594,  radio:"NR",   mcc:404, mnc:20, range:400 },
-  { id:"s131", lat:12.988, lng:77.612,  radio:"LTE",  mcc:404, mnc:45, range:900 },
-  // Chennai
-  { id:"s132", lat:13.083, lng:80.270,  radio:"LTE",  mcc:404, mnc:1,  range:1000 },
-  { id:"s133", lat:13.099, lng:80.288,  radio:"UMTS", mcc:404, mnc:10, range:2500 },
-  // Karachi (MCC 410)
-  { id:"s134", lat:24.860, lng:67.010,  radio:"LTE",  mcc:410, mnc:1,  range:1200 },
-  { id:"s135", lat:24.876, lng:67.028,  radio:"UMTS", mcc:410, mnc:3,  range:3000 },
-  { id:"s136", lat:24.844, lng:66.992,  radio:"GSM",  mcc:410, mnc:6,  range:8000 },
-  // Dhaka (MCC 470)
-  { id:"s137", lat:23.811, lng:90.412,  radio:"LTE",  mcc:470, mnc:1,  range:1000 },
-  { id:"s138", lat:23.827, lng:90.430,  radio:"UMTS", mcc:470, mnc:7,  range:2500 },
-  // Colombo (MCC 413)
-  { id:"s139", lat:6.927,  lng:79.861,  radio:"LTE",  mcc:413, mnc:2,  range:1500 },
-  { id:"s140", lat:6.911,  lng:79.844,  radio:"UMTS", mcc:413, mnc:1,  range:3000 },
-  // Rural India
-  { id:"s141", lat:26.912, lng:75.787,  radio:"LTE",  mcc:404, mnc:20, range:3000 },
-  { id:"s142", lat:22.572, lng:88.363,  radio:"NR",   mcc:404, mnc:20, range:500 },
-  { id:"s143", lat:17.385, lng:78.486,  radio:"LTE",  mcc:404, mnc:45, range:1500 },
-  { id:"s144", lat:25.313, lng:83.006,  radio:"GSM",  mcc:404, mnc:10, range:12000 },
-  // === EAST ASIA ===
-  // Beijing (MCC 460)
-  { id:"s145", lat:39.907, lng:116.391, radio:"NR",   mcc:460, mnc:0,  range:300 },
-  { id:"s146", lat:39.923, lng:116.412, radio:"LTE",  mcc:460, mnc:1,  range:600 },
-  { id:"s147", lat:39.890, lng:116.370, radio:"LTE",  mcc:460, mnc:0,  range:800 },
-  { id:"s148", lat:39.939, lng:116.432, radio:"NR",   mcc:460, mnc:11, range:250 },
-  { id:"s149", lat:39.873, lng:116.348, radio:"UMTS", mcc:460, mnc:1,  range:2000 },
-  // Shanghai
-  { id:"s150", lat:31.228, lng:121.474, radio:"NR",   mcc:460, mnc:0,  range:250 },
-  { id:"s151", lat:31.244, lng:121.493, radio:"LTE",  mcc:460, mnc:1,  range:600 },
-  { id:"s152", lat:31.211, lng:121.453, radio:"LTE",  mcc:460, mnc:0,  range:800 },
-  { id:"s153", lat:31.260, lng:121.514, radio:"NR",   mcc:460, mnc:11, range:300 },
-  // Shenzhen
-  { id:"s154", lat:22.543, lng:114.058, radio:"NR",   mcc:460, mnc:0,  range:200 },
-  { id:"s155", lat:22.559, lng:114.077, radio:"LTE",  mcc:460, mnc:1,  range:500 },
-  // Tokyo (MCC 440)
-  { id:"s156", lat:35.681, lng:139.769, radio:"NR",   mcc:440, mnc:10, range:200 },
-  { id:"s157", lat:35.697, lng:139.789, radio:"LTE",  mcc:440, mnc:20, range:500 },
-  { id:"s158", lat:35.664, lng:139.749, radio:"LTE",  mcc:440, mnc:90, range:700 },
-  { id:"s159", lat:35.713, lng:139.808, radio:"NR",   mcc:440, mnc:10, range:250 },
-  // Osaka
-  { id:"s160", lat:34.693, lng:135.502, radio:"NR",   mcc:440, mnc:20, range:250 },
-  { id:"s161", lat:34.709, lng:135.521, radio:"LTE",  mcc:440, mnc:10, range:600 },
-  // Seoul (MCC 450)
-  { id:"s162", lat:37.566, lng:126.978, radio:"NR",   mcc:450, mnc:5,  range:200 },
-  { id:"s163", lat:37.582, lng:126.997, radio:"LTE",  mcc:450, mnc:8,  range:500 },
-  { id:"s164", lat:37.549, lng:126.959, radio:"NR",   mcc:450, mnc:2,  range:250 },
-  // Busan
-  { id:"s165", lat:35.180, lng:129.076, radio:"NR",   mcc:450, mnc:5,  range:300 },
-  { id:"s166", lat:35.196, lng:129.095, radio:"LTE",  mcc:450, mnc:8,  range:600 },
-  // Hong Kong (MCC 454)
-  { id:"s167", lat:22.319, lng:114.170, radio:"NR",   mcc:454, mnc:4,  range:250 },
-  { id:"s168", lat:22.335, lng:114.188, radio:"LTE",  mcc:454, mnc:6,  range:600 },
-  // Taipei (MCC 466)
-  { id:"s169", lat:25.047, lng:121.517, radio:"LTE",  mcc:466, mnc:92, range:700 },
-  { id:"s170", lat:25.063, lng:121.535, radio:"NR",   mcc:466, mnc:97, range:300 },
-  // Rural China
-  { id:"s171", lat:30.667, lng:104.067, radio:"LTE",  mcc:460, mnc:1,  range:3000 },
-  { id:"s172", lat:36.057, lng:103.833, radio:"LTE",  mcc:460, mnc:0,  range:5000 },
-  { id:"s173", lat:43.826, lng:87.617,  radio:"LTE",  mcc:460, mnc:11, range:8000 },
-  // === SOUTHEAST ASIA ===
-  // Jakarta (MCC 510)
-  { id:"s174", lat:-6.208, lng:106.846, radio:"LTE",  mcc:510, mnc:1,  range:900 },
-  { id:"s175", lat:-6.224, lng:106.864, radio:"NR",   mcc:510, mnc:8,  range:400 },
-  { id:"s176", lat:-6.191, lng:106.827, radio:"UMTS", mcc:510, mnc:11, range:2500 },
-  { id:"s177", lat:-6.240, lng:106.882, radio:"LTE",  mcc:510, mnc:21, range:1200 },
-  // Manila (MCC 515)
-  { id:"s178", lat:14.596, lng:120.984, radio:"LTE",  mcc:515, mnc:2,  range:800 },
-  { id:"s179", lat:14.612, lng:121.002, radio:"NR",   mcc:515, mnc:5,  range:400 },
-  { id:"s180", lat:14.579, lng:120.966, radio:"UMTS", mcc:515, mnc:3,  range:2000 },
-  // Bangkok (MCC 520)
-  { id:"s181", lat:13.754, lng:100.501, radio:"LTE",  mcc:520, mnc:3,  range:900 },
-  { id:"s182", lat:13.770, lng:100.519, radio:"NR",   mcc:520, mnc:4,  range:400 },
-  { id:"s183", lat:13.737, lng:100.482, radio:"UMTS", mcc:520, mnc:15, range:2500 },
-  // Kuala Lumpur (MCC 502)
-  { id:"s184", lat:3.147,  lng:101.693, radio:"LTE",  mcc:502, mnc:12, range:1000 },
-  { id:"s185", lat:3.163,  lng:101.711, radio:"NR",   mcc:502, mnc:19, range:400 },
-  // Singapore (MCC 525)
-  { id:"s186", lat:1.290,  lng:103.852, radio:"NR",   mcc:525, mnc:5,  range:200 },
-  { id:"s187", lat:1.305,  lng:103.870, radio:"LTE",  mcc:525, mnc:1,  range:500 },
-  { id:"s188", lat:1.274,  lng:103.833, radio:"NR",   mcc:525, mnc:3,  range:250 },
-  // Ho Chi Minh (MCC 452)
-  { id:"s189", lat:10.775, lng:106.701, radio:"LTE",  mcc:452, mnc:1,  range:1000 },
-  { id:"s190", lat:10.791, lng:106.719, radio:"UMTS", mcc:452, mnc:4,  range:2500 },
-  // Yangon (MCC 414)
-  { id:"s191", lat:16.866, lng:96.195,  radio:"LTE",  mcc:414, mnc:1,  range:1500 },
-  { id:"s192", lat:16.882, lng:96.213,  radio:"UMTS", mcc:414, mnc:5,  range:4000 },
-  // === RUSSIA/CENTRAL ASIA ===
-  // Moscow (MCC 250)
-  { id:"s193", lat:55.751, lng:37.623,  radio:"LTE",  mcc:250, mnc:1,  range:900 },
-  { id:"s194", lat:55.767, lng:37.641,  radio:"NR",   mcc:250, mnc:2,  range:400 },
-  { id:"s195", lat:55.734, lng:37.604,  radio:"LTE",  mcc:250, mnc:99, range:1100 },
-  // St. Petersburg
-  { id:"s196", lat:59.939, lng:30.315,  radio:"LTE",  mcc:250, mnc:1,  range:1000 },
-  { id:"s197", lat:59.955, lng:30.333,  radio:"UMTS", mcc:250, mnc:2,  range:2500 },
-  // Almaty (MCC 401)
-  { id:"s198", lat:43.238, lng:76.946,  radio:"LTE",  mcc:401, mnc:2,  range:1500 },
-  { id:"s199", lat:43.254, lng:76.964,  radio:"UMTS", mcc:401, mnc:77, range:4000 },
-  // Tashkent (MCC 434)
-  { id:"s200", lat:41.299, lng:69.240,  radio:"LTE",  mcc:434, mnc:4,  range:2000 },
-  { id:"s201", lat:41.315, lng:69.258,  radio:"UMTS", mcc:434, mnc:7,  range:5000 },
-  // Rural Russia / Siberia
-  { id:"s202", lat:56.838, lng:60.609,  radio:"LTE",  mcc:250, mnc:2,  range:5000 },
-  { id:"s203", lat:53.202, lng:50.176,  radio:"GSM",  mcc:250, mnc:20, range:30000 },
-  { id:"s204", lat:61.788, lng:34.365,  radio:"GSM",  mcc:250, mnc:3,  range:25000 },
-  // === AUSTRALIA/OCEANIA ===
-  // Sydney (MCC 505)
-  { id:"s205", lat:-33.868, lng:151.207, radio:"NR",   mcc:505, mnc:1,  range:300 },
-  { id:"s206", lat:-33.884, lng:151.226, radio:"LTE",  mcc:505, mnc:3,  range:700 },
-  { id:"s207", lat:-33.851, lng:151.188, radio:"LTE",  mcc:505, mnc:6,  range:900 },
-  // Melbourne
-  { id:"s208", lat:-37.814, lng:144.963, radio:"NR",   mcc:505, mnc:1,  range:300 },
-  { id:"s209", lat:-37.830, lng:144.981, radio:"LTE",  mcc:505, mnc:3,  range:800 },
-  // Brisbane
-  { id:"s210", lat:-27.470, lng:153.021, radio:"LTE",  mcc:505, mnc:6,  range:900 },
-  { id:"s211", lat:-27.486, lng:153.040, radio:"NR",   mcc:505, mnc:1,  range:350 },
-  // Auckland, NZ (MCC 530)
-  { id:"s212", lat:-36.852, lng:174.763, radio:"LTE",  mcc:530, mnc:24, range:1200 },
-  { id:"s213", lat:-36.868, lng:174.782, radio:"NR",   mcc:530, mnc:5,  range:400 },
-  // Rural Australia
-  { id:"s214", lat:-23.698, lng:133.882, radio:"LTE",  mcc:505, mnc:3,  range:50000 },
-  { id:"s215", lat:-31.953, lng:115.857, radio:"LTE",  mcc:505, mnc:1,  range:5000 },
-  // Additional high-density fills (global urban fill)
-  { id:"s216", lat:52.370, lng:4.895,   radio:"NR",   mcc:204, mnc:8,  range:300 },
-  { id:"s217", lat:48.853, lng:2.350,   radio:"NR",   mcc:208, mnc:10, range:250 },
-  { id:"s218", lat:51.507, lng:-0.128,  radio:"LTE",  mcc:234, mnc:30, range:600 },
-  { id:"s219", lat:40.714, lng:-74.008, radio:"LTE",  mcc:310, mnc:410, range:500 },
-  { id:"s220", lat:34.053, lng:-118.245, radio:"NR",  mcc:310, mnc:260, range:250 },
-  { id:"s221", lat:35.682, lng:139.772, radio:"NR",   mcc:440, mnc:20, range:200 },
-  { id:"s222", lat:22.544, lng:114.060, radio:"NR",   mcc:460, mnc:11, range:200 },
-  { id:"s223", lat:1.291,  lng:103.854, radio:"NR",   mcc:525, mnc:5,  range:200 },
-  { id:"s224", lat:37.567, lng:126.980, radio:"NR",   mcc:450, mnc:5,  range:200 },
-  { id:"s225", lat:19.078, lng:72.880,  radio:"NR",   mcc:404, mnc:20, range:300 },
-  { id:"s226", lat:39.908, lng:116.393, radio:"NR",   mcc:460, mnc:0,  range:250 },
-  { id:"s227", lat:43.651, lng:-79.381, radio:"NR",   mcc:302, mnc:720, range:300 },
-  { id:"s228", lat:48.209, lng:16.373,  radio:"NR",   mcc:232, mnc:1,  range:350 },
-  { id:"s229", lat:59.334, lng:18.067,  radio:"NR",   mcc:240, mnc:7,  range:300 },
-  { id:"s230", lat:55.676, lng:12.568,  radio:"NR",   mcc:238, mnc:2,  range:350 },
-]
-
-// ── Handler ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
-  // 1. Try OpenCelliD if key is set
-  const ocid = await fetchOpenCelliD()
-  if (ocid.length > 100) {
-    return NextResponse.json(ocid, {
-      headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=172800" },
-    })
-  }
-
-  // 2. Try OSM Overpass — fetch all regions in parallel
-  const osmResults = await Promise.allSettled(OSM_REGIONS.map(fetchOSMRegion))
-  const osmTowers  = osmResults.flatMap(r => r.status === "fulfilled" ? r.value : [])
-
-  if (osmTowers.length > 50) {
-    // Deduplicate by rounding to ~100m grid
-    const seen = new Set<string>()
-    const deduped: CellTower[] = []
-    for (const t of osmTowers) {
-      const key = `${(t.lat * 100).toFixed(0)},${(t.lng * 100).toFixed(0)}`
-      if (!seen.has(key)) { seen.add(key); deduped.push(t) }
-    }
-    return NextResponse.json(deduped, {
-      headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=172800" },
-    })
-  }
-
-  // 3. Static fallback
-  return NextResponse.json(STATIC_TOWERS, {
-    headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=172800" },
+  const points: DensityPoint[] = CITIES.map(([lat, lng, towers, mcc, radio]) => ({
+    lat,
+    lng,
+    towers,
+    radio,
+    mcc,
+  }))
+  return NextResponse.json(points, {
+    headers: { "Cache-Control": "no-store" },
   })
 }
