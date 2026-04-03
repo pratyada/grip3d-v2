@@ -18,6 +18,15 @@ interface WildfirePoint {
   color: string
 }
 
+// ── Country types ─────────────────────────────────────────────────────────────
+
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const REGIONS: Record<RegionKey, { label: string; color: string }> = {
@@ -39,6 +48,34 @@ function getRegion(lat: number, lng: number): RegionKey {
   if (lng > 100   && lng <= 180 && lat <  -10) return "oceania"
   if (lng > 25    && lng <= 180 && lat >= -10) return "asia"
   return "other"
+}
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function featureBbox(geometry: any) {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { minLat, maxLat, minLng, maxLng }
 }
 
 // ── Three.js helpers ──────────────────────────────────────────────────────────
@@ -109,6 +146,9 @@ export default function UC18Page() {
   const [regionFilter, setRegionFilter] = useState<RegionKey | "all">("all")
   const [liveTime,     setLiveTime]     = useState(new Date())
   const [lastUpdate,   setLastUpdate]   = useState<Date | null>(null)
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setLiveTime(new Date()), 1000)
@@ -118,6 +158,37 @@ export default function UC18Page() {
   const filtered = useMemo(() => {
     return fires.filter(f => regionFilter === "all" || f.region === regionFilter)
   }, [fires, regionFilter])
+
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    if (!features.length) return
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInst.current) globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
 
   const fetchFires = useCallback(async () => {
     try {
@@ -153,6 +224,10 @@ export default function UC18Page() {
       }
       setFires(pts)
       setLastUpdate(new Date())
+
+      const geoRes = await fetch("/countries-110m.geojson")
+      const geo = await geoRes.json()
+      setCountries(geo.features as CountryFeature[])
     } catch (err: any) {
       if (fires.length === 0) { setErrorMsg(err?.message ?? "Unknown error"); setStatus("error") }
     }
@@ -226,6 +301,8 @@ export default function UC18Page() {
       }
       canvas.addEventListener("click", onClick)
       ;(canvas as any)._fireClick = onClick
+
+      applyCountries(globe, countries, null, null)
     })
 
     return () => {
@@ -253,6 +330,23 @@ export default function UC18Page() {
     for (const f of fires) c[f.region] = (c[f.region] ?? 0) + 1
     return c
   }, [fires])
+
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
+
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !fires.length) return null
+    const name = selectedCountry.properties.name
+    const bbox = featureBbox(selectedCountry.geometry)
+    const matching = fires.filter(f =>
+      f.lat >= bbox.minLat && f.lat <= bbox.maxLat &&
+      f.lng >= bbox.minLng && f.lng <= bbox.maxLng
+    )
+    return { name, count: matching.length, fires: matching.slice(0, 6) }
+  }, [selectedCountry, fires])
 
   const fmtTime = (d: Date) => d.toUTCString().replace("GMT", "UTC").slice(5, 25)
 
@@ -336,6 +430,54 @@ export default function UC18Page() {
           </div>
         </div>
       </div>
+
+      {/* Country hover tooltip */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
+          </div>
+        </div>
+      )}
+
+      {/* Country stats panel */}
+      {selectedCountry && countryStats && !selected && (
+        <div className="absolute bottom-4 right-4 pointer-events-auto w-64" style={{ zIndex: 10 }}>
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid rgba(255,100,0,0.3)",
+            backdropFilter: "blur(14px)",
+          }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats.count} active fire{countryStats.count !== 1 ? "s" : ""} detected
+                </p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)} className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            {countryStats.fires.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {countryStats.fires.map(f => (
+                  <div key={f.id} className="px-2 py-1 rounded text-xs truncate"
+                    style={{ background: "rgba(255,100,0,0.08)", color: "var(--muted)" }}>
+                    {f.title}
+                  </div>
+                ))}
+                {countryStats.count > 6 && (
+                  <p className="text-xs text-center mt-1" style={{ color: "var(--muted)", opacity: 0.6 }}>
+                    +{countryStats.count - 6} more
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>No active fires in bounding area</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Selected fire panel */}
       {selected && (

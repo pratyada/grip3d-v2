@@ -22,6 +22,15 @@ interface SpaceWeather {
   bz:               number
 }
 
+// ── Country types ─────────────────────────────────────────────────────────────
+
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 function auroraColor(prob: number): string {
@@ -45,6 +54,34 @@ function kpLabel(kp: number): { text: string; color: string } {
 }
 
 type HemiFilter = "both" | "north" | "south"
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function featureBbox(geometry: any) {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { minLat, maxLat, minLng, maxLng }
+}
 
 // ── Three.js helpers ──────────────────────────────────────────────────────────
 
@@ -112,6 +149,9 @@ export default function UC20Page() {
   const [hemiFilter,  setHemiFilter]  = useState<HemiFilter>("both")
   const [minProb,     setMinProb]     = useState(10)
   const [liveTime,    setLiveTime]    = useState(new Date())
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setLiveTime(new Date()), 1000)
@@ -140,12 +180,47 @@ export default function UC20Page() {
     })
   }, [allAuroraPoints, hemiFilter, minProb])
 
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    if (!features.length) return
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInst.current) globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
+
   const fetchWeather = useCallback(async () => {
     try {
       const res = await fetch("/api/space-weather")
       if (!res.ok) throw new Error(`API ${res.status}`)
       const d: SpaceWeather = await res.json()
       setWeather(d)
+
+      const geoRes = await fetch("/countries-110m.geojson")
+      const geo = await geoRes.json()
+      setCountries(geo.features as CountryFeature[])
     } catch (err: any) {
       if (!weather) { setErrorMsg(err?.message ?? "Unknown"); setStatus("error") }
     }
@@ -205,6 +280,8 @@ export default function UC20Page() {
         mat.needsUpdate = true
       }
       animId = requestAnimationFrame(blink)
+
+      applyCountries(globe, countries, null, null)
     })
 
     return () => {
@@ -224,6 +301,27 @@ export default function UC20Page() {
     if (!globeInst.current) return
     globeInst.current.controls().autoRotate = isSpinning
   }, [isSpinning])
+
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
+
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !weather) return null
+    const name = selectedCountry.properties.name
+    const bbox = featureBbox(selectedCountry.geometry)
+    const coords = weather.auroraCoords.filter(([rawLng, lat]) => {
+      const lng = rawLng > 180 ? rawLng - 360 : rawLng
+      return lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng
+    })
+    if (!coords.length) return { name, avg: 0, max: 0, count: 0 }
+    const probs = coords.map(c => c[2])
+    const avg = Math.round(probs.reduce((s, p) => s + p, 0) / probs.length)
+    const max = Math.round(Math.max(...probs))
+    return { name, avg, max, count: coords.length }
+  }, [selectedCountry, weather])
 
   const kp = weather ? kpLabel(weather.currentKp) : { text: "—", color: "var(--muted)" }
   const fmtTime = (d: Date) => d.toUTCString().replace("GMT", "UTC").slice(5, 25)
@@ -310,8 +408,55 @@ export default function UC20Page() {
         </div>
       </div>
 
+      {/* Country hover tooltip */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
+          </div>
+        </div>
+      )}
+
+      {/* Country aurora stats panel */}
+      {selectedCountry && countryStats && (
+        <div className="absolute bottom-4 right-4 pointer-events-auto w-64" style={{ zIndex: 10 }}>
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid rgba(0,255,170,0.25)",
+            backdropFilter: "blur(14px)",
+          }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Aurora forecast</p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)} className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            {countryStats.count > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Avg Probability", val: `${countryStats.avg}%`, color: countryStats.avg > 30 ? "#00ffaa" : "var(--muted)" },
+                  { label: "Peak Probability", val: `${countryStats.max}%`, color: countryStats.max > 50 ? "#00ffaa" : "var(--muted)" },
+                ].map(m => (
+                  <div key={m.label} className="rounded-lg px-2 py-2"
+                    style={{ background: "rgba(0,255,170,0.04)", border: "1px solid rgba(0,255,170,0.12)" }}>
+                    <p className="text-xs mb-0.5" style={{ color: "var(--muted)" }}>{m.label}</p>
+                    <p className="text-lg font-bold" style={{ color: m.color }}>{m.val}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                No aurora activity forecast for this region (Kp {weather?.currentKp.toFixed(1)})
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Space weather stats panel */}
-      {weather && (
+      {weather && !selectedCountry && (
         <div className="absolute bottom-4 right-4 pointer-events-auto w-72">
           <div className="rounded-xl p-4" style={{ background: "rgba(0,0,0,0.88)", border: "1px solid rgba(0,255,136,0.2)", backdropFilter: "blur(14px)" }}>
             <p className="text-xs font-semibold tracking-wider mb-3" style={{ color: "var(--muted)" }}>SPACE WEATHER CONDITIONS</p>

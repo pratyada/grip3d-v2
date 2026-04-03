@@ -38,6 +38,13 @@ interface SatPoint {
   satrec: any
 }
 
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Shell / Generation definitions ───────────────────────────────────────────
 
 type ShellKey = "53.0" | "53.2" | "70" | "97.6" | "43" | "other"
@@ -130,6 +137,36 @@ function propagateSat(satrec: any, satLib: any, now: Date): { lat: number; lng: 
 }
 
 
+// ── Country geometry helpers ──────────────────────────────────────────────
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function featureBbox(geometry: any) {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { minLat, maxLat, minLng, maxLng }
+}
+
 // ── Three.js satellite particle helpers ──────────────────────────────────────
 
 // Draw a 2D satellite icon on a canvas — body + solar wings + glow
@@ -219,6 +256,11 @@ export default function UC15Page() {
   const [tleEpoch,   setTleEpoch]   = useState("")
   const [liveTime,   setLiveTime]   = useState(new Date())
   const [loadPct,    setLoadPct]    = useState(0)
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
+  // ref to hold latest propagated points for country stats (doesn't need to trigger re-render)
+  const allPointsRef = useRef<Array<{ lat: number; lng: number; [key: string]: any }>>([])
 
   // ── Live clock ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -260,6 +302,7 @@ export default function UC15Page() {
         satrec:      s.satrec,
       })
     }
+    allPointsRef.current = pts  // store for country filtering
     setPoints(pts)
     setLiveTime(now)
   }, [])
@@ -277,10 +320,17 @@ export default function UC15Page() {
         satLib.current = sLib
         setLoadPct(25)
 
-        // 2. Fetch TLE text from our API proxy
-        const res = await fetch("/api/starlink-tle")
+        // 2. Fetch TLE text from our API proxy (+ GeoJSON in parallel)
+        const [res, geoRes] = await Promise.all([
+          fetch("/api/starlink-tle"),
+          fetch("/countries-110m.geojson"),
+        ])
         if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`)
         const tleText = await res.text()
+        if (geoRes.ok) {
+          const geo = await geoRes.json()
+          setCountries(geo.features as CountryFeature[])
+        }
         if (cancelled) return
         setLoadPct(55)
         if (!tleText || tleText.length < 100) {
@@ -338,6 +388,45 @@ export default function UC15Page() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [status, propagateAll])
 
+  // ── Country polygon helpers ───────────────────────────────────────────────
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    if (!features.length) return
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInst.current) globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
+
+  // ── Sync country polygons when hover/select/countries change ─────────────
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
+
   // ── Init globe.gl + Three.js satellite particle system ────────────────────
   useEffect(() => {
     if (status !== "ready" || !globeRef.current || globeInst.current) return
@@ -369,6 +458,7 @@ export default function UC15Page() {
       ctrl.dampingFactor = 0.1
 
       globeInst.current = globe
+      applyCountries(globe, countries, null, null)
 
       // ── Build satellite particle system ────────────────────────────────────
       const satTexture = makeSatTexture(THREE)
@@ -537,6 +627,21 @@ export default function UC15Page() {
     for (const p of points) counts[p.generation] = (counts[p.generation] ?? 0) + 1
     return counts
   }, [points])
+
+  const countryStats = useMemo(() => {
+    if (!selectedCountry) return null
+    const name = selectedCountry.properties.name
+    const bbox = featureBbox(selectedCountry.geometry)
+    const overhead = allPointsRef.current.filter((p: any) =>
+      p.lat >= bbox.minLat && p.lat <= bbox.maxLat &&
+      p.lng >= bbox.minLng && p.lng <= bbox.maxLng
+    )
+    const byShell: Record<string, number> = {}
+    for (const p of overhead as any[]) {
+      byShell[p.shell] = (byShell[p.shell] ?? 0) + 1
+    }
+    return { name, count: overhead.length, byShell }
+  }, [selectedCountry])
 
   const fmtTime = (d: Date) =>
     d.toUTCString().replace("GMT", "UTC").slice(5, 25)
@@ -791,6 +896,48 @@ export default function UC15Page() {
               }}>
               {showTrack ? "🛤 Ground track ON" : "🛤 Ground track OFF"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Country stats panel ───────────────────────────────────────── */}
+      {selectedCountry && countryStats && !selected && (
+        <div className="absolute bottom-4 right-4 pointer-events-auto w-64" style={{ zIndex: 10 }}>
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid rgba(51,204,221,0.3)",
+            backdropFilter: "blur(14px)",
+          }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats.count} Starlinks overhead (snapshot)
+                </p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)} className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            {countryStats.count > 0 ? (
+              <div className="flex flex-col gap-1">
+                {Object.entries(countryStats.byShell).map(([shell, cnt]) => (
+                  <div key={shell} className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                    style={{ background: "rgba(51,204,221,0.06)" }}>
+                    <span style={{ color: "var(--muted)" }}>{shell}° shell</span>
+                    <span className="font-mono" style={{ color: "#33ccdd" }}>{cnt}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>No satellites overhead right now</p>
+            )}
+          </div>
+        </div>
+      )}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
           </div>
         </div>
       )}

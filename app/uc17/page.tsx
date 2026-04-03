@@ -86,7 +86,44 @@ function updateAircraftBuffer(data: AircraftPoint[], THREE: any, points: any) {
   geo.computeBoundingSphere()
 }
 
+// ── Country types ─────────────────────────────────────────────────────────────
+
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function featureBbox(geometry: any) {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { minLat, maxLat, minLng, maxLng }
+}
 
 const mToFt   = (m: number)  => Math.round(m * 3.28084)
 const msToKts = (ms: number) => (ms * 1.94384).toFixed(0)
@@ -119,6 +156,9 @@ export default function UC17Page() {
   const [liveTime,    setLiveTime]    = useState(new Date())
   const [lastUpdate,  setLastUpdate]  = useState<Date | null>(null)
   const [apiNote,     setApiNote]     = useState("")
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setLiveTime(new Date()), 1000)
@@ -128,6 +168,37 @@ export default function UC17Page() {
   const filtered = useMemo(() => {
     return points.filter(p => altFilter === "all" || p.altBand === altFilter)
   }, [points, altFilter])
+
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    if (!features.length) return
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInst.current) globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
 
   const fetchAircraft = useCallback(async () => {
     try {
@@ -165,6 +236,10 @@ export default function UC17Page() {
       }
       setPoints(pts)
       setLastUpdate(new Date())
+
+      const geoRes = await fetch("/countries-110m.geojson")
+      const geo = await geoRes.json()
+      setCountries(geo.features as CountryFeature[])
     } catch (err: any) {
       setApiNote("Could not reach OpenSky — retrying…")
     }
@@ -243,6 +318,8 @@ export default function UC17Page() {
       }
       canvas.addEventListener("click", onClick)
       ;(canvas as any)._acClick = onClick
+
+      applyCountries(globe, countries, null, null)
     })
 
     return () => {
@@ -271,6 +348,26 @@ export default function UC17Page() {
     for (const p of points) c[p.altBand] = (c[p.altBand] ?? 0) + 1
     return c
   }, [points])
+
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
+
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !points.length) return null
+    const name = selectedCountry.properties.name
+    const matching = points.filter(p =>
+      p.country === name ||
+      p.country.toLowerCase().includes(name.toLowerCase()) ||
+      name.toLowerCase().includes(p.country.toLowerCase())
+    )
+    if (!matching.length) return null
+    const byBand: Record<string, number> = {}
+    for (const p of matching) byBand[p.altBand] = (byBand[p.altBand] ?? 0) + 1
+    return { name, count: matching.length, byBand }
+  }, [selectedCountry, points])
 
   const fmtTime = (d: Date) => d.toUTCString().replace("GMT", "UTC").slice(5, 25)
 
@@ -385,6 +482,46 @@ export default function UC17Page() {
                 <div key={m.label} className="rounded-lg px-2 py-1.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <p className="text-xs" style={{ color: "var(--muted)" }}>{m.label}</p>
                   <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{m.val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Country hover tooltip */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
+          </div>
+        </div>
+      )}
+
+      {/* Country stats panel */}
+      {selectedCountry && countryStats && !selected && (
+        <div className="absolute bottom-4 right-4 pointer-events-auto w-64" style={{ zIndex: 10 }}>
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            backdropFilter: "blur(14px)",
+          }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats.count} registered aircraft airborne
+                </p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)} className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-1">
+              {Object.entries(countryStats.byBand).map(([band, cnt]) => (
+                <div key={band} className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                  style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <span style={{ color: "var(--muted)" }}>{band}</span>
+                  <span className="font-mono" style={{ color: "var(--text)" }}>{cnt}</span>
                 </div>
               ))}
             </div>

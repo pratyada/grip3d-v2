@@ -5,6 +5,15 @@ import Link from "next/link"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
+
+
 interface CableSegment {
   name: string
   color: string
@@ -34,6 +43,20 @@ const OCEANS: Record<OceanKey, { label: string; color: string }> = {
   indian:   { label: "Indian Ocean",     color: "#44ff88" },
   arctic:   { label: "Arctic",           color: "#aaddff" },
   other:    { label: "Other / Regional", color: "#aaaaaa" },
+}
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
 }
 
 function getOcean(coords: number[][]): OceanKey {
@@ -66,18 +89,25 @@ export default function UC19Page() {
   const [oceanFilter,  setOceanFilter]  = useState<OceanKey | "all">("all")
   const [showStations, setShowStations] = useState(true)
   const [liveTime,     setLiveTime]     = useState(new Date())
+  const [countries,        setCountries]        = useState<CountryFeature[]>([])
+  const [hoveredCountry,   setHoveredCountry]   = useState<CountryFeature | null>(null)
+  const [selectedCountry,  setSelectedCountry]  = useState<CountryFeature | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setLiveTime(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  // Fetch cable data
+  // Fetch cable data + countries GeoJSON in parallel
   useEffect(() => {
-    fetch("/api/submarine-cables")
-      .then(r => { if (!r.ok) throw new Error(`API ${r.status}`); return r.json() })
-      .then((d: ApiData) => { setData(d); setStatus("ready") })
-      .catch(err => { setErrorMsg(err.message); setStatus("error") })
+    Promise.all([
+      fetch("/api/submarine-cables").then(r => { if (!r.ok) throw new Error(`API ${r.status}`); return r.json() }),
+      fetch("/countries-110m.geojson").then(r => r.json()).catch(() => null),
+    ]).then(([d, geo]: [ApiData, any]) => {
+      setData(d)
+      setStatus("ready")
+      if (geo?.features) setCountries(geo.features)
+    }).catch(err => { setErrorMsg(err.message); setStatus("error") })
   }, [])
 
   // Segments with ocean tag
@@ -95,6 +125,53 @@ export default function UC19Page() {
     for (const s of taggedSegments) c[s.ocean as OceanKey] = (c[s.ocean as OceanKey] ?? 0) + 1
     return c
   }, [taggedSegments])
+
+  // ── Country polygon helpers ───────────────────────────────────────────────
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInst.current) globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
+
+  // ── Country stats ─────────────────────────────────────────────────────────
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !data) return null
+    const name = selectedCountry.properties.name
+    const stations = data.stations.filter(s => s.country === name || s.country.includes(name))
+    if (!stations.length) return null
+    return { name, stationCount: stations.length, stations }
+  }, [selectedCountry, data])
+
+  // ── Re-apply countries on hover/selection change ──────────────────────────
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
 
   // Init globe — runs when data arrives
   useEffect(() => {
@@ -133,6 +210,9 @@ export default function UC19Page() {
         .pointAltitude(0.002)
         .pointLabel((d: any) => `${d.name}${d.country ? ` · ${d.country}` : ""}`)
         .onPointClick((d: any) => { setSelStation(d as LandingStation); setSelected(null); setIsSpinning(false) })
+
+      // ── Country borders ──
+      applyCountries(globe, countries, null, null)
 
       const ctrl = globe.controls()
       ctrl.autoRotate = true; ctrl.autoRotateSpeed = 0.15
@@ -300,8 +380,48 @@ export default function UC19Page() {
         </div>
       )}
 
+      {/* Country stats panel */}
+      {selectedCountry && countryStats && (
+        <div className="absolute bottom-4 right-4 pointer-events-auto w-64" style={{ zIndex: 10 }}>
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid rgba(51,204,221,0.3)",
+            backdropFilter: "blur(14px)",
+          }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats.stationCount} landing station{countryStats.stationCount !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)}
+                className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-0.5 max-h-36 overflow-y-auto">
+              {countryStats.stations.map((s, i) => (
+                <div key={i} className="px-2 py-1 rounded text-xs"
+                  style={{ background: "rgba(51,204,221,0.06)", border: "1px solid rgba(51,204,221,0.12)" }}>
+                  <span style={{ color: "#33ccdd" }}>{s.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Country hover tooltip */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
+          </div>
+        </div>
+      )}
+
       {/* Hint */}
-      {!selected && !selStation && (
+      {!selected && !selStation && !selectedCountry && (
         <div className="absolute bottom-4 right-4 pointer-events-none">
           <p className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,0,0,0.6)", color: "var(--muted)", border: "1px solid rgba(255,255,255,0.08)" }}>
             Click any cable or station for details

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
 import {
   getCities,
@@ -18,6 +18,14 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts"
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : String(n)
@@ -25,6 +33,20 @@ const salaryFmt = (n: number) => `$${(n / 1000).toFixed(0)}K`
 
 // Max jobs across all cities — used for point size normalisation
 const MAX_JOBS = Math.max(...getCities().map(c => c.totalJobs))
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
 
 // ── Globe config helpers ──────────────────────────────────────────────────────
 function cityToPoint(city: CityJobData, filterCat: JobCategory | null) {
@@ -51,11 +73,73 @@ export default function UC14Page() {
   const [activeTab, setActiveTab] = useState<"breakdown" | "trend">("breakdown")
   const [globeReady, setGlobeReady] = useState(false)
   const [isSpinning, setIsSpinning] = useState(true)
+  const [countries,        setCountries]        = useState<CountryFeature[]>([])
+  const [hoveredCountry,   setHoveredCountry]   = useState<CountryFeature | null>(null)
+  const [selectedCountry,  setSelectedCountry]  = useState<CountryFeature | null>(null)
 
   const stats = getGlobalStats()
+  const cityData = getCities()
 
   // ── Build point data ──────────────────────────────────────────────────────
-  const points = getCities().map(c => cityToPoint(c, selectedCategory))
+  const points = cityData.map(c => cityToPoint(c, selectedCategory))
+
+  // ── Country polygon helpers ───────────────────────────────────────────────
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.07)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.04)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected?.properties.name === d.properties.name) return "rgba(255,255,255,0.90)"
+        if (hovered?.properties.name === d.properties.name)  return "rgba(255,255,255,0.60)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.004)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        if (globeInstance.current) globeInstance.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      })
+  }
+
+  // ── Country stats ─────────────────────────────────────────────────────────
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !cityData) return null
+    const name = selectedCountry.properties.name
+    const citiesInCountry = cityData.filter(c => c.country === name || c.country.includes(name))
+    if (!citiesInCountry.length) return null
+    const totalJobs = citiesInCountry.reduce((s, c) => s + c.totalJobs, 0)
+    const avgSalary = Math.round(citiesInCountry.reduce((s, c) => s + c.avgSalaryUSD, 0) / citiesInCountry.length)
+    const topCat = citiesInCountry.reduce((best, c) => c.totalJobs > best.totalJobs ? c : best).topCategory
+    return { name, cities: citiesInCountry, totalJobs, avgSalary, topCat }
+  }, [selectedCountry, cityData])
+
+  // ── Fetch GeoJSON countries ───────────────────────────────────────────────
+  useEffect(() => {
+    fetch("/countries-110m.geojson")
+      .then(r => r.json())
+      .then(geo => setCountries(geo.features))
+      .catch(() => {/* silently ignore if not available */})
+  }, [])
+
+  // ── Re-apply countries on hover/selection change ──────────────────────────
+  useEffect(() => {
+    if (!globeInstance.current || !countries.length) return
+    applyCountries(globeInstance.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
 
   // ── Init globe.gl ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -101,6 +185,9 @@ export default function UC14Page() {
           setSelectedCity(pt.city)
         })
 
+      // ── Country borders ──
+      applyCountries(globe, countries, null, null)
+
       // Auto-rotate
       const ctrl = globe.controls()
       ctrl.autoRotate = true
@@ -130,7 +217,7 @@ export default function UC14Page() {
   // ── Update points when category filter changes ────────────────────────────
   useEffect(() => {
     if (!globeReady || !globeInstance.current) return
-    const newPoints = getCities().map(c => cityToPoint(c, selectedCategory))
+    const newPoints = cityData.map(c => cityToPoint(c, selectedCategory))
     globeInstance.current
       .pointsData(newPoints)
       .pointAltitude("altitude")
@@ -264,6 +351,62 @@ export default function UC14Page() {
             cursor: "grab",
           }}
         />
+
+        {/* ── Country hover tooltip ── */}
+        {hoveredCountry && !selectedCountry && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 10 }}>
+            <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--text)", backdropFilter: "blur(8px)" }}>
+              {hoveredCountry.properties.name}
+            </div>
+          </div>
+        )}
+
+        {/* ── Country stats panel ── */}
+        {selectedCountry && countryStats && (
+          <div className="absolute bottom-4 right-4 pointer-events-auto w-68"
+            style={{ zIndex: 10 }}>
+            <div className="rounded-xl p-4" style={{
+              background: "rgba(0,0,0,0.88)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              backdropFilter: "blur(14px)",
+            }}>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{countryStats.name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                    {countryStats.cities.length} cit{countryStats.cities.length === 1 ? "y" : "ies"} tracked
+                  </p>
+                </div>
+                <button onClick={() => setSelectedCountry(null)}
+                  className="opacity-40 hover:opacity-80" style={{ color: "var(--muted)" }}>✕</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {[
+                  { label: "Total Jobs",   val: countryStats.totalJobs.toLocaleString() },
+                  { label: "Avg Salary",   val: `$${(countryStats.avgSalary / 1000).toFixed(0)}K` },
+                  { label: "Top Sector",   val: countryStats.topCat },
+                  { label: "Cities",       val: countryStats.cities.length.toString() },
+                ].map(m => (
+                  <div key={m.label} className="rounded-lg px-2 py-1.5"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>{m.label}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{m.val}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col gap-0.5 max-h-28 overflow-y-auto">
+                {countryStats.cities.map(c => (
+                  <div key={c.id} className="flex items-center justify-between px-2 py-1 rounded text-xs"
+                    style={{ background: "rgba(255,255,255,0.03)" }}>
+                    <span style={{ color: "var(--text)" }}>{c.city}</span>
+                    <span style={{ color: "var(--muted)" }}>{c.totalJobs.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* City detail panel */}
         {selectedCity && (
