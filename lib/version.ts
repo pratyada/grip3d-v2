@@ -15,7 +15,7 @@
 
 export const VERSION = {
   major: 1,
-  minor: 9,
+  minor: 10,
   patch: 0,
 } as const
 
@@ -23,18 +23,23 @@ export const VERSION = {
 export const VERSION_STRING = `v${VERSION.major}.${VERSION.minor}.${VERSION.patch}`
 
 /** ISO date of the release (YYYY-MM-DD) */
-export const RELEASE_DATE = "2026-04-02"
+export const RELEASE_DATE = "2026-04-03"
 
 /** Short human-readable date, e.g. "1 Apr 2026" */
 export const RELEASE_DATE_LABEL = new Date(RELEASE_DATE + "T00:00:00")
   .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 
 /** One-liner describing what this release contains */
-export const RELEASE_LABEL = "UC06 Cell Towers · UC09 EV Charging · UC21 Financial Globe · UC22 Agriculture"
+export const RELEASE_LABEL = "UC23 Skyscraper Race · UC24 Rail Networks · UC25 Ocean Crisis · UC26 AI Infrastructure · UC27 Global Conflicts"
 
 // =============================================================================
 // CHANGELOG
 // =============================================================================
+// v1.10.0 2026-04-03  UC23 Global Skyscraper Race (deck.gl ColumnLayer, 60+ buildings) ·
+//                     UC24 World Rail Networks (PathLayer + ArcLayer, 25+ corridors) ·
+//                     UC25 Ocean Crisis Atlas (plastic + coral bleaching + SST) ·
+//                     UC26 AI Infrastructure Race (82 data centers, Stargate) ·
+//                     UC27 Global Conflict Monitor 2025 (24+ conflicts, 117M displaced)
 // v1.9.0  2026-04-02  UC06 Cell Tower Density (OpenCelliD, 2G/3G/LTE/5G) ·
 //                     UC09 EV Charging & Gas Stations (Open Charge Map/NREL) ·
 //                     UC21 Financial Globe (World Bank GDP, Frankfurter FX) ·
