@@ -67,7 +67,7 @@ const EXCHANGES: StockExchange[] = [
     indexName: "NYSE Composite",
     indexValue: 18_850,
     marketCapUsdT: 27.7,
-    color: "#ffcc00",
+    color: "#00e5ff",
   },
   {
     id: "NASDAQ",
@@ -80,7 +80,7 @@ const EXCHANGES: StockExchange[] = [
     indexName: "NASDAQ Composite",
     indexValue: 19_310,
     marketCapUsdT: 25.1,
-    color: "#ffaa00",
+    color: "#7c4dff",
   },
   {
     id: "LSE",

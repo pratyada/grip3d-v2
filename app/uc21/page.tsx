@@ -382,8 +382,8 @@ export default function UC21Page() {
         .pointsData(d.exchanges)
         .pointLat("lat")
         .pointLng("lng")
-        .pointAltitude(0.015)
-        .pointRadius(0.5)
+        .pointAltitude(0.025)
+        .pointRadius(0.7)
         .pointColor("color")
         .pointsMerge(false)
         .pointLabel((ex: any) => `<div style="font-family:sans-serif;padding:6px 10px;background:rgba(0,0,0,0.85);border-radius:8px;border:1px solid ${ex.color}44;color:#fff;font-size:12px;"><b style="color:${ex.color}">${ex.name}</b><br/>${ex.indexName}: ${fmtIndex(ex.indexValue)}<br/><span style="color:#aaa">Market cap: $${ex.marketCapUsdT.toFixed(1)}T</span></div>`)
@@ -537,19 +537,19 @@ export default function UC21Page() {
     if (viewMode === "gdp") {
       // Keep polygons visible, hide exchange labels emphasis, keep arcs subtle
       g.pointsData(d.exchanges)
-        .pointAltitude(0.015)
-        .pointRadius(0.3)
+        .pointAltitude(0.025)
+        .pointRadius(0.5)
       g.arcsData([])
     } else if (viewMode === "exchanges") {
       g.pointsData(d.exchanges)
-        .pointAltitude(0.04)
-        .pointRadius(0.8)
+        .pointAltitude(0.06)
+        .pointRadius(1.0)
       g.arcsData([])
     } else {
       // flows
       g.pointsData(d.exchanges)
-        .pointAltitude(0.015)
-        .pointRadius(0.4)
+        .pointAltitude(0.025)
+        .pointRadius(0.6)
       g.arcsData(d.flows)
     }
   }, [viewMode, globeReady])
@@ -767,10 +767,11 @@ export default function UC21Page() {
 
       {/* ── Selected country panel ────────────────────────────────────────────── */}
       {selectedCountry && (
-        <div className="absolute bottom-4 right-4 pointer-events-auto w-72">
-          <div className="rounded-xl p-4"
+        <div className="uc21-detail-panel absolute pointer-events-auto"
+          style={{ bottom: 40, right: 16, width: "clamp(240px, 40vw, 288px)", maxWidth: "calc(100vw - 32px)" }}>
+          <div className="rounded-xl p-3"
             style={{ background: "rgba(0,0,0,0.88)", border: "1px solid rgba(255,200,50,0.3)", backdropFilter: "blur(14px)" }}>
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 pr-2">
                 <p className="text-sm font-bold leading-tight" style={{ color: "var(--text)" }}>
                   {selectedCountry.country}
@@ -811,24 +812,24 @@ export default function UC21Page() {
 
       {/* ── Selected exchange panel with chart ────────────────────────────────── */}
       {selectedExch && (
-        <div className="absolute bottom-4 right-4 pointer-events-auto"
-          style={{ width: "420px", maxWidth: "calc(100vw - 320px)" }}>
+        <div className="uc21-detail-panel absolute pointer-events-auto"
+          style={{ bottom: 40, right: 16, width: "clamp(280px, 45vw, 420px)", maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
           <div className="rounded-xl overflow-hidden"
             style={{ background: "rgba(0,0,0,0.92)", border: `1px solid ${selectedExch.color}44`, backdropFilter: "blur(14px)" }}>
 
             {/* Header */}
-            <div className="flex items-start justify-between p-4 pb-2">
+            <div className="flex items-start justify-between p-3 pb-1.5">
               <div className="min-w-0 pr-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold" style={{ color: selectedExch.color }}>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-sm font-bold" style={{ color: selectedExch.color }}>
                     {selectedExch.id}
                   </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
                     style={{ background: `${selectedExch.color}22`, color: selectedExch.color, border: `1px solid ${selectedExch.color}44` }}>
                     {selectedExch.indexName}
                   </span>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                <p className="text-xs mt-0.5 truncate" style={{ color: "var(--muted)" }}>
                   {selectedExch.name} · {selectedExch.city}, {selectedExch.country}
                 </p>
               </div>
@@ -838,21 +839,21 @@ export default function UC21Page() {
             </div>
 
             {/* Price & Change */}
-            <div className="px-4 pb-2">
+            <div className="px-3 pb-1.5">
               {chartData ? (
-                <div className="flex items-baseline gap-3">
-                  <span className="text-2xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
                     {chartData.lastPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm font-semibold tabular-nums"
+                  <span className="text-xs font-semibold tabular-nums"
                     style={{ color: chartData.changePct >= 0 ? "#44ff88" : "#ff5555" }}>
                     {chartData.changePct >= 0 ? "▲" : "▼"} {Math.abs(chartData.change).toFixed(2)} ({Math.abs(chartData.changePct).toFixed(2)}%)
                   </span>
                   <span className="text-xs" style={{ color: "var(--muted)" }}>{chartData.currency}</span>
                 </div>
               ) : (
-                <div className="flex items-baseline gap-3">
-                  <span className="text-2xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
                     {fmtIndex(selectedExch.indexValue)}
                   </span>
                   <span className="text-xs" style={{ color: "var(--muted)" }}>indicative</span>
@@ -861,10 +862,10 @@ export default function UC21Page() {
             </div>
 
             {/* Time Range Tabs */}
-            <div className="flex gap-1 px-4 pb-2">
+            <div className="flex gap-0.5 px-3 pb-1.5 flex-wrap">
               {TIME_RANGES.map(r => (
                 <button key={r.key} onClick={() => setChartRange(r.key)}
-                  className="px-2.5 py-1 rounded-md text-xs font-semibold transition-all"
+                  className="px-2 py-1 rounded-md text-xs font-semibold transition-all"
                   style={{
                     background: chartRange === r.key ? `${selectedExch.color}22` : "transparent",
                     border:     chartRange === r.key ? `1px solid ${selectedExch.color}55` : "1px solid transparent",
@@ -876,7 +877,7 @@ export default function UC21Page() {
             </div>
 
             {/* Chart Area */}
-            <div className="px-2 pb-1" style={{ height: 180 }}>
+            <div className="uc21-chart-area px-2 pb-1">
               {chartLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="w-6 h-6 rounded-full border-2 border-transparent animate-spin"
@@ -898,7 +899,7 @@ export default function UC21Page() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis
                       dataKey="t"
-                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }}
+                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }}
                       axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
                       tickLine={false}
                       tickFormatter={(ts: number) => {
@@ -909,14 +910,14 @@ export default function UC21Page() {
                         if (chartRange === "max" || chartRange === "5y") return d.getFullYear().toString()
                         return d.toLocaleDateString("en-US", { month: "short" })
                       }}
-                      minTickGap={30}
+                      minTickGap={20}
                     />
                     <YAxis
                       domain={["auto", "auto"]}
-                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }}
+                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }}
                       axisLine={false}
                       tickLine={false}
-                      width={48}
+                      width={40}
                       tickFormatter={(v: number) => v >= 10000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}
                     />
                     <Tooltip
@@ -949,7 +950,7 @@ export default function UC21Page() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-1.5 px-4 pb-4 pt-1">
+            <div className="uc21-stats-grid grid gap-1 px-3 pb-3 pt-1">
               {[
                 { label: "Market Cap",  val: `$${selectedExch.marketCapUsdT.toFixed(1)}T` },
                 { label: "Prev Close",  val: chartData ? chartData.prevClose.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—" },
@@ -960,7 +961,7 @@ export default function UC21Page() {
                   { label: "Volume",    val: (() => { const v = chartData.points[chartData.points.length - 1]?.v ?? 0; return v >= 1e9 ? `${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v.toLocaleString() })() },
                 ] : []),
               ].map(m => (
-                <div key={m.label} className="rounded-lg px-2 py-1.5"
+                <div key={m.label} className="rounded-lg px-2 py-1"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <p className="text-xs" style={{ color: "var(--muted)" }}>{m.label}</p>
                   <p className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{m.val}</p>
@@ -997,6 +998,10 @@ export default function UC21Page() {
         /* Hide scrollbar on sidebar */
         .uc21-sidebar::-webkit-scrollbar { display: none; }
         .uc21-sidebar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Chart area height */
+        .uc21-chart-area { height: 170px; }
+        /* Stats grid default: 3 cols */
+        .uc21-stats-grid { grid-template-columns: repeat(3, 1fr); }
         /* Mobile: shrink sidebar so globe is visible */
         @media (max-width: 640px) {
           .uc21-sidebar {
@@ -1006,6 +1011,15 @@ export default function UC21Page() {
             gap: 4px !important;
             max-height: calc(100vh - 80px) !important;
           }
+          .uc21-detail-panel {
+            left: 8px !important;
+            right: 8px !important;
+            bottom: 40px !important;
+            width: auto !important;
+            max-width: 100vw !important;
+          }
+          .uc21-chart-area { height: 130px; }
+          .uc21-stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
       `}</style>
     </div>
