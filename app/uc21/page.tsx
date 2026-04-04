@@ -301,8 +301,8 @@ export default function UC21Page() {
           const entry = gdpMapLocal.get(iso2) || gdpMapLocal.get(iso3)
           return entry ? gdpToColor(entry.gdpUsd, localMaxGdp) : "#1a1a1a"
         })
-        .polygonSideColor(() => "rgba(50,40,0,0.15)")
-        .polygonStrokeColor(() => "rgba(255,200,50,0.12)")
+        .polygonSideColor(() => "rgba(50,40,0,0.25)")
+        .polygonStrokeColor(() => "rgba(255,200,50,0.45)")
         .polygonLabel((feat: any) => {
           const props = feat?.properties ?? {}
           const iso2  = (props.ISO_A2 ?? props.iso_a2 ?? "").toUpperCase()
