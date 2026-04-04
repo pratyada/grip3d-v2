@@ -59,6 +59,16 @@ const WHEAT: CropRecord[] = [
   { iso3:"ESP", country:"Spain",          lat:40.4, lng:-3.7,  production:8310,   yield:3.55, area:2340  },
   { iso3:"ETH", country:"Ethiopia",       lat:9.1,  lng:40.5,  production:5590,   yield:2.81, area:1990  },
   { iso3:"IRQ", country:"Iraq",           lat:33.2, lng:43.7,  production:2270,   yield:2.44, area:930   },
+  { iso3:"AFG", country:"Afghanistan",     lat:33.9, lng:67.7,  production:4580,   yield:2.21, area:2072  },
+  { iso3:"DZA", country:"Algeria",         lat:28.0, lng:3.0,   production:2660,   yield:1.58, area:1683  },
+  { iso3:"UZB", country:"Uzbekistan",      lat:41.4, lng:64.6,  production:6875,   yield:4.61, area:1492  },
+  { iso3:"CHE", country:"Switzerland",     lat:46.8, lng:8.2,   production:476,    yield:6.39, area:75    },
+  { iso3:"NZL", country:"New Zealand",     lat:-40.9,lng:174.9, production:492,    yield:8.54, area:58    },
+  { iso3:"CHL", country:"Chile",           lat:-35.7,lng:-71.5, production:1290,   yield:5.84, area:221   },
+  { iso3:"TUN", country:"Tunisia",         lat:34.0, lng:9.0,   production:850,    yield:1.44, area:590   },
+  { iso3:"SYR", country:"Syria",           lat:34.8, lng:38.9,  production:2190,   yield:1.92, area:1140  },
+  { iso3:"NER", country:"Niger",           lat:17.6, lng:8.1,   production:22,     yield:0.84, area:26    },
+  { iso3:"JPN", country:"Japan",           lat:36.2, lng:138.3, production:1100,   yield:4.67, area:235   },
 ]
 
 const RICE: CropRecord[] = [
@@ -87,6 +97,14 @@ const RICE: CropRecord[] = [
   { iso3:"EGY", country:"Egypt",          lat:26.8, lng:30.8,  production:7100,   yield:9.93, area:715   },
   { iso3:"NPL", country:"Nepal",          lat:28.4, lng:84.1,  production:5620,   yield:3.72, area:1510  },
   { iso3:"ECU", country:"Ecuador",        lat:-1.8, lng:-78.2, production:1360,   yield:5.03, area:270   },
+  { iso3:"LKA", country:"Sri Lanka",       lat:7.9,  lng:80.8,  production:4780,   yield:4.31, area:1109  },
+  { iso3:"SLE", country:"Sierra Leone",    lat:8.5,  lng:-11.8, production:1270,   yield:2.15, area:591   },
+  { iso3:"ITA", country:"Italy",           lat:42.5, lng:12.6,  production:1470,   yield:6.68, area:220   },
+  { iso3:"IRN", country:"Iran",            lat:32.4, lng:53.7,  production:2460,   yield:4.73, area:520   },
+  { iso3:"GIN", country:"Guinea",          lat:9.9,  lng:-9.7,  production:2590,   yield:2.17, area:1193  },
+  { iso3:"PRK", country:"North Korea",     lat:40.3, lng:127.5, production:2800,   yield:4.85, area:577   },
+  { iso3:"DOM", country:"Dominican Rep.",  lat:18.7, lng:-70.2, production:830,    yield:5.48, area:151   },
+  { iso3:"BFA", country:"Burkina Faso",    lat:12.4, lng:-1.6,  production:390,    yield:2.26, area:173   },
 ]
 
 const MAIZE: CropRecord[] = [
@@ -115,6 +133,14 @@ const MAIZE: CropRecord[] = [
   { iso3:"SRB", country:"Serbia",         lat:44.0, lng:21.0,  production:7920,   yield:7.42, area:1067  },
   { iso3:"MWI", country:"Malawi",         lat:-13.3,lng:34.3,  production:3580,   yield:2.73, area:1312  },
   { iso3:"CMR", country:"Cameroon",       lat:5.7,  lng:12.4,  production:2420,   yield:2.06, area:1175  },
+  { iso3:"GHA", country:"Ghana",           lat:7.9,  lng:-1.0,  production:2220,   yield:2.19, area:1014  },
+  { iso3:"VNM", country:"Vietnam",         lat:14.1, lng:108.3, production:4700,   yield:4.88, area:963   },
+  { iso3:"PAK", country:"Pakistan",        lat:30.4, lng:69.3,  production:9560,   yield:5.26, area:1817  },
+  { iso3:"EGY", country:"Egypt",           lat:26.8, lng:30.8,  production:7200,   yield:7.85, area:917   },
+  { iso3:"THA", country:"Thailand",        lat:15.9, lng:100.9, production:5030,   yield:4.55, area:1106  },
+  { iso3:"BOL", country:"Bolivia",         lat:-16.3,lng:-63.6, production:1100,   yield:3.33, area:330   },
+  { iso3:"PRY", country:"Paraguay",        lat:-23.4,lng:-58.4, production:5200,   yield:6.17, area:843   },
+  { iso3:"IRN", country:"Iran",            lat:32.4, lng:53.7,  production:1640,   yield:6.14, area:267   },
 ]
 
 const SOYBEANS: CropRecord[] = [
@@ -138,6 +164,11 @@ const SOYBEANS: CropRecord[] = [
   { iso3:"JPN", country:"Japan",          lat:36.2, lng:138.3, production:262,    yield:2.24, area:117   },
   { iso3:"KOR", country:"South Korea",    lat:35.9, lng:127.8, production:121,    yield:1.81, area:67    },
   { iso3:"THA", country:"Thailand",       lat:15.9, lng:100.9, production:248,    yield:2.07, area:120   },
+  { iso3:"MYS", country:"Malaysia",        lat:4.2,  lng:101.9, production:38,     yield:1.52, area:25    },
+  { iso3:"MMR", country:"Myanmar",         lat:17.1, lng:96.9,  production:290,    yield:1.49, area:195   },
+  { iso3:"BGD", country:"Bangladesh",      lat:23.7, lng:90.4,  production:120,    yield:1.41, area:85    },
+  { iso3:"VNM", country:"Vietnam",         lat:14.1, lng:108.3, production:175,    yield:1.63, area:107   },
+  { iso3:"ETH", country:"Ethiopia",        lat:9.1,  lng:40.5,  production:155,    yield:2.00, area:78    },
 ]
 
 const COFFEE: CropRecord[] = [
@@ -161,6 +192,11 @@ const COFFEE: CropRecord[] = [
   { iso3:"KEN", country:"Kenya",           lat:0.0,  lng:37.9,  production:74,    yield:0.75, area:99    },
   { iso3:"ECU", country:"Ecuador",         lat:-1.8, lng:-78.2, production:60,    yield:0.63, area:95    },
   { iso3:"CUB", country:"Cuba",            lat:22.0, lng:-80.0, production:29,    yield:0.48, area:60    },
+  { iso3:"RWA", country:"Rwanda",          lat:-1.9, lng:29.9,  production:23,     yield:0.83, area:28    },
+  { iso3:"THA", country:"Thailand",        lat:15.9, lng:100.9, production:28,     yield:0.93, area:30    },
+  { iso3:"LAO", country:"Laos",            lat:18.2, lng:103.9, production:145,    yield:1.80, area:81    },
+  { iso3:"DOM", country:"Dominican Rep.",  lat:18.7, lng:-70.2, production:27,     yield:0.67, area:40    },
+  { iso3:"MYS", country:"Malaysia",        lat:4.2,  lng:101.9, production:20,     yield:0.53, area:38    },
 ]
 
 const COCOA: CropRecord[] = [
@@ -179,6 +215,11 @@ const COCOA: CropRecord[] = [
   { iso3:"DOM", country:"Dominican Rep.", lat:18.7, lng:-70.2, production:76,    yield:0.60, area:127   },
   { iso3:"PER", country:"Peru",           lat:-9.2, lng:-75.0, production:165,   yield:0.79, area:209   },
   { iso3:"MEX", country:"Mexico",         lat:23.6, lng:-102.6,production:37,    yield:0.40, area:93    },
+  { iso3:"IND", country:"India",           lat:20.6, lng:78.9,  production:25,     yield:0.48, area:52    },
+  { iso3:"VEN", country:"Venezuela",       lat:6.4,  lng:-66.6, production:22,     yield:0.35, area:63    },
+  { iso3:"GIN", country:"Guinea",          lat:9.9,  lng:-9.7,  production:17,     yield:0.42, area:40    },
+  { iso3:"LBR", country:"Liberia",         lat:6.4,  lng:-9.4,  production:12,     yield:0.29, area:41    },
+  { iso3:"PHL", country:"Philippines",     lat:12.9, lng:121.8, production:8,      yield:0.27, area:30    },
 ]
 
 const SUGARCANE: CropRecord[] = [
@@ -202,6 +243,11 @@ const SUGARCANE: CropRecord[] = [
   { iso3:"KEN", country:"Kenya",          lat:0.0,  lng:37.9,  production:4970,   yield:55.1,area:90    },
   { iso3:"ECU", country:"Ecuador",        lat:-1.8, lng:-78.2, production:8630,   yield:92.8,area:93    },
   { iso3:"CUB", country:"Cuba",           lat:22.0, lng:-80.0, production:1530,   yield:40.2,area:38    },
+  { iso3:"BGD", country:"Bangladesh",      lat:23.7, lng:90.4,  production:5100,   yield:42.5, area:120   },
+  { iso3:"VNM", country:"Vietnam",         lat:14.1, lng:108.3, production:16400,  yield:64.1, area:256   },
+  { iso3:"VEN", country:"Venezuela",       lat:6.4,  lng:-66.6, production:6100,   yield:61.0, area:100   },
+  { iso3:"DOM", country:"Dominican Rep.",  lat:18.7, lng:-70.2, production:4680,   yield:75.5, area:62    },
+  { iso3:"JAM", country:"Jamaica",         lat:18.1, lng:-77.3, production:1480,   yield:56.9, area:26    },
 ]
 
 const COTTON: CropRecord[] = [
@@ -225,6 +271,11 @@ const COTTON: CropRecord[] = [
   { iso3:"CMR", country:"Cameroon",       lat:5.7,  lng:12.4,  production:274,   yield:1.16, area:236   },
   { iso3:"EGY", country:"Egypt",          lat:26.8, lng:30.8,  production:181,   yield:2.64, area:69    },
   { iso3:"SYR", country:"Syria",          lat:34.8, lng:38.9,  production:165,   yield:1.38, area:120   },
+  { iso3:"CIV", country:"Ivory Coast",     lat:7.5,  lng:-5.5,  production:230,   yield:1.05, area:219   },
+  { iso3:"TCD", country:"Chad",            lat:15.4, lng:18.7,  production:135,   yield:0.63, area:214   },
+  { iso3:"KEN", country:"Kenya",           lat:0.0,  lng:37.9,  production:25,    yield:0.56, area:45    },
+  { iso3:"IRN", country:"Iran",            lat:32.4, lng:53.7,  production:87,    yield:1.24, area:70    },
+  { iso3:"TJK", country:"Tajikistan",      lat:38.9, lng:71.3,  production:110,   yield:0.83, area:133   },
 ]
 
 // Arable land % — World Bank AG.LND.AGRI.ZS, approx 2021
@@ -315,6 +366,21 @@ const ARABLE: ArableRecord[] = [
   { iso3:"NIC", country:"Nicaragua",      lat:12.9, lng:-85.2, pct:14.8 },
   { iso3:"CRI", country:"Costa Rica",     lat:9.7,  lng:-83.8, pct:4.9  },
   { iso3:"PNG", country:"Papua New Guinea",lat:-6.3,lng:143.9, pct:1.1  },
+  { iso3:"AFG", country:"Afghanistan",     lat:33.9, lng:67.7,  pct:12.0 },
+  { iso3:"DZA", country:"Algeria",         lat:28.0, lng:3.0,   pct:3.4  },
+  { iso3:"TUN", country:"Tunisia",         lat:34.0, lng:9.0,   pct:18.1 },
+  { iso3:"GIN", country:"Guinea",          lat:9.9,  lng:-9.7,  pct:12.2 },
+  { iso3:"SLE", country:"Sierra Leone",    lat:8.5,  lng:-11.8, pct:27.5 },
+  { iso3:"TCD", country:"Chad",            lat:15.4, lng:18.7,  pct:3.9  },
+  { iso3:"LBR", country:"Liberia",         lat:6.4,  lng:-9.4,  pct:5.3  },
+  { iso3:"RWA", country:"Rwanda",          lat:-1.9, lng:29.9,  pct:47.5 },
+  { iso3:"TGO", country:"Togo",            lat:8.6,  lng:0.8,   pct:45.2 },
+  { iso3:"BEN", country:"Benin",           lat:9.3,  lng:2.3,   pct:27.8 },
+  { iso3:"NER", country:"Niger",           lat:17.6, lng:8.1,   pct:14.4 },
+  { iso3:"JAM", country:"Jamaica",         lat:18.1, lng:-77.3, pct:11.1 },
+  { iso3:"VEN", country:"Venezuela",       lat:6.4,  lng:-66.6, pct:3.4  },
+  { iso3:"TJK", country:"Tajikistan",      lat:38.9, lng:71.3,  pct:6.7  },
+  { iso3:"MNG", country:"Mongolia",        lat:46.9, lng:103.8, pct:0.5  },
 ]
 
 // ── Route handler ──────────────────────────────────────────────────────────────

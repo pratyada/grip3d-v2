@@ -984,6 +984,31 @@ export default function UC23Page() {
       globe.controls().autoRotateSpeed = 0.15
       globe.controls().enableDamping   = true
       globe.controls().dampingFactor   = 0.1
+
+      // Configure point accessors once — only pointsData changes on filter
+      globe
+        .pointLat("lat")
+        .pointLng("lng")
+        .pointRadius(0.06)
+        .pointColor((d: Building) => STATUS_COLOR[d.status] ?? "#ffffff")
+        .pointsMerge(false)
+        .pointLabel((d: Building) =>
+          `<div style="background:rgba(0,0,0,0.85);border:1px solid rgba(253,231,37,0.4);border-radius:8px;padding:8px 12px;font-size:12px;color:#fff;max-width:200px">
+            <b style="color:#fde725">${d.name}</b><br/>
+            ${d.heightM}m &middot; ${d.floors} floors<br/>
+            ${d.city}, ${d.country}<br/>
+            ${d.status === "complete" ? d.year : "Est. " + d.year}
+          </div>`
+        )
+        .onPointClick((d: Building) => {
+          setSelected(d)
+          globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.4 }, 700)
+          setIsSpinning(false)
+        })
+        .onPointHover((d: Building | null) => {
+          if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
+        })
+
       globeInst.current = globe
       setGlobeReady(true)
     })
@@ -1009,35 +1034,14 @@ export default function UC23Page() {
     [filter],
   )
 
-  // Apply buildings as points whenever filter or globeReady changes
+  // Update point data whenever filter changes
   useEffect(() => {
     if (!globeInst.current || !globeReady) return
     const g = globeInst.current
     const maxH = Math.max(...filtered.map(b => b.heightM))
     g
-      .pointsData(filtered)
-      .pointLat("lat")
-      .pointLng("lng")
       .pointAltitude((d: Building) => (d.heightM / maxH) * 0.55)
-      .pointRadius(0.06)
-      .pointColor((d: Building) => STATUS_COLOR[d.status] ?? "#ffffff")
-      .pointsMerge(false)
-      .pointLabel((d: Building) =>
-        `<div style="background:rgba(0,0,0,0.85);border:1px solid rgba(253,231,37,0.4);border-radius:8px;padding:8px 12px;font-size:12px;color:#fff;max-width:200px">
-          <b style="color:#fde725">${d.name}</b><br/>
-          ${d.heightM}m &middot; ${d.floors} floors<br/>
-          ${d.city}, ${d.country}<br/>
-          ${d.status === "complete" ? d.year : "Est. " + d.year}
-        </div>`
-      )
-      .onPointClick((d: Building) => {
-        setSelected(d)
-        globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.4 }, 700)
-        setIsSpinning(false)
-      })
-      .onPointHover((d: Building | null) => {
-        if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
-      })
+      .pointsData(filtered)
   }, [filtered, globeReady])
 
   // Apply country borders
