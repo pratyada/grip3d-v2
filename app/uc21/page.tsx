@@ -179,6 +179,51 @@ const TICKER_ITEMS = [
   { symbol: "^SSMI",   label: "SMI",           value: 12100,  change: +0.21 },
 ]
 
+// ── Country currency symbols & centroids ─────────────────────────────────────
+// ISO-2 → currency symbol
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  US: "$", CA: "C$", MX: "$", BR: "R$", AR: "$", CL: "$", CO: "$", PE: "S/",
+  GB: "£", DE: "€", FR: "€", IT: "€", ES: "€", NL: "€", BE: "€", AT: "€",
+  PT: "€", IE: "€", FI: "€", GR: "€", LU: "€", SK: "€", SI: "€", EE: "€",
+  LV: "€", LT: "€", CY: "€", MT: "€", HR: "€",
+  CH: "Fr", SE: "kr", NO: "kr", DK: "kr", PL: "zł", CZ: "Kč", HU: "Ft",
+  RO: "lei", BG: "лв", RU: "₽", UA: "₴", TR: "₺",
+  JP: "¥", CN: "¥", KR: "₩", IN: "₹", ID: "Rp", TH: "฿", VN: "₫",
+  PH: "₱", MY: "RM", SG: "S$", TW: "NT$", HK: "HK$", BD: "৳", PK: "₨",
+  LK: "Rs", NP: "Rs", MM: "K", KH: "៛", LA: "₭",
+  AU: "A$", NZ: "NZ$",
+  SA: "﷼", AE: "د.إ", IL: "₪", EG: "£", QA: "﷼", KW: "د.ك", BH: "BD",
+  OM: "﷼", JO: "JD", LB: "LL", IQ: "ع.د", IR: "﷼",
+  ZA: "R", NG: "₦", KE: "KSh", GH: "₵", TZ: "TSh", ET: "Br",
+  MA: "MAD", TN: "DT", DZ: "د.ج",
+}
+
+// ISO-2 → approximate centroid [lat, lng]
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  US: [39.8, -98.6], CA: [56.1, -106.3], MX: [23.6, -102.6], BR: [-14.2, -51.9],
+  AR: [-38.4, -63.6], CL: [-35.7, -71.5], CO: [4.6, -74.3], PE: [-9.2, -75.0],
+  VE: [6.4, -66.6], EC: [-1.8, -78.2], BO: [-16.3, -63.6], PY: [-23.4, -58.4],
+  UY: [-32.5, -55.8],
+  GB: [55.4, -3.4], DE: [51.2, 10.5], FR: [46.2, 2.2], IT: [41.9, 12.6],
+  ES: [40.5, -3.7], NL: [52.1, 5.3], BE: [50.5, 4.5], AT: [47.5, 14.6],
+  PT: [39.4, -8.2], IE: [53.1, -8.0], FI: [61.9, 25.7], GR: [39.1, 21.8],
+  CH: [46.8, 8.2], SE: [60.1, 18.6], NO: [60.5, 8.5], DK: [56.3, 9.5],
+  PL: [51.9, 19.1], CZ: [49.8, 15.5], HU: [47.2, 19.5], RO: [45.9, 25.0],
+  BG: [42.7, 25.5], RU: [61.5, 105.3], UA: [48.4, 31.2], TR: [39.0, 35.2],
+  JP: [36.2, 138.3], CN: [35.9, 104.2], KR: [35.9, 127.8], IN: [20.6, 79.0],
+  ID: [-0.8, 113.9], TH: [15.9, 101.0], VN: [14.1, 108.3], PH: [12.9, 121.8],
+  MY: [4.2, 101.9], SG: [1.4, 103.8], TW: [23.7, 121.0], HK: [22.4, 114.1],
+  BD: [23.7, 90.4], PK: [30.4, 69.3], LK: [7.9, 80.8], NP: [28.4, 84.1],
+  MM: [21.9, 96.0], KH: [12.6, 105.0], LA: [19.9, 102.5],
+  AU: [-25.3, 133.8], NZ: [-40.9, 174.9],
+  SA: [23.9, 45.1], AE: [23.4, 53.8], IL: [31.0, 34.9], EG: [26.8, 30.8],
+  QA: [25.4, 51.2], KW: [29.3, 47.5], IQ: [33.2, 43.7], IR: [32.4, 53.7],
+  JO: [30.6, 36.2], LB: [33.9, 35.9],
+  ZA: [-30.6, 22.9], NG: [9.1, 8.7], KE: [-0.0, 37.9], GH: [7.9, -1.0],
+  TZ: [-6.4, 34.9], ET: [9.1, 40.5], MA: [31.8, -7.1], TN: [34.0, 9.5],
+  DZ: [28.0, 1.7],
+}
+
 // ── GDP legend scale ──────────────────────────────────────────────────────────
 const GDP_LEGEND_STEPS = [
   { label: "<$10B",  color: "#222" },
@@ -360,6 +405,36 @@ export default function UC21Page() {
         .arcDashGap(0.2)
         .arcDashAnimateTime(2500)
         .arcLabel((fl: any) => `<div style="font-family:sans-serif;padding:4px 8px;background:rgba(0,0,0,0.8);border-radius:6px;color:#ffcc00;font-size:11px;">${fl.label} · $${fl.valueBn}B</div>`)
+
+      // ── Currency symbol labels on each country ─────────────────────────────
+      const currencyLabels = Object.entries(COUNTRY_CENTROIDS)
+        .filter(([iso2]) => CURRENCY_SYMBOLS[iso2])
+        .map(([iso2, [lat, lng]]) => ({
+          lat, lng,
+          text: CURRENCY_SYMBOLS[iso2],
+          iso2,
+          size: 0.6,
+          color: "rgba(255,220,100,0.85)",
+        }))
+
+      globe
+        .labelsData(currencyLabels)
+        .labelLat("lat")
+        .labelLng("lng")
+        .labelText("text")
+        .labelSize("size")
+        .labelDotRadius(0)
+        .labelColor("color")
+        .labelAltitude(0.008)
+        .labelResolution(3)
+        .labelTypeFace(undefined as any) // use default
+        .labelLabel((d: any) => {
+          const entry = gdpMapLocal.get(d.iso2)
+          const name = entry?.country ?? d.iso2
+          return `<div style="font-family:sans-serif;padding:4px 8px;background:rgba(0,0,0,0.85);border-radius:6px;color:#ffdd88;font-size:11px;border:1px solid rgba(255,200,50,0.3);">
+            <b style="color:#ffcc00">${d.text}</b> ${name}${entry ? ` · GDP: ${fmtGdp(entry.gdpUsd)}` : ""}
+          </div>`
+        })
 
       // Fetch Natural Earth GeoJSON with ISO properties for proper country matching
       fetch("//raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
