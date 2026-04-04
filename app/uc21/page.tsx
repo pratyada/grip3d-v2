@@ -2,8 +2,46 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  CartesianGrid,
+} from "recharts"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+interface ChartPoint {
+  t: number
+  o: number
+  h: number
+  l: number
+  c: number
+  v: number
+}
+
+interface MarketHistory {
+  symbol: string
+  currency: string
+  exchange: string
+  range: string
+  interval: string
+  prevClose: number
+  lastPrice: number
+  change: number
+  changePct: number
+  points: ChartPoint[]
+}
+
+type TimeRange = "1d" | "5d" | "1mo" | "6mo" | "1y" | "5y" | "max"
+
+const TIME_RANGES: { key: TimeRange; label: string }[] = [
+  { key: "1d",  label: "1D"  },
+  { key: "5d",  label: "5D"  },
+  { key: "1mo", label: "1M"  },
+  { key: "6mo", label: "6M"  },
+  { key: "1y",  label: "1Y"  },
+  { key: "5y",  label: "5Y"  },
+  { key: "max", label: "MAX" },
+]
 
 interface GdpEntry {
   iso2: string
@@ -119,6 +157,28 @@ const INDICES = [
   { label: "Sensex",        region: "🇮🇳", value: 77_200, change: +0.65 },
 ]
 
+// ── Ticker tape data ────────────────────────────────────────────────────────
+const TICKER_ITEMS = [
+  { symbol: "^GSPC",   label: "S&P 500",      value: 5780,   change: +0.82 },
+  { symbol: "^DJI",    label: "Dow Jones",     value: 43250,  change: +0.55 },
+  { symbol: "^IXIC",   label: "NASDAQ",        value: 19310,  change: +1.14 },
+  { symbol: "^FTSE",   label: "FTSE 100",      value: 8260,   change: +0.31 },
+  { symbol: "^GDAXI",  label: "DAX",           value: 19900,  change: +0.67 },
+  { symbol: "^FCHI",   label: "CAC 40",        value: 7480,   change: +0.42 },
+  { symbol: "^N225",   label: "Nikkei 225",    value: 39850,  change: -0.44 },
+  { symbol: "000001.SS",label:"Shanghai",      value: 3310,   change: +1.12 },
+  { symbol: "^HSI",    label: "Hang Seng",     value: 20100,  change: -0.25 },
+  { symbol: "^NSEI",   label: "Nifty 50",      value: 23400,  change: +0.65 },
+  { symbol: "^BSESN",  label: "Sensex",        value: 77200,  change: +0.71 },
+  { symbol: "^AXJO",   label: "ASX 200",       value: 8340,   change: +0.38 },
+  { symbol: "^GSPTSE", label: "TSX",           value: 24100,  change: +0.29 },
+  { symbol: "^KS11",   label: "KOSPI",         value: 2560,   change: -0.18 },
+  { symbol: "^TWII",   label: "TAIEX",         value: 22800,  change: +0.92 },
+  { symbol: "^BVSP",   label: "Ibovespa",      value: 134000, change: +0.55 },
+  { symbol: "^TASI.SR",label: "TASI",          value: 11900,  change: +0.33 },
+  { symbol: "^SSMI",   label: "SMI",           value: 12100,  change: +0.21 },
+]
+
 // ── GDP legend scale ──────────────────────────────────────────────────────────
 const GDP_LEGEND_STEPS = [
   { label: "<$10B",  color: "#222" },
@@ -145,6 +205,12 @@ export default function UC21Page() {
   const [selectedExch,    setSelectedExch]    = useState<StockExchange | null>(null)
   const [globeReady,      setGlobeReady]      = useState(false)
 
+  // Chart state
+  const [chartData,    setChartData]    = useState<MarketHistory | null>(null)
+  const [chartRange,   setChartRange]   = useState<TimeRange>("1y")
+  const [chartLoading, setChartLoading] = useState(false)
+  const [chartError,   setChartError]   = useState("")
+
   // ── Fetch financial data ────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
@@ -161,6 +227,26 @@ export default function UC21Page() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // ── Fetch chart data when exchange or range changes ────────────────────────
+  useEffect(() => {
+    if (!selectedExch) { setChartData(null); return }
+    let cancelled = false
+    setChartLoading(true)
+    setChartError("")
+    fetch(`/api/market-history?exchange=${selectedExch.id}&range=${chartRange}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`API ${r.status}`)
+        return r.json()
+      })
+      .then((json: MarketHistory) => {
+        if (!cancelled) { setChartData(json); setChartLoading(false) }
+      })
+      .catch(err => {
+        if (!cancelled) { setChartError(err?.message ?? "Failed"); setChartLoading(false) }
+      })
+    return () => { cancelled = true }
+  }, [selectedExch, chartRange])
 
   // ── Derived: GDP map ────────────────────────────────────────────────────────
   const gdpMap = useMemo<Map<string, GdpEntry>>(() => {
@@ -604,43 +690,192 @@ export default function UC21Page() {
         </div>
       )}
 
-      {/* ── Selected exchange panel ───────────────────────────────────────────── */}
+      {/* ── Selected exchange panel with chart ────────────────────────────────── */}
       {selectedExch && (
-        <div className="absolute bottom-4 right-4 pointer-events-auto w-72">
-          <div className="rounded-xl p-4"
-            style={{ background: "rgba(0,0,0,0.88)", border: `1px solid ${selectedExch.color}44`, backdropFilter: "blur(14px)" }}>
-            <div className="flex items-start justify-between mb-3">
+        <div className="absolute bottom-4 right-4 pointer-events-auto"
+          style={{ width: "420px", maxWidth: "calc(100vw - 320px)" }}>
+          <div className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(0,0,0,0.92)", border: `1px solid ${selectedExch.color}44`, backdropFilter: "blur(14px)" }}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between p-4 pb-2">
               <div className="min-w-0 pr-2">
-                <p className="text-sm font-bold leading-tight" style={{ color: selectedExch.color }}>
-                  {selectedExch.id}
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold" style={{ color: selectedExch.color }}>
+                    {selectedExch.id}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: `${selectedExch.color}22`, color: selectedExch.color, border: `1px solid ${selectedExch.color}44` }}>
+                    {selectedExch.indexName}
+                  </span>
+                </div>
                 <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-                  {selectedExch.name}
+                  {selectedExch.name} · {selectedExch.city}, {selectedExch.country}
                 </p>
               </div>
-              <button onClick={() => setSelectedExch(null)}
-                className="opacity-40 hover:opacity-80 text-base flex-shrink-0"
+              <button onClick={() => { setSelectedExch(null); setChartData(null); setChartRange("1y") }}
+                className="opacity-40 hover:opacity-80 text-lg flex-shrink-0 leading-none"
                 style={{ color: "var(--muted)" }}>✕</button>
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+
+            {/* Price & Change */}
+            <div className="px-4 pb-2">
+              {chartData ? (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
+                    {chartData.lastPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums"
+                    style={{ color: chartData.changePct >= 0 ? "#44ff88" : "#ff5555" }}>
+                    {chartData.changePct >= 0 ? "▲" : "▼"} {Math.abs(chartData.change).toFixed(2)} ({Math.abs(chartData.changePct).toFixed(2)}%)
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>{chartData.currency}</span>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl font-bold tabular-nums" style={{ color: "var(--text)" }}>
+                    {fmtIndex(selectedExch.indexValue)}
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>indicative</span>
+                </div>
+              )}
+            </div>
+
+            {/* Time Range Tabs */}
+            <div className="flex gap-1 px-4 pb-2">
+              {TIME_RANGES.map(r => (
+                <button key={r.key} onClick={() => setChartRange(r.key)}
+                  className="px-2.5 py-1 rounded-md text-xs font-semibold transition-all"
+                  style={{
+                    background: chartRange === r.key ? `${selectedExch.color}22` : "transparent",
+                    border:     chartRange === r.key ? `1px solid ${selectedExch.color}55` : "1px solid transparent",
+                    color:      chartRange === r.key ? selectedExch.color : "var(--muted)",
+                  }}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Area */}
+            <div className="px-2 pb-1" style={{ height: 180 }}>
+              {chartLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="w-6 h-6 rounded-full border-2 border-transparent animate-spin"
+                    style={{ borderTopColor: selectedExch.color }} />
+                </div>
+              ) : chartError ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-xs" style={{ color: "var(--muted)" }}>Chart unavailable</p>
+                </div>
+              ) : chartData && chartData.points.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData.points} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={chartData.changePct >= 0 ? "#44ff88" : "#ff5555"} stopOpacity={0.3} />
+                        <stop offset="100%" stopColor={chartData.changePct >= 0 ? "#44ff88" : "#ff5555"} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis
+                      dataKey="t"
+                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }}
+                      axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
+                      tickLine={false}
+                      tickFormatter={(ts: number) => {
+                        const d = new Date(ts * 1000)
+                        if (chartRange === "1d") return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                        if (chartRange === "5d") return d.toLocaleDateString("en-US", { weekday: "short" })
+                        if (chartRange === "1mo") return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                        if (chartRange === "max" || chartRange === "5y") return d.getFullYear().toString()
+                        return d.toLocaleDateString("en-US", { month: "short" })
+                      }}
+                      minTickGap={30}
+                    />
+                    <YAxis
+                      domain={["auto", "auto"]}
+                      tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={48}
+                      tickFormatter={(v: number) => v >= 10000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(0,0,0,0.9)",
+                        border: `1px solid ${selectedExch.color}44`,
+                        borderRadius: 8,
+                        fontSize: 11,
+                        color: "#fff",
+                      }}
+                      labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()}
+                      formatter={(val) => [Number(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), "Close"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="c"
+                      stroke={chartData.changePct >= 0 ? "#44ff88" : "#ff5555"}
+                      strokeWidth={1.5}
+                      fill="url(#chartGrad)"
+                      dot={false}
+                      animationDuration={500}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-xs" style={{ color: "var(--muted)" }}>Select a timeframe</p>
+                </div>
+              )}
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-1.5 px-4 pb-4 pt-1">
               {[
-                { label: "City",       val: selectedExch.city },
-                { label: "Country",    val: selectedExch.country },
-                { label: "Index",      val: selectedExch.indexName },
-                { label: "Value",      val: fmtIndex(selectedExch.indexValue) },
-                { label: "Market Cap", val: `$${selectedExch.marketCapUsdT.toFixed(1)}T` },
-                { label: "ISO",        val: selectedExch.iso2 },
+                { label: "Market Cap",  val: `$${selectedExch.marketCapUsdT.toFixed(1)}T` },
+                { label: "Prev Close",  val: chartData ? chartData.prevClose.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—" },
+                { label: "Index",       val: selectedExch.indexName },
+                ...(chartData?.points.length ? [
+                  { label: "High",      val: Math.max(...chartData.points.map(p => p.h)).toLocaleString("en-US", { maximumFractionDigits: 2 }) },
+                  { label: "Low",       val: Math.min(...chartData.points.map(p => p.l)).toLocaleString("en-US", { maximumFractionDigits: 2 }) },
+                  { label: "Volume",    val: (() => { const v = chartData.points[chartData.points.length - 1]?.v ?? 0; return v >= 1e9 ? `${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v.toLocaleString() })() },
+                ] : []),
               ].map(m => (
                 <div key={m.label} className="rounded-lg px-2 py-1.5"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <p className="text-xs" style={{ color: "var(--muted)" }}>{m.label}</p>
-                  <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{m.val}</p>
+                  <p className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{m.val}</p>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
+
+      {/* ── Scrolling Ticker Tape ────────────────────────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 pointer-events-none overflow-hidden"
+        style={{ height: 32, background: "rgba(0,0,0,0.85)", borderTop: "1px solid rgba(255,200,50,0.15)" }}>
+        <div className="flex items-center h-full animate-[tickerScroll_60s_linear_infinite] whitespace-nowrap"
+          style={{ width: "max-content" }}>
+          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((t, i) => (
+            <span key={`${t.symbol}-${i}`} className="inline-flex items-center gap-1.5 px-4 text-xs font-mono">
+              <span className="font-semibold" style={{ color: "#ffcc00" }}>{t.label}</span>
+              <span style={{ color: "var(--text)" }}>{t.value.toLocaleString()}</span>
+              <span style={{ color: t.change >= 0 ? "#44ff88" : "#ff5555", fontSize: 10 }}>
+                {t.change >= 0 ? "▲" : "▼"}{Math.abs(t.change).toFixed(2)}%
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Ticker animation keyframes */}
+      <style>{`
+        @keyframes tickerScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </div>
   )
 }
