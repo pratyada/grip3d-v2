@@ -4,7 +4,7 @@ import Link from "next/link"
 export const metadata: Metadata = {
   title: "AI Infrastructure Race — Technical Details — GRIP 3D",
   description:
-    "Technical deep-dive into UC26: global hyperscale data centers, undersea cable routes, deck.gl GlobeView, ColumnLayer towers, ArcLayer great-circle cables, and the $500B Stargate investment.",
+    "Technical deep-dive into UC26: global hyperscale data centers, undersea cable routes, globe.gl points, animated arc cables, country border interaction, and the $500B Stargate investment.",
 }
 
 // ── Static data ──────────────────────────────────────────────────────────────
@@ -17,14 +17,14 @@ const STATS = [
   { val: "30",      label: "Undersea cable routes"      },
   { val: "$500B",   label: "Stargate investment"        },
   { val: "2025",    label: "Data vintage"               },
-  { val: "deck.gl", label: "Rendering engine"          },
+  { val: "globe.gl", label: "Rendering engine"          },
 ]
 
 const PIPELINE = [
   {
     n: "01", color: "#0078d7",
     title: "Hyperscale Data Center Dataset",
-    desc: "82 hyperscale data centers across 12 operators — Microsoft/OpenAI (including Stargate sites), Google/DeepMind, Amazon/AWS, Meta, Alibaba/Aliyun, ByteDance/TikTok, Tencent, Baidu, Oracle, Apple, IBM, and Chinese national AI clusters (Guizhou Gui'an, Inner Mongolia, Xinjiang, Lanzhou). Each record carries power capacity in MW, estimated H100-equivalent GPU units, operational status, open year, and an AI-focused flag. Values are approximate but grounded in public announcements, SEC filings, and infrastructure reporting as of early 2025.",
+    desc: "82 hyperscale data centers across 12 operators — Microsoft/OpenAI (including Stargate sites), Google/DeepMind, Amazon/AWS, Meta, Alibaba/Aliyun, ByteDance/TikTok, Tencent, Baidu, Oracle, Apple, IBM, and Chinese national AI clusters (Guizhou Gui'an, Inner Mongolia, Xinjiang, Lanzhou). Each record carries power capacity in MW, estimated H100-equivalent GPU units, operational status, open year, and an AI-focused flag. Values are approximate but grounded in public announcements, SEC filings, and infrastructure reporting as of early 2025. Click any country border to see the facilities and cables in that country.",
     tech: ["82 facilities", "12 operators", "MW capacity", "GPU unit estimates", "Operational status", "AI-focused flag"],
   },
   {
@@ -35,15 +35,15 @@ const PIPELINE = [
   },
   {
     n: "03", color: "#00c8ff",
-    title: "deck.gl GlobeView Rendering",
-    desc: "The visualization uses deck.gl's _GlobeView — a WebGL globe projection that correctly handles the spherical surface for all layer types. ColumnLayer renders each data center as an extruded hexagonal prism with height = log₁₀(MW) × 2,000,000 metres, creating a dramatic tower skyline effect where the world's largest AI clusters (Ashburn, The Dalles, Guizhou) visibly dominate. ArcLayer with greatCircle:true draws geodesic cable arcs on the sphere surface. ScatterplotLayer provides both ambient glow rings (low opacity) around each facility and the pulsing Stargate animation rings.",
-    tech: ["deck.gl _GlobeView", "ColumnLayer towers", "ArcLayer great-circle", "ScatterplotLayer glow", "WebGL extruded geometry"],
+    title: "globe.gl Rendering & Country Borders",
+    desc: "The visualization uses globe.gl — a Three.js-based WebGL globe that renders satellite imagery, topology bump maps, and atmosphere effects. Data centers are rendered as 3D points (pointsData) with altitude = log₁₀(MW)/log₁₀(maxMW) × 0.5, making capacity visually proportional to height. Animated cable arcs use arcDashAnimateTime for a flowing cable effect. Country polygons (polygonsData) from a 110m-resolution GeoJSON enable hover highlighting and click-to-select with fly-to animation. The globe auto-rotates and supports damped panning.",
+    tech: ["globe.gl pointsData", "arcsData animated", "polygonsData borders", "Three.js WebGL", "fly-to animations"],
   },
   {
     n: "04", color: "#e879f9",
     title: "Stargate Highlight & Pulse",
-    desc: "When the Stargate toggle is active, a second ScatterplotLayer with animated radius renders on top of all Stargate Phase 1 sites (Abilene TX 600MW, Iowa 500MW). The radius oscillates using Math.sin(frame × π/180) at 60fps via requestAnimationFrame, creating a breathing purple glow that visually communicates the scale and importance of the $500B OpenAI/Microsoft/SoftBank investment — the largest announced AI infrastructure commitment in history. The pulsing radius and opacity are both animated for maximum visual impact.",
-    tech: ["requestAnimationFrame pulse", "sin-wave radius animation", "Layer z-ordering", "Purple glow rings", "$500B Stargate"],
+    desc: "When the Stargate toggle is active, globe.gl's ringsData API renders expanding ring pulses over all Stargate Phase 1 sites (Abilene TX 600MW, Iowa 500MW). The ring radius and color opacity oscillate via a setInterval-driven sin-wave, creating a breathing purple glow that visually communicates the scale and importance of the $500B OpenAI/Microsoft/SoftBank investment — the largest announced AI infrastructure commitment in history.",
+    tech: ["setInterval pulse", "sin-wave amplitude", "ringsData API", "Purple glow rings", "$500B Stargate"],
   },
   {
     n: "05", color: "#22c55e",
@@ -54,14 +54,14 @@ const PIPELINE = [
 ]
 
 const TECH = [
-  { label: "Globe engine",      value: "deck.gl _GlobeView (WebGL2)"                    },
-  { label: "Tower layer",       value: "ColumnLayer — height = log₁₀(MW) × 2M metres"  },
-  { label: "Cable layer",       value: "ArcLayer greatCircle:true — width ∝ log₂(Tbps)" },
-  { label: "Glow layer",        value: "ScatterplotLayer — ambient + Stargate pulse"     },
-  { label: "Framework",         value: "Next.js 'use client', React 19"                 },
-  { label: "Data",              value: "Hardcoded — public announcements & filings 2025" },
+  { label: "Globe engine",      value: "globe.gl (Three.js WebGL)"                         },
+  { label: "Data center layer", value: "pointsData — altitude = log₁₀(MW) / log₁₀(maxMW) × 0.5" },
+  { label: "Cable layer",       value: "arcsData — animated dash, width ∝ log₂(Tbps)"     },
+  { label: "Country borders",   value: "polygonsData — hover highlight + click fly-to"     },
+  { label: "Pulse layer",       value: "ringsData — setInterval sin-wave Stargate rings"   },
+  { label: "Framework",         value: "Next.js 'use client', React 19"                    },
+  { label: "Data",              value: "Hardcoded — public announcements & filings 2025"   },
   { label: "Operators",         value: "12: Microsoft, Google, Amazon, Meta, Alibaba, ByteDance, Tencent, Baidu, Oracle, Apple, IBM, Other" },
-  { label: "Animation",         value: "requestAnimationFrame — 60fps Stargate pulse"  },
 ]
 
 const HIGHLIGHTS = [
@@ -111,10 +111,10 @@ export default function UC26DetailsPage() {
         AI &amp; Data Center Infrastructure Race
       </h1>
       <p className="text-lg max-w-3xl mb-10" style={{ color: "var(--muted)" }}>
-        82 hyperscale data centers across 12 operators rendered as 3D towers on a deck.gl WebGL globe,
-        connected by 30 undersea cable routes. Heights encode power capacity in MW — the largest AI
-        clusters tower over every other facility. Filter by operator or status, toggle the Stargate
-        pulse overlay, and click any tower for full facility details.
+        82 hyperscale data centers across 12 operators rendered as 3D points on a globe.gl WebGL globe,
+        connected by 30 animated undersea cable arcs. Point altitude encodes power capacity in MW.
+        Country borders light up on hover and fly you to any nation on click. Filter by operator or
+        status, toggle the Stargate pulse overlay, and click any point for full facility details.
       </p>
 
       {/* Stats grid */}

@@ -4,7 +4,7 @@ import Link from "next/link"
 export const metadata: Metadata = {
   title: "UC27 Architecture — Global Conflict Monitor — GRIP 3D",
   description:
-    "Technical deep-dive into UC27 Global Conflict Monitor: deck.gl GlobeView, ScatterplotLayer conflict zones, ArcLayer great-circle displacement flows, GeoJsonLayer crisis polygons, and hardcoded ACLED/UNHCR/OCHA 2024-2025 data.",
+    "Technical deep-dive into UC27 Global Conflict Monitor: globe.gl WebGL globe, pointsData conflict zones, arcsData displacement flows, polygonsData country borders, and hardcoded ACLED/UNHCR/OCHA 2024-2025 data.",
 }
 
 const PIPELINE_STEPS = [
@@ -17,31 +17,31 @@ const PIPELINE_STEPS = [
   },
   {
     n: "02",
-    title: "deck.gl Globe Rendering",
+    title: "globe.gl WebGL Globe",
     color: "#ff8c00",
-    desc: "The globe is rendered using deck.gl's _GlobeView (experimental globe projection) via the @deck.gl/react DeckGL component. A SolidPolygonLayer provides the dark earth background. The controller is enabled for pan, zoom, and tilt interactions. View state is managed via React state with onViewStateChange callbacks.",
-    tech: ["@deck.gl/react DeckGL", "_GlobeView (globe projection)", "SolidPolygonLayer (earth)", "controller: true"],
+    desc: "The globe is rendered using globe.gl, a Three.js-based globe library. The globe is dynamically imported (code-split) and mounted into a div ref. Earth night texture, topology bump map, and night-sky background are provided via unpkg CDN URLs. Atmosphere color is reddish (#ff4444) to match the conflict theme. Auto-rotation and damping are configured via globe.controls().",
+    tech: ["globe.gl (dynamic import)", "Three.js Globe", "earth-night.jpg texture", "atmosphereColor #ff4444", "controls().autoRotate"],
   },
   {
     n: "03",
-    title: "Conflict Zones — ScatterplotLayer",
+    title: "Conflict Zones — pointsData",
     color: "#ffaa00",
-    desc: "Active conflicts are rendered as filled circles via ScatterplotLayer. Radius is proportional to the displaced population count (power-scaled) and animates via a requestAnimationFrame pulse loop. Fill colour encodes intensity (red / orange / yellow). Selected conflicts are highlighted with a white border. Hover and click interactions surface the details panel.",
-    tech: ["ScatterplotLayer", "requestAnimationFrame pulse", "Intensity colour encoding", "pickable: true, onClick / onHover"],
+    desc: "Active conflicts are rendered as globe points via globe.gl's pointsData API. Radius is proportional to the displaced population count (power-scaled). A setInterval pulse loop alternates pointAltitude between two values to create a breathing effect. Fill colour encodes intensity (red / orange / yellow). Selected conflicts are highlighted in white. Click flies the globe to that conflict location.",
+    tech: ["pointsData / pointRadius / pointColor", "setInterval pulse (altitude)", "Intensity colour encoding", "onPointClick / onPointHover"],
   },
   {
     n: "04",
-    title: "Displacement Arcs — ArcLayer",
+    title: "Displacement Arcs — arcsData",
     color: "#c084fc",
-    desc: "The 25 major refugee and displacement flow corridors are visualised as great-circle arcs using ArcLayer with greatCircle: true. Arc width is proportional to flow volume. Source colour (orange) transitions to target colour (red) along the arc, conveying directionality of displacement. Arcs remain visible across all filter states to maintain geographic context.",
-    tech: ["ArcLayer", "greatCircle: true", "Width by displaced volume", "Orange → red colour gradient"],
+    desc: "The 25 major refugee and displacement flow corridors are visualised as animated great-circle arcs using globe.gl's arcsData API. Arc width is proportional to flow volume. Dashed animation (arcDashLength / arcDashGap / arcDashAnimateTime) visualises flow direction. Arcs remain visible across all filter states to maintain geographic context.",
+    tech: ["arcsData / arcStroke / arcColor", "arcDashLength + arcDashGap", "arcDashAnimateTime (animated)", "arcAltitudeAutoScale"],
   },
   {
     n: "05",
-    title: "Filtering & Interaction",
+    title: "Country Borders & Interaction",
     color: "#22c55e",
-    desc: "Conflicts can be filtered by type (war, civil-war, insurgency, territorial, humanitarian-crisis) and by intensity level. Filters are applied via useMemo on the conflicts array and re-derive the ScatterplotLayer data prop. Clicking a conflict dot or a leaderboard entry opens a details panel showing parties, status, displacement, and estimated casualties.",
-    tech: ["useMemo filtering", "Type + intensity filter state", "Leaderboard top-5 by displaced", "Click-to-select detail panel"],
+    desc: "Country borders are fetched from the public /countries-110m.geojson endpoint and applied via globe.gl's polygonsData API. Hovering a country highlights its border; clicking flies to it and opens a country stats panel showing active conflicts, total displaced, conflict types, and displacement corridors originating from that country. Conflicts can also be filtered by type and intensity.",
+    tech: ["polygonsData / polygonStrokeColor", "onPolygonHover + onPolygonClick", "featureCentroid fly-to", "Country stats panel", "useMemo filtering"],
   },
   {
     n: "06",
@@ -62,14 +62,14 @@ const STATS = [
 ]
 
 const TECH_STACK = [
-  { label: "Globe renderer",     value: "deck.gl _GlobeView" },
-  { label: "React integration",  value: "@deck.gl/react DeckGL" },
-  { label: "Conflict zones",     value: "ScatterplotLayer" },
-  { label: "Displacement flows", value: "ArcLayer (greatCircle)" },
-  { label: "Crisis polygons",    value: "GeoJsonLayer" },
-  { label: "Earth background",   value: "SolidPolygonLayer" },
-  { label: "Animation",          value: "requestAnimationFrame" },
-  { label: "Framework",          value: "Next.js 16 App Router" },
+  { label: "Globe renderer",     value: "globe.gl (Three.js)" },
+  { label: "React integration",  value: "useRef + dynamic import" },
+  { label: "Conflict zones",     value: "pointsData API" },
+  { label: "Displacement flows", value: "arcsData (animated dash)" },
+  { label: "Country borders",    value: "polygonsData GeoJSON" },
+  { label: "Pulse animation",    value: "setInterval (altitude)" },
+  { label: "Data fetch",         value: "countries-110m.geojson" },
+  { label: "Framework",          value: "Next.js App Router" },
 ]
 
 const CONFLICT_TYPES = [
@@ -127,8 +127,8 @@ export default function UC27DetailsPage() {
           </p>
         </div>
         <p className="text-base max-w-3xl" style={{ color: "var(--muted)" }}>
-          A deck.gl WebGL globe showing 24+ active armed conflicts (2024-2025), 25 major refugee and
-          displacement flow corridors, and humanitarian crisis zones. All data is hardcoded from
+          A globe.gl WebGL globe showing 24+ active armed conflicts (2024-2025), 25 animated refugee
+          displacement flow corridors, and interactive country borders. All data is hardcoded from
           publicly available ACLED, UNHCR, and OCHA reporting.
         </p>
       </div>

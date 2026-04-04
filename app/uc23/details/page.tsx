@@ -4,20 +4,20 @@ import Link from "next/link"
 export const metadata: Metadata = {
   title: "Global Skyscraper Race — Technical Details — GRIP 3D",
   description:
-    "Deep-dive into UC23: deck.gl GlobeView, ColumnLayer height exaggeration, 60+ hardcoded buildings from Jeddah Tower (1008m) to Carlton Centre, status filtering, and the race to 1000m.",
+    "Deep-dive into UC23: globe.gl WebGL globe, 66 hardcoded buildings from Jeddah Tower (1008m) to Carlton Centre, country border interaction, status filtering, and the race to 1000m.",
 }
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
 const STATS = [
-  { val: "60+",   label: "Buildings mapped"      },
-  { val: "1008m", label: "Tallest (Jeddah Tower)" },
-  { val: "3",     label: "Status categories"     },
-  { val: "1931",  label: "Oldest (Empire State)"  },
-  { val: "2030",  label: "Latest (proposed)"      },
-  { val: "20+",   label: "Countries covered"      },
-  { val: "deck.gl", label: "Visualisation engine" },
-  { val: "GlobeView", label: "Projection"         },
+  { val: "66",       label: "Buildings mapped"      },
+  { val: "1008m",    label: "Tallest (Jeddah Tower)" },
+  { val: "3",        label: "Status categories"     },
+  { val: "1931",     label: "Oldest (Empire State)"  },
+  { val: "2030",     label: "Latest (proposed)"      },
+  { val: "20+",      label: "Countries covered"      },
+  { val: "globe.gl", label: "Visualisation engine"  },
+  { val: "WebGL",    label: "Rendering backend"      },
 ]
 
 const PIPELINE = [
@@ -33,33 +33,33 @@ const PIPELINE = [
     n: "02",
     icon: "🌐",
     color: "#ff8c00",
-    title: "deck.gl GlobeView (Experimental)",
-    desc: "The visualisation uses deck.gl's experimental _GlobeView projection, which renders the entire planet as a sphere using WebGL. Unlike the default MapView (Mercator), GlobeView supports free orbital rotation and provides a physically accurate representation of great-circle distances — critical for a dataset spanning every inhabited continent. The initial view state centres on the Arabian Peninsula (longitude 45°, latitude 25°) to highlight the Burj Khalifa, Jeddah Tower, and Makkah Clock Tower cluster.",
-    tech: ["_GlobeView (experimental)", "WebGL sphere rendering", "Orbital rotation controller", "No tile server required"],
+    title: "globe.gl WebGL Globe",
+    desc: "The visualisation uses globe.gl — a Three.js-based WebGL globe renderer. It loads satellite night-lights imagery (earth-night.jpg) plus a topology bump map and starfield background, giving a photorealistic appearance with no tile server required. The initial point-of-view centres on the Arabian Peninsula (lat 25°, lng 45°, altitude 2.0) to spotlight the Gulf supertall cluster. Auto-rotation, damping, and a Pause/Spin toggle let users explore at their own pace.",
+    tech: ["globe.gl + Three.js", "earth-night.jpg satellite imagery", "Topology bump map", "Auto-rotate with damping"],
   },
   {
     n: "03",
     icon: "📐",
     color: "#6495ed",
-    title: "ColumnLayer Height Exaggeration",
-    desc: "Buildings are extruded as 3D columns using deck.gl's ColumnLayer. Because real building heights (160m – 1008m) are negligible at globe scale (Earth radius 6,371km), elevations are exaggerated by a factor of roughly 6,400x: the tallest building in the current filter group is mapped to 6.5 million virtual metres, and all others scale proportionally. Column radius is 35km — wide enough to be visible at zoom level 1.6 but not so wide as to overlap neighbouring buildings in dense clusters like Dubai Marina or Manhattan.",
-    tech: ["ColumnLayer", "diskResolution: 12", "radius: 35 000m", "Elevation ∝ (heightM / max) × 6.5M"],
+    title: "Point Altitude Height Encoding",
+    desc: "Buildings are placed as globe.gl points whose altitude is proportional to height. The tallest building in the active filter set is mapped to altitude 0.55 (55% of Earth radius above the surface), and all others scale linearly. At globe.gl's altitude scale this creates dramatic spikes for supertalls like the Jeddah Tower and Burj Khalifa. Point radius is 0.06 — small enough to avoid overlap in dense urban clusters like Dubai Marina or Manhattan, yet large enough to be comfortably clickable.",
+    tech: ["pointsData() + pointAltitude()", "altitude = (heightM / max) × 0.55", "pointRadius: 0.06", "pointsMerge: false"],
   },
   {
     n: "04",
     icon: "🎨",
     color: "#fde725",
     title: "Status Colour Encoding",
-    desc: "Three RGBA colours encode construction status at a glance: yellow (#fde725 — Viridis endpoint) for completed buildings, orange (#ff8c00) for those under active construction, and cornflower blue (#6495ed) for proposed towers. The yellow colour is intentionally borrowed from the Viridis perceptual colour scale to signal 'complete and valid'. Each column also has a matching semi-transparent ScatterplotLayer glow dot at its base, amplifying the signal for small-radius columns at low zoom.",
-    tech: ["Yellow #fde725 — complete", "Orange #ff8c00 — under construction", "Blue #6495ed — proposed", "ScatterplotLayer base glow"],
+    desc: "Three CSS colours encode construction status at a glance: yellow (#fde725 — Viridis endpoint) for completed buildings, orange (#ff8c00) for those under active construction, and cornflower blue (#6495ed) for proposed towers. Hovering a point reveals a rich tooltip with name, height, floor count, city, country, and year. Clicking flies the camera to the building at altitude 1.4 and opens a detail panel with a height-comparison bar against the Burj Khalifa.",
+    tech: ["Yellow #fde725 — complete", "Orange #ff8c00 — under construction", "Blue #6495ed — proposed", "Rich HTML tooltips"],
   },
   {
     n: "05",
     icon: "🏆",
     color: "#ff8c00",
-    title: "Top-10 Leaderboard & Click Interaction",
-    desc: "A top-10 leaderboard panel (sortable by height or completion year) occupies the top-right corner. Clicking any row or any extruded column animates the view state to centre and zoom on that building, then opens a detail panel showing height, floor count, year, status, use type, and architect. A mini progress bar compares the selected building's height against both the Burj Khalifa (828m, current tallest) and the Jeddah Tower (1008m, first building to break 1000m upon completion). The status filter chips (All / Complete / Under Construction / Proposed) update the layers and leaderboard in real time via React useMemo.",
-    tech: ["Click → fly to building", "Detail panel with 6 metrics", "Height bar vs Burj Khalifa", "Real-time status filtering"],
+    title: "Top-10 Leaderboard, Country Borders & Click Interaction",
+    desc: "A top-10 leaderboard panel (sortable by height or completion year) occupies the top-right corner. Clicking any row or any point animates the camera to that building and opens a detail panel. Country borders are rendered as globe.gl polygons from a 110m-resolution GeoJSON: white at 0.18 opacity by default, brightening to 0.6 on hover and turning yellow on selection. Selecting a country opens a stats panel showing building count, tallest tower, and status breakdown. The status filter chips update the point data in real time via React useMemo.",
+    tech: ["Country polygons — 110m GeoJSON", "Hover + selection highlight", "Country stats panel", "Real-time status filtering"],
   },
 ]
 
@@ -75,8 +75,8 @@ const HIGHLIGHTS = [
     color: "#ff8c00",
   },
   {
-    title: "deck.gl on a Globe",
-    body:  "Rendering 3D columns on a WebGL globe requires significant height exaggeration — real building heights range from 160m to 1008m, a factor of roughly 1.4 million times smaller than Earth's radius. The ColumnLayer elevation is mapped to 6.5 million virtual metres for the tallest building, creating a visually dramatic spike effect while preserving relative height ratios. The SolidPolygonLayer earth background uses a simple flat polygon at [−180, +180] longitude to paint the globe surface a deep navy without needing any tile or GeoJSON ocean data.",
+    title: "globe.gl Point Altitude Encoding",
+    body:  "Rendering height on a WebGL globe requires careful normalisation — real building heights range from 160m to 1008m, negligible at Earth scale. globe.gl's pointAltitude maps these to a 0–0.55 range (fraction of Earth radius), creating dramatic spikes for supertalls while preserving relative ratios. Country polygons from Natural Earth 110m data provide geographic context with minimal geometry overhead. The bounding-box centroid algorithm (walk all coordinate pairs, average min/max lat and lng) correctly centres the camera on countries of any shape, including non-convex territories.",
     color: "#6495ed",
   },
 ]
@@ -133,14 +133,14 @@ const NOTABLE = [
 ]
 
 const TECH = [
-  { icon: "🌐", label: "Globe projection",   value: "deck.gl _GlobeView (experimental WebGL sphere)" },
-  { icon: "🏗",  label: "3D buildings",       value: "deck.gl ColumnLayer — extruded, pickable"        },
-  { icon: "✨", label: "Base glow",           value: "deck.gl ScatterplotLayer — semi-transparent dots" },
-  { icon: "🌍", label: "Earth background",   value: "deck.gl SolidPolygonLayer — deep-navy fill"      },
-  { icon: "📊", label: "Data",               value: "Static TypeScript array, 60+ buildings"          },
+  { icon: "🌐", label: "Globe renderer",     value: "globe.gl — Three.js WebGL sphere, dynamic import"      },
+  { icon: "🏗",  label: "Building markers",  value: "pointsData() — altitude-encoded, colour-coded points"  },
+  { icon: "🗺",  label: "Country borders",   value: "polygonsData() — 110m GeoJSON, hover + select states"  },
+  { icon: "🌍", label: "Globe imagery",      value: "earth-night.jpg + topology bump + night-sky background" },
+  { icon: "📊", label: "Data",               value: "Static TypeScript array, 66 buildings"                  },
   { icon: "🎨", label: "Status colours",     value: "Yellow / Orange / Blue — complete / building / proposed" },
-  { icon: "⚛️", label: "Framework",          value: "Next.js 16 — 'use client', React 19, useMemo layers" },
-  { icon: "🔍", label: "Interaction",        value: "Click column → fly to + detail panel; leaderboard rows" },
+  { icon: "⚛️", label: "Framework",          value: "Next.js — 'use client', React, useEffect globe init"    },
+  { icon: "🔍", label: "Interaction",        value: "Click point or leaderboard row → fly to + detail panel" },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -176,9 +176,9 @@ export default function UC23DetailsPage() {
         Global Skyscraper Race
       </h1>
       <p className="text-lg max-w-3xl mb-10" style={{ color: "var(--muted)" }}>
-        Sixty-plus of the world's tallest and most notable buildings rendered as extruded 3D columns on a
-        deck.gl GlobeView WebGL sphere. Filter by construction status, sort the leaderboard by height or
-        completion year, and track the race to 1000m.
+        Sixty-six of the world&apos;s tallest and most notable buildings rendered as altitude-encoded points on a
+        globe.gl WebGL sphere. Filter by construction status, sort the leaderboard by height or
+        completion year, click country borders for per-country stats, and track the race to 1000m.
       </p>
 
       {/* Stats grid */}

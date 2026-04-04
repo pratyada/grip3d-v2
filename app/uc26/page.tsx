@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -49,9 +49,31 @@ interface CableArc {
   name: string
 }
 
-// ── Operator colours ────────────────────────────────────────────────────────
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
 
-const OP_COLORS: Record<Operator, [number, number, number, number]> = {
+// ── Operator colours ─────────────────────────────────────────────────────────
+
+const OP_COLORS: Record<Operator, string> = {
+  Microsoft: "rgb(0,120,215)",
+  Google:    "rgb(66,133,244)",
+  Amazon:    "rgb(255,153,0)",
+  Meta:      "rgb(24,119,242)",
+  Oracle:    "rgb(255,0,0)",
+  Apple:     "rgb(150,150,150)",
+  Alibaba:   "rgb(255,103,0)",
+  ByteDance: "rgb(37,244,238)",
+  Tencent:   "rgb(18,183,107)",
+  Baidu:     "rgb(56,104,218)",
+  IBM:       "rgb(54,100,209)",
+  Other:     "rgb(120,120,120)",
+}
+
+const OP_COLORS_RGBA: Record<Operator, [number, number, number, number]> = {
   Microsoft: [0,   120, 215, 230],
   Google:    [66,  133, 244, 230],
   Amazon:    [255, 153, 0,   230],
@@ -66,10 +88,10 @@ const OP_COLORS: Record<Operator, [number, number, number, number]> = {
   Other:     [120, 120, 120, 180],
 }
 
-// ── Data: Hyperscale Data Centers ──────────────────────────────────────────
+// ── Data: Hyperscale Data Centers ─────────────────────────────────────────────
 
 const DATA_CENTERS: DataCenter[] = [
-  // ── Microsoft / OpenAI / Stargate ─────────────────────────────────────────
+  // ── Microsoft / OpenAI / Stargate ──────────────────────────────────────────
   {
     id: "msft-stargate-iowa",
     name: "Stargate Iowa Campus",
@@ -375,7 +397,7 @@ const DATA_CENTERS: DataCenter[] = [
     aiFocused: true,
   },
 
-  // ── Meta ───────────────────────────────────────────────────────────────────
+  // ── Meta ────────────────────────────────────────────────────────────────────
   {
     id: "meta-dekalb",
     name: "DeKalb Illinois AI Campus",
@@ -571,7 +593,7 @@ const DATA_CENTERS: DataCenter[] = [
     aiFocused: false,
   },
 
-  // ── Apple ─────────────────────────────────────────────────────────────────
+  // ── Apple ──────────────────────────────────────────────────────────────────
   {
     id: "apple-maiden",
     name: "Apple Maiden NC",
@@ -751,7 +773,7 @@ const DATA_CENTERS: DataCenter[] = [
     aiFocused: false,
   },
 
-  // ── IBM ───────────────────────────────────────────────────────────────────
+  // ── IBM ────────────────────────────────────────────────────────────────────
   {
     id: "ibm-dallas",
     name: "IBM Cloud Dallas",
@@ -774,7 +796,7 @@ const DATA_CENTERS: DataCenter[] = [
   },
 ]
 
-// ── Data: Undersea Cable Arcs ──────────────────────────────────────────────
+// ── Data: Undersea Cable Arcs ─────────────────────────────────────────────────
 
 const CABLE_ARCS: CableArc[] = [
   {
@@ -1109,11 +1131,7 @@ const CABLE_ARCS: CableArc[] = [
   },
 ]
 
-// ── Helper functions ───────────────────────────────────────────────────────
-
-function columnHeight(mw: number): number {
-  return Math.log10(Math.max(mw, 1)) * 2_000_000
-}
+// ── Helper functions ──────────────────────────────────────────────────────────
 
 function fmtMW(mw: number): string {
   if (mw >= 1000) return `${(mw / 1000).toFixed(1)}GW`
@@ -1121,9 +1139,9 @@ function fmtMW(mw: number): string {
 }
 
 const STATUS_COLORS: Record<DCStatus, string> = {
-  operational:         "#22c55e",
+  operational:          "#22c55e",
   "under-construction": "#f59e0b",
-  announced:           "#a78bfa",
+  announced:            "#a78bfa",
 }
 
 const ALL_OPERATORS: Operator[] = [
@@ -1132,32 +1150,83 @@ const ALL_OPERATORS: Operator[] = [
   "Oracle", "Apple", "IBM", "Other",
 ]
 
-// ── Main Component ─────────────────────────────────────────────────────────
+// Compute bounding-box centroid from any GeoJSON geometry (coords are [lng, lat])
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+    } else {
+      for (const sub of c) walk(sub)
+    }
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function applyCountries(
+  globe: any,
+  features: CountryFeature[],
+  hovered: CountryFeature | null,
+  selected: CountryFeature | null,
+  onHover: (f: CountryFeature | null) => void,
+  onClick: (f: CountryFeature) => void,
+) {
+  globe
+    .polygonsData(features)
+    .polygonCapColor((d: any) => {
+      if (selected && d.properties.name === selected.properties.name)
+        return "rgba(253,231,37,0.10)"
+      if (hovered && d.properties.name === hovered.properties.name)
+        return "rgba(255,255,255,0.06)"
+      return "rgba(0,0,0,0)"
+    })
+    .polygonSideColor(() => "rgba(0,0,0,0)")
+    .polygonStrokeColor((d: any) => {
+      if (selected && d.properties.name === selected.properties.name)
+        return "rgba(253,231,37,0.9)"
+      if (hovered && d.properties.name === hovered.properties.name)
+        return "rgba(255,255,255,0.6)"
+      return "rgba(255,255,255,0.18)"
+    })
+    .polygonAltitude(0.005)
+    .onPolygonHover((d: any) => onHover(d as CountryFeature | null))
+    .onPolygonClick((d: any) => onClick(d as CountryFeature))
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function UC26Page() {
-  const deckRef            = useRef<HTMLDivElement>(null)
-  const [ready, setReady]  = useState(false)
-  const [deckInst, setDeckInst] = useState<any>(null)
-  const [pulse, setPulse]  = useState(0)
+  const globeRef  = useRef<HTMLDivElement>(null)
+  const globeInst = useRef<any>(null)
+
+  const [globeReady,      setGlobeReady]      = useState(false)
+  const [isSpinning,      setIsSpinning]      = useState(true)
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
   const [selectedDC,      setSelectedDC]      = useState<DataCenter | null>(null)
   const [filterOperators, setFilterOperators] = useState<Set<Operator>>(new Set())
   const [filterStatus,    setFilterStatus]    = useState<Set<DCStatus>>(new Set())
   const [showCables,      setShowCables]      = useState(true)
   const [showStargate,    setShowStargate]    = useState(false)
+  const [pulsePhase,      setPulsePhase]      = useState(0)
 
-  // Pulse animation for Stargate glow rings
+  // ── Fetch countries ──────────────────────────────────────────────────────
   useEffect(() => {
-    let id: number
-    const tick = () => {
-      setPulse(p => (p + 1) % 360)
-      id = requestAnimationFrame(tick)
-    }
-    id = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(id)
+    fetch("/countries-110m.geojson")
+      .then(r => r.json())
+      .then(geo => setCountries(geo.features as CountryFeature[]))
+      .catch(() => {/* non-fatal */})
   }, [])
 
-  // Filtered data centers
+  // ── Filtered data centers ────────────────────────────────────────────────
   const visibleDCs = useMemo(() => {
     return DATA_CENTERS.filter(dc => {
       if (filterOperators.size > 0 && !filterOperators.has(dc.operator)) return false
@@ -1166,16 +1235,14 @@ export default function UC26Page() {
     })
   }, [filterOperators, filterStatus])
 
-  // Stargate sites
+  // ── Stargate sites ────────────────────────────────────────────────────────
   const stargateSites = useMemo(() => {
     if (!showStargate) return []
     return DATA_CENTERS.filter(dc => dc.project?.startsWith("Stargate"))
   }, [showStargate])
 
-  // Stats
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const totalMW    = DATA_CENTERS.reduce((s, dc) => s + dc.mw, 0)
-    const totalGPU   = DATA_CENTERS.reduce((s, dc) => s + dc.gpuUnits, 0)
     const mwByOp: Record<string, number> = {}
     for (const dc of DATA_CENTERS) {
       mwByOp[dc.operator] = (mwByOp[dc.operator] ?? 0) + dc.mw
@@ -1183,10 +1250,193 @@ export default function UC26Page() {
     const leaderboard = Object.entries(mwByOp)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-    return { totalMW, totalGPU, leaderboard }
+    return { leaderboard }
   }, [])
 
-  // Toggle operator filter
+  // ── Country stats ─────────────────────────────────────────────────────────
+  const countryStats = useMemo(() => {
+    if (!selectedCountry) return null
+    const name = selectedCountry.properties.name
+    // Map GeoJSON names to the country field used in DATA_CENTERS
+    const nameMap: Record<string, string> = {
+      "United States of America": "USA",
+      "United Kingdom": "UK",
+      "South Korea": "South Korea",
+      "United Arab Emirates": "UAE",
+    }
+    const dcCountry = nameMap[name] ?? name
+    const dcs = DATA_CENTERS.filter(dc => dc.country === dcCountry)
+    if (!dcs.length) return null
+    const totalMW = dcs.reduce((s, dc) => s + dc.mw, 0)
+    const operators = [...new Set(dcs.map(dc => dc.operator))]
+    const cableCount = CABLE_ARCS.filter(c => {
+      // Check if either endpoint name includes the country
+      return c.sourceName.includes(dcCountry) || c.targetName.includes(dcCountry) ||
+             c.sourceName.includes(name) || c.targetName.includes(name)
+    }).length
+    return { name: dcCountry, geoName: name, count: dcs.length, totalMW, operators, cableCount }
+  }, [selectedCountry])
+
+  // ── Max MW for altitude scaling ───────────────────────────────────────────
+  const maxMW = useMemo(() => Math.max(...DATA_CENTERS.map(dc => dc.mw)), [])
+
+  // ── Globe init ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeRef.current || globeInst.current) return
+
+    import("globe.gl").then(mod => {
+      if (!globeRef.current) return
+      const GlobeGL = (mod.default ?? mod) as any
+      const globe = new GlobeGL()
+      globe(globeRef.current)
+        .width(globeRef.current.clientWidth)
+        .height(globeRef.current.clientHeight)
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .atmosphereColor("#1a3fff")
+        .atmosphereAltitude(0.14)
+        .pointOfView({ lat: 30, lng: 0, altitude: 2.2 })
+
+      globe.controls().autoRotate      = true
+      globe.controls().autoRotateSpeed = 0.15
+      globe.controls().enableDamping   = true
+      globe.controls().dampingFactor   = 0.1
+
+      globeInst.current = globe
+      setGlobeReady(true)
+    })
+
+    return () => {
+      globeInst.current?.controls()?.dispose?.()
+      globeInst.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Apply points data ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const g = globeInst.current
+    if (!g || !globeReady) return
+
+    g.pointsData(visibleDCs)
+      .pointLat("lat")
+      .pointLng("lng")
+      .pointAltitude((d: DataCenter) =>
+        (Math.log10(d.mw + 1) / Math.log10(maxMW + 1)) * 0.5
+      )
+      .pointRadius(0.08)
+      .pointColor((d: DataCenter) => OP_COLORS[d.operator] ?? "#aaa")
+      .pointsMerge(false)
+      .pointLabel((d: DataCenter) =>
+        `<div style="background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:8px 12px;font-family:sans-serif;max-width:220px;">` +
+        `<b style="color:#fff;font-size:13px;">${d.name}</b><br/>` +
+        `<span style="color:#aaa;font-size:11px;">${d.city}, ${d.country}</span><br/>` +
+        `<span style="color:${OP_COLORS[d.operator]};font-size:11px;">${d.operator}</span>` +
+        ` · <span style="color:#ddd;font-size:11px;">${fmtMW(d.mw)}</span>` +
+        `</div>`
+      )
+      .onPointClick((d: DataCenter) => {
+        setSelectedDC(d)
+        g.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.4 }, 700)
+        setIsSpinning(false)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globeReady, visibleDCs, maxMW])
+
+  // ── Apply arcs data ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const g = globeInst.current
+    if (!g || !globeReady) return
+
+    g.arcsData(showCables ? CABLE_ARCS : [])
+      .arcStartLat((d: CableArc) => d.sourceCoords[1])
+      .arcStartLng((d: CableArc) => d.sourceCoords[0])
+      .arcEndLat((d: CableArc) => d.targetCoords[1])
+      .arcEndLng((d: CableArc) => d.targetCoords[0])
+      .arcColor(() => "rgba(0,200,255,0.35)")
+      .arcStroke((d: CableArc) => Math.log2(d.capacityTbps + 1) * 0.2)
+      .arcDashLength(0.4)
+      .arcDashGap(0.3)
+      .arcDashAnimateTime(4000)
+      .arcAltitudeAutoScale(0.3)
+      .arcLabel((d: CableArc) =>
+        `<div style="background:rgba(0,0,0,0.85);border:1px solid rgba(0,200,255,0.25);border-radius:8px;padding:6px 10px;font-family:sans-serif;">` +
+        `<b style="color:#00c8ff;font-size:12px;">${d.name}</b><br/>` +
+        `<span style="color:#aaa;font-size:11px;">${d.capacityTbps} Tbps · ${d.laidYear}</span><br/>` +
+        `<span style="color:#888;font-size:10px;">${d.operators.join(", ")}</span>` +
+        `</div>`
+      )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globeReady, showCables])
+
+  // ── Apply country polygons ─────────────────────────────────────────────────
+  const handlePolygonHover = useCallback((f: CountryFeature | null) => {
+    setHoveredCountry(f)
+  }, [])
+
+  const handlePolygonClick = useCallback((f: CountryFeature) => {
+    setSelectedCountry(prev =>
+      prev?.properties.name === f.properties.name ? null : f
+    )
+    const { lat, lng } = featureCentroid(f.geometry)
+    globeInst.current?.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+    setIsSpinning(false)
+  }, [])
+
+  useEffect(() => {
+    const g = globeInst.current
+    if (!g || !globeReady || !countries.length) return
+    applyCountries(g, countries, hoveredCountry, selectedCountry, handlePolygonHover, handlePolygonClick)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globeReady, countries, hoveredCountry, selectedCountry])
+
+  // ── Stargate pulse animation ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeReady) return
+    const id = setInterval(() => {
+      setPulsePhase(p => (p + 6) % 360)
+    }, 50)
+    return () => clearInterval(id)
+  }, [globeReady])
+
+  // Apply Stargate rings as custom points layer update
+  useEffect(() => {
+    const g = globeInst.current
+    if (!g || !globeReady) return
+    if (!showStargate || stargateSites.length === 0) {
+      g.ringsData([])
+      return
+    }
+    const amp = 0.5 + 0.5 * Math.abs(Math.sin((pulsePhase * Math.PI) / 180))
+    g.ringsData(stargateSites)
+      .ringLat("lat")
+      .ringLng("lng")
+      .ringMaxRadius(3.0 + amp * 1.5)
+      .ringPropagationSpeed(2)
+      .ringRepeatPeriod(1200)
+      .ringColor(() => `rgba(168,85,247,${(0.4 + 0.4 * amp).toFixed(2)})`)
+      .ringAltitude(0.01)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globeReady, showStargate, stargateSites, pulsePhase])
+
+  // ── Spin control ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeInst.current) return
+    globeInst.current.controls().autoRotate = isSpinning
+  }, [isSpinning])
+
+  // ── Resize ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onResize = () => {
+      if (globeInst.current && globeRef.current)
+        globeInst.current.width(globeRef.current.clientWidth).height(globeRef.current.clientHeight)
+    }
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
+  // ── Filter helpers ────────────────────────────────────────────────────────
   const toggleOp = useCallback((op: Operator) => {
     setFilterOperators(prev => {
       const next = new Set(prev)
@@ -1203,211 +1453,20 @@ export default function UC26Page() {
     })
   }, [])
 
-  // Build layers
-  const layers = useMemo(() => {
-    const pulseRad = Math.sin((pulse * Math.PI) / 180)
-
-    // Glow ScatterplotLayer
-    const glowLayer = {
-      type: "ScatterplotLayer",
-      id: "glow",
-      data: visibleDCs,
-      getPosition: (d: DataCenter) => [d.lng, d.lat],
-      getRadius: (d: DataCenter) => d.mw * 800 + 15000,
-      getFillColor: (d: DataCenter) => {
-        const c = OP_COLORS[d.operator]
-        return [c[0], c[1], c[2], 25]
-      },
-      radiusUnits: "meters",
-      pickable: false,
-    }
-
-    // Column towers
-    const columnLayer = {
-      type: "ColumnLayer",
-      id: "towers",
-      data: visibleDCs,
-      diskResolution: 12,
-      radius: 35000,
-      getPosition: (d: DataCenter) => [d.lng, d.lat],
-      getElevation: (d: DataCenter) => columnHeight(d.mw),
-      getFillColor: (d: DataCenter) => {
-        const c = OP_COLORS[d.operator]
-        const sel = selectedDC?.id === d.id
-        return sel ? [255, 255, 255, 255] : [c[0], c[1], c[2], c[3]]
-      },
-      elevationScale: 1,
-      extruded: true,
-      pickable: true,
-      autoHighlight: true,
-      highlightColor: [255, 255, 255, 80],
-      onClick: (info: any) => {
-        if (info.object) setSelectedDC(info.object as DataCenter)
-      },
-    }
-
-    // Cable arcs
-    const arcLayer = showCables ? {
-      type: "ArcLayer",
-      id: "cables",
-      data: CABLE_ARCS,
-      getSourcePosition: (d: CableArc) => d.sourceCoords,
-      getTargetPosition: (d: CableArc) => d.targetCoords,
-      getSourceColor: [0, 200, 255, 100],
-      getTargetColor: [120, 80, 255, 100],
-      getWidth: (d: CableArc) => Math.max(1, Math.log2(d.capacityTbps + 1) * 0.8),
-      widthUnits: "pixels",
-      greatCircle: true,
-      pickable: false,
-    } : null
-
-    // Stargate pulse rings
-    const stargateLayer = stargateSites.length > 0 ? {
-      type: "ScatterplotLayer",
-      id: "stargate-pulse",
-      data: stargateSites,
-      getPosition: (d: DataCenter) => [d.lng, d.lat],
-      getRadius: (d: DataCenter) => d.mw * 1200 * (1 + 0.4 * Math.abs(pulseRad)),
-      getFillColor: [168, 85, 247, Math.floor(60 + 40 * Math.abs(pulseRad))],
-      radiusUnits: "meters",
-      pickable: false,
-    } : null
-
-    return [glowLayer, arcLayer, stargateLayer, columnLayer].filter(Boolean)
-  }, [visibleDCs, showCables, stargateSites, pulse, selectedDC])
-
-  // Initialize deck.gl
-  useEffect(() => {
-    if (!deckRef.current) return
-
-    let deck: any
-    let mounted = true
-
-    import("deck.gl").then((deckMod) => {
-      if (!mounted || !deckRef.current) return
-
-      const Deck        = deckMod.Deck as any
-      const GlobeView   = (deckMod as any)._GlobeView
-
-      const canvas = document.createElement("canvas")
-      canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;"
-      deckRef.current.appendChild(canvas)
-
-      deck = new Deck({
-        canvas,
-        width: "100%",
-        height: "100%",
-        views: [new GlobeView({ id: "globe", repeat: true })],
-        initialViewState: {
-          longitude: 0,
-          latitude: 20,
-          zoom: 1.5,
-        },
-        controller: true,
-        layers: [],
-        parameters: {
-          clearColor: [0.02, 0.02, 0.08, 1],
-        },
-      })
-
-      setDeckInst(deck)
-      setReady(true)
-    })
-
-    return () => {
-      mounted = false
-      deck?.finalize?.()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Update layers when data/filters change
-  useEffect(() => {
-    if (!deckInst || !ready) return
-
-    import("deck.gl").then((deckMod) => {
-      const { ScatterplotLayer, ColumnLayer, ArcLayer } = deckMod
-
-      const pulseRad = Math.sin((pulse * Math.PI) / 180)
-
-      const glowLayer = new ScatterplotLayer({
-        id: "glow",
-        data: visibleDCs,
-        getPosition: (d: DataCenter) => [d.lng, d.lat],
-        getRadius: (d: DataCenter) => d.mw * 800 + 15000,
-        getFillColor: (d: DataCenter) => {
-          const c = OP_COLORS[d.operator]
-          return [c[0], c[1], c[2], 25]
-        },
-        radiusUnits: "meters",
-        pickable: false,
-      })
-
-      const columnLayer = new ColumnLayer({
-        id: "towers",
-        data: visibleDCs,
-        diskResolution: 12,
-        radius: 35000,
-        getPosition: (d: DataCenter) => [d.lng, d.lat],
-        getElevation: (d: DataCenter) => columnHeight(d.mw),
-        getFillColor: (d: DataCenter) => {
-          const c = OP_COLORS[d.operator]
-          const sel = selectedDC?.id === d.id
-          return sel ? [255, 255, 255, 255] : [c[0], c[1], c[2], c[3]]
-        },
-        elevationScale: 1,
-        extruded: true,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 80],
-        onClick: (info: any) => {
-          if (info.object) setSelectedDC(info.object as DataCenter)
-        },
-      })
-
-      const arcLayer = showCables ? new ArcLayer({
-        id: "cables",
-        data: CABLE_ARCS,
-        getSourcePosition: (d: CableArc) => d.sourceCoords,
-        getTargetPosition: (d: CableArc) => d.targetCoords,
-        getSourceColor: [0, 200, 255, 100],
-        getTargetColor: [120, 80, 255, 100],
-        getWidth: (d: CableArc) => Math.max(1, Math.log2(d.capacityTbps + 1) * 0.8),
-        widthUnits: "pixels",
-        greatCircle: true,
-        pickable: false,
-      }) : null
-
-      const stargateLayer = stargateSites.length > 0 ? new ScatterplotLayer({
-        id: "stargate-pulse",
-        data: stargateSites,
-        getPosition: (d: DataCenter) => [d.lng, d.lat],
-        getRadius: (d: DataCenter) => d.mw * 1200 * (1 + 0.4 * Math.abs(pulseRad)),
-        getFillColor: [168, 85, 247, Math.floor(60 + 40 * Math.abs(pulseRad))],
-        radiusUnits: "meters",
-        pickable: false,
-      }) : null
-
-      const layerList = [glowLayer, arcLayer, stargateLayer, columnLayer].filter(Boolean)
-      deckInst.setProps({ layers: layerList })
-    })
-  }, [deckInst, ready, visibleDCs, showCables, stargateSites, pulse, selectedDC])
-
-  // ── Render ───────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="relative" style={{ minHeight: "calc(100vh - 64px)", background: "#050510" }}>
 
       {/* Globe canvas container */}
-      <div ref={deckRef} className="absolute inset-0" style={{ cursor: "grab" }} />
+      <div ref={globeRef} className="absolute inset-0" style={{ cursor: "grab" }} />
 
       {/* Loading overlay */}
-      {!ready && (
+      {!globeReady && (
         <div className="absolute inset-0 flex items-center justify-center z-50"
-             style={{ background: "#050510" }}>
+          style={{ background: "#050510" }}>
           <div className="text-center">
             <div className="w-16 h-16 rounded-full border-2 border-transparent animate-spin mx-auto mb-4"
-                 style={{ borderTopColor: "#0078d7", borderRightColor: "#3385ff" }} />
+              style={{ borderTopColor: "#0078d7", borderRightColor: "#3385ff" }} />
             <p className="text-sm font-medium" style={{ color: "#aaa" }}>
               Loading AI infrastructure globe…
             </p>
@@ -1415,7 +1474,7 @@ export default function UC26Page() {
         </div>
       )}
 
-      {/* ── Title bar ─────────────────────────────────────────────────────── */}
+      {/* ── Title bar ───────────────────────────────────────────────────────── */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-4 pointer-events-none z-20">
 
         {/* Title + stats chips */}
@@ -1425,12 +1484,12 @@ export default function UC26Page() {
               AI Infrastructure Race
             </h1>
             <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                  style={{ background: "rgba(0,120,215,0.18)", color: "#60b0ff", border: "1px solid rgba(0,120,215,0.35)" }}>
+              style={{ background: "rgba(0,120,215,0.18)", color: "#60b0ff", border: "1px solid rgba(0,120,215,0.35)" }}>
               2025
             </span>
           </div>
           <p className="text-xs mb-2" style={{ color: "#666" }}>
-            Global hyperscale data centers &amp; undersea cables
+            Global hyperscale data centers &amp; undersea cables · Click a country for stats
           </p>
           <div className="flex flex-wrap gap-1.5">
             {[
@@ -1440,7 +1499,7 @@ export default function UC26Page() {
               { label: `${CABLE_ARCS.length} cable routes` },
             ].map(s => (
               <div key={s.label} className="px-2 py-1 rounded-md text-xs"
-                   style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "#aaa" }}>
+                style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "#aaa" }}>
                 {s.label}
               </div>
             ))}
@@ -1450,12 +1509,18 @@ export default function UC26Page() {
         {/* Top-right controls */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
+            onClick={() => setIsSpinning(s => !s)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", color: "#aaa", backdropFilter: "blur(8px)" }}>
+            {isSpinning ? "Pause" : "Spin"}
+          </button>
+          <button
             onClick={() => setShowCables(v => !v)}
             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
-              background: showCables ? "rgba(0,200,255,0.12)" : "rgba(0,0,0,0.6)",
-              border:     showCables ? "1px solid rgba(0,200,255,0.35)" : "1px solid rgba(255,255,255,0.12)",
-              color:      showCables ? "#00c8ff" : "#666",
+              background:     showCables ? "rgba(0,200,255,0.12)" : "rgba(0,0,0,0.6)",
+              border:         showCables ? "1px solid rgba(0,200,255,0.35)" : "1px solid rgba(255,255,255,0.12)",
+              color:          showCables ? "#00c8ff" : "#666",
               backdropFilter: "blur(8px)",
             }}>
             Cables
@@ -1464,28 +1529,38 @@ export default function UC26Page() {
             onClick={() => setShowStargate(v => !v)}
             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
-              background: showStargate ? "rgba(168,85,247,0.18)" : "rgba(0,0,0,0.6)",
-              border:     showStargate ? "1px solid rgba(168,85,247,0.4)" : "1px solid rgba(255,255,255,0.12)",
-              color:      showStargate ? "#c084fc" : "#666",
+              background:     showStargate ? "rgba(168,85,247,0.18)" : "rgba(0,0,0,0.6)",
+              border:         showStargate ? "1px solid rgba(168,85,247,0.4)" : "1px solid rgba(255,255,255,0.12)",
+              color:          showStargate ? "#c084fc" : "#666",
               backdropFilter: "blur(8px)",
             }}>
             Stargate
           </button>
           <Link href="/uc26/details"
-                className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ background: "rgba(0,120,215,0.12)", border: "1px solid rgba(0,120,215,0.3)", color: "#60b0ff", backdropFilter: "blur(8px)" }}>
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,120,215,0.12)", border: "1px solid rgba(0,120,215,0.3)", color: "#60b0ff", backdropFilter: "blur(8px)" }}>
             Details →
           </Link>
         </div>
       </div>
 
-      {/* ── Left sidebar: Operator filters ───────────────────────────────── */}
+      {/* ── Country hover label (top center) ────────────────────────────────── */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none z-20">
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", backdropFilter: "blur(8px)" }}>
+            {hoveredCountry.properties.name}
+          </div>
+        </div>
+      )}
+
+      {/* ── Left sidebar: Stargate callout + Operator filters ───────────────── */}
       <div className="absolute left-4 z-20 pointer-events-auto flex flex-col gap-2"
-           style={{ top: 120, width: 210, bottom: 16 }}>
+        style={{ top: 120, width: 210, bottom: 16 }}>
 
         {/* $500B Stargate highlight */}
         <div className="rounded-xl p-3"
-             style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.25)", backdropFilter: "blur(14px)" }}>
+          style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.25)", backdropFilter: "blur(14px)" }}>
           <p className="text-xs font-bold tracking-wider mb-0.5" style={{ color: "#c084fc" }}>STARGATE PROJECT</p>
           <p className="text-xl font-black" style={{ color: "#e879f9" }}>$500B</p>
           <p className="text-xs" style={{ color: "#a78bfa" }}>OpenAI + Microsoft + SoftBank</p>
@@ -1494,24 +1569,24 @@ export default function UC26Page() {
 
         {/* Operator filter */}
         <div className="rounded-xl p-3 flex-1 min-h-0 overflow-y-auto"
-             style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
+          style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
           <p className="text-xs font-semibold tracking-wider mb-2" style={{ color: "#555" }}>OPERATORS</p>
           <div className="flex flex-col gap-1">
             {ALL_OPERATORS.map(op => {
               const active = filterOperators.has(op)
-              const c      = OP_COLORS[op]
-              const hex    = `rgb(${c[0]},${c[1]},${c[2]})`
+              const hex    = OP_COLORS[op]
               const dcCnt  = DATA_CENTERS.filter(d => d.operator === op).length
               if (dcCnt === 0) return null
+              const c = OP_COLORS_RGBA[op]
               return (
                 <button key={op}
-                        onClick={() => toggleOp(op)}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-all"
-                        style={{
-                          background: active ? `rgba(${c[0]},${c[1]},${c[2]},0.12)` : "transparent",
-                          border:     active ? `1px solid rgba(${c[0]},${c[1]},${c[2]},0.4)` : "1px solid transparent",
-                          color:      active ? hex : "#666",
-                        }}>
+                  onClick={() => toggleOp(op)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-all"
+                  style={{
+                    background: active ? `rgba(${c[0]},${c[1]},${c[2]},0.12)` : "transparent",
+                    border:     active ? `1px solid rgba(${c[0]},${c[1]},${c[2]},0.4)` : "1px solid transparent",
+                    color:      active ? hex : "#666",
+                  }}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: hex }} />
                   <span className="flex-1 truncate font-medium">{op}</span>
                   <span className="flex-shrink-0 text-xs opacity-60">{dcCnt}</span>
@@ -1528,13 +1603,13 @@ export default function UC26Page() {
               const label  = s === "under-construction" ? "Under Construction" : s.charAt(0).toUpperCase() + s.slice(1)
               return (
                 <button key={s}
-                        onClick={() => toggleStatus(s)}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-all"
-                        style={{
-                          background: active ? `${col}18` : "transparent",
-                          border:     active ? `1px solid ${col}44` : "1px solid transparent",
-                          color:      active ? col : "#666",
-                        }}>
+                  onClick={() => toggleStatus(s)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-all"
+                  style={{
+                    background: active ? `${col}18` : "transparent",
+                    border:     active ? `1px solid ${col}44` : "1px solid transparent",
+                    color:      active ? col : "#666",
+                  }}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col }} />
                   <span className="flex-1">{label}</span>
                 </button>
@@ -1544,47 +1619,47 @@ export default function UC26Page() {
 
           {(filterOperators.size > 0 || filterStatus.size > 0) && (
             <button onClick={() => { setFilterOperators(new Set()); setFilterStatus(new Set()) }}
-                    className="mt-2 w-full py-1 rounded-lg text-xs"
-                    style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.08)" }}>
+              className="mt-2 w-full py-1 rounded-lg text-xs"
+              style={{ background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.08)" }}>
               Clear filters
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Right sidebar: Leaderboard ────────────────────────────────────── */}
+      {/* ── Right sidebar: Leaderboard ───────────────────────────────────────── */}
       <div className="absolute right-4 z-20 pointer-events-auto"
-           style={{ top: 80, width: 230 }}>
+        style={{ top: 80, width: 230 }}>
         <div className="rounded-xl p-3"
-             style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
+          style={{ background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
           <p className="text-xs font-semibold tracking-wider mb-3" style={{ color: "#555" }}>
             LEADERBOARD — MW CAPACITY
           </p>
           <div className="flex flex-col gap-1">
             {stats.leaderboard.map(([op, mw], idx) => {
-              const c   = OP_COLORS[op as Operator] ?? OP_COLORS.Other
-              const hex = `rgb(${c[0]},${c[1]},${c[2]})`
+              const c   = OP_COLORS_RGBA[op as Operator] ?? OP_COLORS_RGBA.Other
+              const hex = OP_COLORS[op as Operator] ?? OP_COLORS.Other
               const pct = (mw / stats.leaderboard[0][1]) * 100
               return (
                 <div key={op} className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono w-4 flex-shrink-0 text-right"
-                          style={{ color: idx < 3 ? hex : "#555" }}>
+                      style={{ color: idx < 3 ? hex : "#555" }}>
                       {idx + 1}
                     </span>
                     <span className="flex-1 text-xs font-medium truncate"
-                          style={{ color: idx < 3 ? hex : "#888" }}>
+                      style={{ color: idx < 3 ? hex : "#888" }}>
                       {op}
                     </span>
                     <span className="text-xs font-bold flex-shrink-0"
-                          style={{ color: idx < 3 ? hex : "#555" }}>
+                      style={{ color: idx < 3 ? hex : "#555" }}>
                       {fmtMW(mw)}
                     </span>
                   </div>
                   <div className="ml-6 h-1 rounded-full overflow-hidden"
-                       style={{ background: "rgba(255,255,255,0.05)" }}>
+                    style={{ background: "rgba(255,255,255,0.05)" }}>
                     <div className="h-full rounded-full"
-                         style={{ width: `${pct}%`, background: `rgba(${c[0]},${c[1]},${c[2]},0.6)` }} />
+                      style={{ width: `${pct}%`, background: `rgba(${c[0]},${c[1]},${c[2]},0.6)` }} />
                   </div>
                 </div>
               )
@@ -1594,26 +1669,87 @@ export default function UC26Page() {
           {/* Cable legend */}
           {showCables && (
             <div className="mt-3 pt-3"
-                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
               <p className="text-xs font-semibold tracking-wider mb-2" style={{ color: "#555" }}>
                 UNDERSEA CABLES
               </p>
               <div className="flex items-center gap-2 text-xs" style={{ color: "#666" }}>
                 <div className="h-0.5 w-8 rounded-full"
-                     style={{ background: "linear-gradient(to right, #00c8ff, #7850ff)" }} />
-                <span>Great-circle arc, width ∝ Tbps</span>
+                  style={{ background: "linear-gradient(to right, #00c8ff, #7850ff)" }} />
+                <span>Animated arc, width ∝ Tbps</span>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Bottom-right: Selected DC panel ──────────────────────────────── */}
-      {selectedDC && (
+      {/* ── Bottom panels ────────────────────────────────────────────────────── */}
+
+      {/* Country stats panel (bottom-right when country selected) */}
+      {selectedCountry && countryStats && (
         <div className="absolute bottom-4 right-4 z-20 pointer-events-auto"
-             style={{ width: 270 }}>
+          style={{ width: 270 }}>
           <div className="rounded-xl p-4"
-               style={{ background: "rgba(0,0,0,0.9)", border: `1px solid rgba(${OP_COLORS[selectedDC.operator][0]},${OP_COLORS[selectedDC.operator][1]},${OP_COLORS[selectedDC.operator][2]},0.4)`, backdropFilter: "blur(16px)" }}>
+            style={{ background: "rgba(0,0,0,0.9)", border: "1px solid rgba(253,231,37,0.3)", backdropFilter: "blur(16px)" }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#fde725" }}>{countryStats.geoName}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#666" }}>
+                  {countryStats.count} facilities · {fmtMW(countryStats.totalMW)} total
+                </p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)}
+                className="opacity-40 hover:opacity-80 text-base" style={{ color: "#aaa" }}>✕</button>
+            </div>
+
+            {/* Operators present */}
+            <div className="mb-3">
+              <p className="text-xs mb-1.5 font-semibold" style={{ color: "#555" }}>OPERATORS PRESENT</p>
+              <div className="flex flex-wrap gap-1">
+                {countryStats.operators.map(op => {
+                  const hex = OP_COLORS[op as Operator] ?? "#aaa"
+                  return (
+                    <span key={op} className="text-xs px-2 py-0.5 rounded-full"
+                      style={{ background: `${hex}18`, color: hex, border: `1px solid ${hex}33` }}>
+                      {op}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              <div className="rounded-lg px-2 py-2"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <p className="text-xs" style={{ color: "#555" }}>Data Centers</p>
+                <p className="text-lg font-bold" style={{ color: "#fde725" }}>{countryStats.count}</p>
+              </div>
+              <div className="rounded-lg px-2 py-2"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <p className="text-xs" style={{ color: "#555" }}>Total Capacity</p>
+                <p className="text-lg font-bold" style={{ color: "#fde725" }}>{fmtMW(countryStats.totalMW)}</p>
+              </div>
+              <div className="rounded-lg px-2 py-2 col-span-2"
+                style={{ background: "rgba(0,200,255,0.05)", border: "1px solid rgba(0,200,255,0.15)" }}>
+                <p className="text-xs" style={{ color: "#555" }}>Cable Endpoints Nearby</p>
+                <p className="text-base font-bold" style={{ color: "#00c8ff" }}>{countryStats.cableCount} routes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected DC panel (bottom-right when DC selected and no country selected) */}
+      {selectedDC && !selectedCountry && (
+        <div className="absolute bottom-4 right-4 z-20 pointer-events-auto"
+          style={{ width: 270 }}>
+          <div className="rounded-xl p-4"
+            style={{
+              background: "rgba(0,0,0,0.9)",
+              border: `1px solid rgba(${OP_COLORS_RGBA[selectedDC.operator][0]},${OP_COLORS_RGBA[selectedDC.operator][1]},${OP_COLORS_RGBA[selectedDC.operator][2]},0.4)`,
+              backdropFilter: "blur(16px)",
+            }}>
             <div className="flex items-start justify-between mb-3">
               <div className="min-w-0 pr-2">
                 <p className="text-sm font-bold leading-tight" style={{ color: "#fff" }}>
@@ -1624,8 +1760,8 @@ export default function UC26Page() {
                 </p>
               </div>
               <button onClick={() => setSelectedDC(null)}
-                      className="text-sm opacity-40 hover:opacity-80 flex-shrink-0"
-                      style={{ color: "#aaa" }}>
+                className="text-sm opacity-40 hover:opacity-80 flex-shrink-0"
+                style={{ color: "#aaa" }}>
                 ✕
               </button>
             </div>
@@ -1633,15 +1769,15 @@ export default function UC26Page() {
             {/* Operator badge */}
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                    style={{
-                      background: `rgba(${OP_COLORS[selectedDC.operator][0]},${OP_COLORS[selectedDC.operator][1]},${OP_COLORS[selectedDC.operator][2]},0.15)`,
-                      color: `rgb(${OP_COLORS[selectedDC.operator][0]},${OP_COLORS[selectedDC.operator][1]},${OP_COLORS[selectedDC.operator][2]})`,
-                      border: `1px solid rgba(${OP_COLORS[selectedDC.operator][0]},${OP_COLORS[selectedDC.operator][1]},${OP_COLORS[selectedDC.operator][2]},0.35)`,
-                    }}>
+                style={{
+                  background: `rgba(${OP_COLORS_RGBA[selectedDC.operator][0]},${OP_COLORS_RGBA[selectedDC.operator][1]},${OP_COLORS_RGBA[selectedDC.operator][2]},0.15)`,
+                  color: OP_COLORS[selectedDC.operator],
+                  border: `1px solid rgba(${OP_COLORS_RGBA[selectedDC.operator][0]},${OP_COLORS_RGBA[selectedDC.operator][1]},${OP_COLORS_RGBA[selectedDC.operator][2]},0.35)`,
+                }}>
                 {selectedDC.operator}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: STATUS_COLORS[selectedDC.status] + "18", color: STATUS_COLORS[selectedDC.status], border: `1px solid ${STATUS_COLORS[selectedDC.status]}33` }}>
+                style={{ background: STATUS_COLORS[selectedDC.status] + "18", color: STATUS_COLORS[selectedDC.status], border: `1px solid ${STATUS_COLORS[selectedDC.status]}33` }}>
                 {selectedDC.status === "under-construction" ? "Under Construction" : selectedDC.status.charAt(0).toUpperCase() + selectedDC.status.slice(1)}
               </span>
             </div>
@@ -1655,7 +1791,7 @@ export default function UC26Page() {
                 { label: "AI Focused",       val: selectedDC.aiFocused ? "Yes" : "No" },
               ].map(m => (
                 <div key={m.label} className="rounded-lg px-2 py-1.5"
-                     style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <p className="text-xs" style={{ color: "#555" }}>{m.label}</p>
                   <p className="text-sm font-semibold" style={{ color: "#ddd" }}>{m.val}</p>
                 </div>
@@ -1665,7 +1801,7 @@ export default function UC26Page() {
             {/* Project tag */}
             {selectedDC.project && (
               <div className="rounded-lg px-3 py-2 mt-1"
-                   style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.25)" }}>
+                style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.25)" }}>
                 <p className="text-xs font-semibold" style={{ color: "#a78bfa" }}>Project</p>
                 <p className="text-xs mt-0.5" style={{ color: "#c084fc" }}>{selectedDC.project}</p>
               </div>
@@ -1679,13 +1815,25 @@ export default function UC26Page() {
         </div>
       )}
 
-      {/* ── Bottom-left: Legend ───────────────────────────────────────────── */}
+      {/* Country hover tooltip (bottom-right when hovering but nothing selected) */}
+      {hoveredCountry && !selectedCountry && !selectedDC && (
+        <div className="absolute bottom-4 right-4 z-20 pointer-events-none"
+          style={{ width: 270 }}>
+          <div className="rounded-xl px-4 py-3"
+            style={{ background: "rgba(0,0,0,0.82)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(12px)" }}>
+            <p className="text-sm font-semibold" style={{ color: "#fff" }}>{hoveredCountry.properties.name}</p>
+            <p className="text-xs mt-0.5" style={{ color: "#666" }}>Click for country stats</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom-left: Legend ──────────────────────────────────────────────── */}
       <div className="absolute bottom-4 left-4 z-20 pointer-events-none"
-           style={{ maxWidth: 220 }}>
+        style={{ maxWidth: 220 }}>
         <div className="rounded-xl px-3 py-2"
-             style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(8px)" }}>
-          <p className="text-xs mb-1.5" style={{ color: "#555" }}>Tower height = log₁₀(MW) capacity</p>
-          <div className="flex items-center gap-3 text-xs" style={{ color: "#555" }}>
+          style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(8px)" }}>
+          <p className="text-xs mb-1.5" style={{ color: "#555" }}>Point height = log(MW) capacity</p>
+          <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: "#555" }}>
             <span className="flex items-center gap-1">
               <span className="inline-block w-2 h-2 rounded-full" style={{ background: STATUS_COLORS.operational }} />
               Operational
@@ -1701,6 +1849,7 @@ export default function UC26Page() {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

@@ -1,12 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import DeckGL from "@deck.gl/react"
-import { _GlobeView as GlobeView } from "@deck.gl/core"
-import { ColumnLayer, ScatterplotLayer, SolidPolygonLayer } from "@deck.gl/layers"
+import { useEffect, useRef, useState, useMemo } from "react"
 import Link from "next/link"
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────────
 
 interface Building {
   id: string
@@ -23,7 +20,16 @@ interface Building {
   architect: string
 }
 
-// ── Data ───────────────────────────────────────────────────────────────────────
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
+type StatusFilter = "all" | "complete" | "under-construction" | "proposed"
+
+// ── Data ────────────────────────────────────────────────────────────────────────
 
 const BUILDINGS: Building[] = [
   {
@@ -882,78 +888,183 @@ const BUILDINGS: Building[] = [
   },
 ]
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Constants ───────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<string, [number, number, number, number]> = {
-  complete:             [253, 231,  37, 220],  // yellow
-  "under-construction": [255, 140,   0, 230],  // orange
-  proposed:             [100, 149, 237, 200],  // cornflower blue
+const STATUS_COLOR: Record<string, string> = {
+  complete:             "#fde725",
+  "under-construction": "#ff8c00",
+  proposed:             "#6495ed",
 }
 
-const EARTH_POLYGON = [[-180, 90], [180, 90], [180, -90], [-180, -90], [-180, 90]]
+// ── Helpers ─────────────────────────────────────────────────────────────────────
 
-const GLOBE_VIEW = new GlobeView({ id: "globe", controller: true })
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c as [number, number]
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+    } else {
+      for (const sub of c) walk(sub)
+    }
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
 
-const INITIAL_VIEW_STATE = { longitude: 45, latitude: 25, zoom: 1.6 }
+function applyCountries(
+  globe: any,
+  features: CountryFeature[],
+  hovered: CountryFeature | null,
+  selected: CountryFeature | null,
+  onHover: (d: CountryFeature | null) => void,
+  onClick: (d: CountryFeature) => void,
+) {
+  globe
+    .polygonsData(features)
+    .polygonCapColor((d: any) => {
+      if (selected?.properties.name === d.properties.name) return "rgba(253,231,37,0.10)"
+      if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.06)"
+      return "rgba(0,0,0,0)"
+    })
+    .polygonSideColor(() => "rgba(0,0,0,0)")
+    .polygonStrokeColor((d: any) => {
+      if (selected?.properties.name === d.properties.name) return "rgba(253,231,37,0.9)"
+      if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.6)"
+      return "rgba(255,255,255,0.18)"
+    })
+    .polygonAltitude(0.005)
+    .onPolygonHover((d: any) => onHover(d as CountryFeature | null))
+    .onPolygonClick((d: any) => onClick(d as CountryFeature))
+}
 
-type StatusFilter = "all" | "complete" | "under-construction" | "proposed"
-
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────────────────────
 
 export default function UC23Page() {
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE)
-  const [selected,  setSelected]  = useState<Building | null>(null)
-  const [filter,    setFilter]    = useState<StatusFilter>("all")
-  const [sortBy,    setSortBy]    = useState<"height" | "year">("height")
+  const globeRef  = useRef<HTMLDivElement>(null)
+  const globeInst = useRef<any>(null)
+  const [globeReady, setGlobeReady] = useState(false)
 
+  const [selected,         setSelected]         = useState<Building | null>(null)
+  const [filter,           setFilter]           = useState<StatusFilter>("all")
+  const [sortBy,           setSortBy]           = useState<"height" | "year">("height")
+  const [countries,        setCountries]        = useState<CountryFeature[]>([])
+  const [hoveredCountry,   setHoveredCountry]   = useState<CountryFeature | null>(null)
+  const [selectedCountry,  setSelectedCountry]  = useState<CountryFeature | null>(null)
+  const [isSpinning,       setIsSpinning]       = useState(true)
+
+  // Fetch countries GeoJSON
+  useEffect(() => {
+    fetch("/countries-110m.geojson").then(r => r.json()).then(geo => {
+      setCountries((geo.features as CountryFeature[]))
+    }).catch(() => { /* silently ignore — borders are decorative */ })
+  }, [])
+
+  // Globe init
+  useEffect(() => {
+    if (!globeRef.current || globeInst.current) return
+    import("globe.gl").then(mod => {
+      if (!globeRef.current) return
+      const GlobeGL = (mod.default ?? mod) as any
+      const globe = new GlobeGL()
+      globe(globeRef.current)
+        .width(globeRef.current.clientWidth)
+        .height(globeRef.current.clientHeight)
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .atmosphereColor("#1a3fff")
+        .atmosphereAltitude(0.14)
+        .pointOfView({ lat: 25, lng: 45, altitude: 2.0 })
+      globe.controls().autoRotate      = true
+      globe.controls().autoRotateSpeed = 0.15
+      globe.controls().enableDamping   = true
+      globe.controls().dampingFactor   = 0.1
+      globeInst.current = globe
+      setGlobeReady(true)
+    })
+    return () => {
+      globeInst.current?.controls()?.dispose?.()
+      globeInst.current = null
+    }
+  }, [])
+
+  // Resize handler
+  useEffect(() => {
+    const onResize = () => {
+      if (globeInst.current && globeRef.current)
+        globeInst.current.width(globeRef.current.clientWidth).height(globeRef.current.clientHeight)
+    }
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
+  // Derived: filtered buildings
   const filtered = useMemo(
     () => filter === "all" ? BUILDINGS : BUILDINGS.filter(b => b.status === filter),
     [filter],
   )
 
-  const maxHeight = useMemo(() => Math.max(...filtered.map(b => b.heightM)), [filtered])
+  // Apply buildings as points whenever filter or globeReady changes
+  useEffect(() => {
+    if (!globeInst.current || !globeReady) return
+    const g = globeInst.current
+    const maxH = Math.max(...filtered.map(b => b.heightM))
+    g
+      .pointsData(filtered)
+      .pointLat("lat")
+      .pointLng("lng")
+      .pointAltitude((d: Building) => (d.heightM / maxH) * 0.55)
+      .pointRadius(0.06)
+      .pointColor((d: Building) => STATUS_COLOR[d.status] ?? "#ffffff")
+      .pointsMerge(false)
+      .pointLabel((d: Building) =>
+        `<div style="background:rgba(0,0,0,0.85);border:1px solid rgba(253,231,37,0.4);border-radius:8px;padding:8px 12px;font-size:12px;color:#fff;max-width:200px">
+          <b style="color:#fde725">${d.name}</b><br/>
+          ${d.heightM}m &middot; ${d.floors} floors<br/>
+          ${d.city}, ${d.country}<br/>
+          ${d.status === "complete" ? d.year : "Est. " + d.year}
+        </div>`
+      )
+      .onPointClick((d: Building) => {
+        setSelected(d)
+        globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.4 }, 700)
+        setIsSpinning(false)
+      })
+      .onPointHover((d: Building | null) => {
+        if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
+      })
+  }, [filtered, globeReady])
 
-  const layers = useMemo(() => [
-    // Earth background
-    new SolidPolygonLayer({
-      id: "earth",
-      data: [{ polygon: EARTH_POLYGON }],
-      getPolygon: (d: any) => d.polygon,
-      getFillColor: [8, 18, 38, 255],
-      stroked: false,
-    }),
+  // Apply country borders
+  useEffect(() => {
+    if (!globeInst.current || !globeReady || !countries.length) return
+    applyCountries(
+      globeInst.current,
+      countries,
+      hoveredCountry,
+      selectedCountry,
+      setHoveredCountry,
+      (f: CountryFeature) => {
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        globeInst.current?.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        setIsSpinning(false)
+      },
+    )
+  }, [countries, hoveredCountry, selectedCountry, globeReady])
 
-    // Glow dots at base
-    new ScatterplotLayer<Building>({
-      id: "glows",
-      data: filtered,
-      getPosition:   (d) => [d.lng, d.lat],
-      getColor:      (d) => STATUS_COLOR[d.status] ?? ([200, 200, 200, 120] as [number,number,number,number]),
-      getRadius:     80000,
-      radiusUnits:   "meters",
-      opacity:       0.35,
-      pickable:      false,
-    }),
+  // Spin control
+  useEffect(() => {
+    if (!globeInst.current) return
+    globeInst.current.controls().autoRotate = isSpinning
+  }, [isSpinning])
 
-    // Column layer — 3D extruded buildings
-    new ColumnLayer<Building>({
-      id: "buildings",
-      data: filtered,
-      diskResolution: 12,
-      radius: 35000,
-      extruded: true,
-      getPosition:   (d) => [d.lng, d.lat],
-      getElevation:  (d) => (d.heightM / maxHeight) * 6_500_000,
-      getFillColor:  (d) => STATUS_COLOR[d.status] ?? ([200, 200, 200, 200] as [number,number,number,number]),
-      getLineColor:  [0, 0, 0, 80] as [number, number, number, number],
-      lineWidthMinPixels: 1,
-      pickable: true,
-      autoHighlight: true,
-      highlightColor: [255, 255, 255, 60] as [number, number, number, number],
-      onClick: (info: any) => setSelected(info.object ?? null),
-    }),
-  ], [filtered, maxHeight])
-
+  // Derived: top-10 leaderboard
   const top10 = useMemo(
     () =>
       [...BUILDINGS]
@@ -962,19 +1073,22 @@ export default function UC23Page() {
     [sortBy],
   )
 
+  // Derived: selected country stats
+  const countryStats = useMemo(() => {
+    if (!selectedCountry) return null
+    const name = selectedCountry.properties.name
+    const inCountry = BUILDINGS.filter(b => b.country === name)
+    if (!inCountry.length) return null
+    const tallest = inCountry.reduce((a, b) => b.heightM > a.heightM ? b : a)
+    const complete = inCountry.filter(b => b.status === "complete").length
+    const underConstruction = inCountry.filter(b => b.status === "under-construction").length
+    const proposed = inCountry.filter(b => b.status === "proposed").length
+    return { name, count: inCountry.length, tallest, complete, underConstruction, proposed }
+  }, [selectedCountry])
+
   return (
-    <div className="relative" style={{ height: "calc(100vh - 64px)", background: "#000810" }}>
-      <DeckGL
-        views={GLOBE_VIEW}
-        viewState={viewState}
-        onViewStateChange={({ viewState: vs }: { viewState: typeof INITIAL_VIEW_STATE }) =>
-          setViewState(vs)
-        }
-        layers={layers}
-        parameters={{ cull: true } as any}
-        style={{ position: "absolute", inset: "0" }}
-        getCursor={() => "crosshair"}
-      />
+    <div className="relative" style={{ height: "calc(100vh - 64px)", background: "#000" }}>
+      <div ref={globeRef} className="absolute inset-0" />
 
       {/* ── Top bar ── */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-4 pointer-events-none">
@@ -995,10 +1109,10 @@ export default function UC23Page() {
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-            World's tallest buildings — height, status &amp; race to 1000m
+            World&apos;s tallest buildings — height, status &amp; race to 1000m
           </p>
 
-          {/* Status filter */}
+          {/* Status filter chips */}
           <div className="flex gap-1.5 flex-wrap">
             {(["all", "complete", "under-construction", "proposed"] as StatusFilter[]).map(s => (
               <button
@@ -1006,9 +1120,9 @@ export default function UC23Page() {
                 onClick={() => setFilter(s)}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  background:    filter === s ? "rgba(253,231,37,0.2)" : "rgba(0,0,0,0.6)",
-                  border:        filter === s ? "1px solid rgba(253,231,37,0.6)" : "1px solid rgba(255,255,255,0.12)",
-                  color:         filter === s ? "#fde725" : "var(--muted)",
+                  background:     filter === s ? "rgba(253,231,37,0.2)" : "rgba(0,0,0,0.6)",
+                  border:         filter === s ? "1px solid rgba(253,231,37,0.6)" : "1px solid rgba(255,255,255,0.12)",
+                  color:          filter === s ? "#fde725" : "var(--muted)",
                   backdropFilter: "blur(8px)",
                 }}
               >
@@ -1022,28 +1136,40 @@ export default function UC23Page() {
         </div>
 
         <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={() => setIsSpinning(p => !p)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{
+              background:     "rgba(0,0,0,0.6)",
+              border:         "1px solid rgba(255,255,255,0.15)",
+              color:          "var(--muted)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {isSpinning ? "Pause" : "Spin"}
+          </button>
           <Link
             href="/uc23/details"
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{
-              background:    "rgba(253,231,37,0.12)",
-              border:        "1px solid rgba(253,231,37,0.3)",
-              color:         "#fde725",
+              background:     "rgba(253,231,37,0.12)",
+              border:         "1px solid rgba(253,231,37,0.3)",
+              color:          "#fde725",
               backdropFilter: "blur(8px)",
             }}
           >
-            About →
+            View Details →
           </Link>
         </div>
       </div>
 
-      {/* ── Legend (bottom-left) ── */}
+      {/* ── Legend + sort toggle (bottom-left) ── */}
       <div className="absolute bottom-4 left-4 pointer-events-auto w-52">
         <div
           className="rounded-xl p-3"
           style={{
-            background:    "rgba(0,0,0,0.82)",
-            border:        "1px solid rgba(255,255,255,0.1)",
+            background:     "rgba(0,0,0,0.82)",
+            border:         "1px solid rgba(255,255,255,0.1)",
             backdropFilter: "blur(14px)",
           }}
         >
@@ -1051,9 +1177,9 @@ export default function UC23Page() {
             STATUS
           </p>
           {[
-            { s: "complete",            label: "Completed",          c: "#fde725" },
-            { s: "under-construction",  label: "Under Construction", c: "#ff8c00" },
-            { s: "proposed",            label: "Proposed",           c: "#6495ed" },
+            { s: "complete",           label: "Completed",          c: "#fde725" },
+            { s: "under-construction", label: "Under Construction", c: "#ff8c00" },
+            { s: "proposed",           label: "Proposed",           c: "#6495ed" },
           ].map(({ s, label, c }) => (
             <div key={s} className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: c }} />
@@ -1088,8 +1214,8 @@ export default function UC23Page() {
         <div
           className="rounded-xl p-3"
           style={{
-            background:    "rgba(0,0,0,0.82)",
-            border:        "1px solid rgba(253,231,37,0.2)",
+            background:     "rgba(0,0,0,0.82)",
+            border:         "1px solid rgba(253,231,37,0.2)",
             backdropFilter: "blur(14px)",
           }}
         >
@@ -1101,7 +1227,8 @@ export default function UC23Page() {
               key={b.id}
               onClick={() => {
                 setSelected(b)
-                setViewState(v => ({ ...v, longitude: b.lng, latitude: b.lat, zoom: 3 }))
+                globeInst.current?.pointOfView({ lat: b.lat, lng: b.lng, altitude: 1.4 }, 700)
+                setIsSpinning(false)
               }}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 cursor-pointer transition-all"
               style={{
@@ -1118,7 +1245,7 @@ export default function UC23Page() {
               </div>
               <span
                 className="text-xs font-bold flex-shrink-0"
-                style={{ color: `rgb(${STATUS_COLOR[b.status].slice(0, 3).join(",")})` }}
+                style={{ color: STATUS_COLOR[b.status] ?? "#fff" }}
               >
                 {b.heightM}m
               </span>
@@ -1127,14 +1254,83 @@ export default function UC23Page() {
         </div>
       </div>
 
-      {/* ── Selected building panel (bottom-right) ── */}
-      {selected && (
-        <div className="absolute bottom-4 right-4 pointer-events-auto w-72">
+      {/* ── Bottom-right: country stats panel or selected building panel ── */}
+      <div className="absolute bottom-4 right-4 pointer-events-auto w-72">
+        {selectedCountry && countryStats ? (
+          <div
+            className="rounded-xl p-4 mb-3"
+            style={{
+              background:     "rgba(0,0,0,0.88)",
+              border:         "1px solid rgba(253,231,37,0.3)",
+              backdropFilter: "blur(14px)",
+            }}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#fde725" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats.count} building{countryStats.count !== 1 ? "s" : ""} in dataset
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCountry(null)}
+                className="opacity-40 hover:opacity-80 text-base"
+                style={{ color: "var(--muted)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-lg px-3 py-2 mb-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(253,231,37,0.15)" }}>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>Tallest building</p>
+              <p className="text-sm font-bold truncate" style={{ color: "#fde725" }}>{countryStats.tallest.name}</p>
+              <p className="text-xs font-mono" style={{ color: "var(--muted)" }}>{countryStats.tallest.heightM}m</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { label: "Complete",  val: countryStats.complete,          c: "#fde725" },
+                { label: "Building",  val: countryStats.underConstruction, c: "#ff8c00" },
+                { label: "Proposed",  val: countryStats.proposed,          c: "#6495ed" },
+              ].map(({ label, val, c }) => (
+                <div key={label} className="rounded-lg px-2 py-2 text-center"
+                  style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${c}33` }}>
+                  <p className="text-base font-bold" style={{ color: c }}>{val}</p>
+                  <p className="text-xs" style={{ color: "var(--muted)" }}>{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : hoveredCountry ? (
+          <div
+            className="rounded-xl px-4 py-3 mb-3"
+            style={{
+              background:     "rgba(0,0,0,0.82)",
+              border:         "1px solid rgba(255,255,255,0.14)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{hoveredCountry.properties.name}</p>
+            {(() => {
+              const cnt = BUILDINGS.filter(b => b.country === hoveredCountry.properties.name).length
+              return cnt > 0 ? (
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {cnt} building{cnt !== 1 ? "s" : ""} · Click for stats
+                </p>
+              ) : (
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Click to select</p>
+              )
+            })()}
+          </div>
+        ) : null}
+
+        {/* Selected building detail panel */}
+        {selected && (
           <div
             className="rounded-xl p-4"
             style={{
-              background:    "rgba(0,0,0,0.9)",
-              border:        "1px solid rgba(253,231,37,0.3)",
+              background:     "rgba(0,0,0,0.9)",
+              border:         "1px solid rgba(253,231,37,0.3)",
               backdropFilter: "blur(14px)",
             }}
           >
@@ -1188,8 +1384,8 @@ export default function UC23Page() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

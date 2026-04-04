@@ -5,6 +5,13 @@ import Link from "next/link"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 type ViewMode = "plastic" | "bleaching" | "temp"
 
 type PlasticConc = "critical" | "high" | "moderate" | "low"
@@ -501,6 +508,36 @@ function bleachDotSize(pct: number): number {
   return 0.25 + (pct / 100) * 0.55
 }
 
+// ── Country border helpers ─────────────────────────────────────────────────────
+
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+function featureBbox(geometry: any): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng
+    } else for (const sub of c) walk(sub)
+  }
+  walk(geometry?.coordinates)
+  return { minLat, maxLat, minLng, maxLng }
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function UC25Page() {
@@ -514,6 +551,9 @@ export default function UC25Page() {
   const [selectedPlastic,  setSelectedPlastic]  = useState<PlasticPoint | null>(null)
   const [selectedBleach,   setSelectedBleach]   = useState<BleachingEvent | null>(null)
   const [selectedTemp,     setSelectedTemp]     = useState<TempAnomaly | null>(null)
+  const [countries,        setCountries]        = useState<CountryFeature[]>([])
+  const [hoveredCountry,   setHoveredCountry]   = useState<CountryFeature | null>(null)
+  const [selectedCountry,  setSelectedCountry]  = useState<CountryFeature | null>(null)
 
   const viewModeRef = useRef<ViewMode>("plastic")
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
@@ -522,6 +562,13 @@ export default function UC25Page() {
   useEffect(() => {
     const id = setInterval(() => setAnimTick(t => t + 1), 800)
     return () => clearInterval(id)
+  }, [])
+
+  // Fetch country borders
+  useEffect(() => {
+    fetch("/countries-110m.geojson").then(r => r.json()).then(geo => {
+      setCountries(geo.features as CountryFeature[])
+    })
   }, [])
 
   // ── Globe init ──────────────────────────────────────────────────────────────
@@ -573,20 +620,6 @@ export default function UC25Page() {
           globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.5 }, 700)
         })
 
-        // ── Garbage patch polygons ─────────────────────────────────────────
-        .polygonsData(GARBAGE_PATCHES)
-        .polygonAltitude(0.008)
-        .polygonCapColor(() => "rgba(255,120,0,0.18)")
-        .polygonSideColor(() => "rgba(255,80,0,0.08)")
-        .polygonStrokeColor(() => "rgba(255,100,20,0.55)")
-        .polygonLabel((d: GarbagePatch) =>
-          `<div style="font-family:sans-serif;padding:7px 11px;background:rgba(0,0,0,0.88);border-radius:9px;border:1px solid rgba(255,100,20,0.45);color:#fff;font-size:12px;">
-            <b style="color:#ff8844">${d.properties.name}</b><br/>
-            ${(d.properties.oceanKm2 / 1e6).toFixed(1)}M km² · ${(d.properties.plasticTonnes / 1000).toFixed(0)}k tonnes<br/>
-            <span style="color:#aaa;font-size:11px">Discovered: ${d.properties.discovered}</span>
-          </div>`
-        )
-
         // ── Gyre arcs ─────────────────────────────────────────────────────
         .arcsData(GYRE_ARCS)
         .arcStartLat("srcLat")
@@ -611,6 +644,9 @@ export default function UC25Page() {
 
       globeInst.current = globe
       setGlobeReady(true)
+      // Country borders are applied via the sync useEffect once countries load.
+      // For immediate init with no countries yet, set up an empty polygon layer.
+      applyCountries(globe, [], GARBAGE_PATCHES, null, null)
 
       const onResize = () => {
         if (globe && globeRef.current) {
@@ -633,6 +669,67 @@ export default function UC25Page() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Country polygon layer ───────────────────────────────────────────────────
+  // globe.gl has a single polygonsData slot; we merge country borders with
+  // garbage patches (in plastic mode) so both render simultaneously.
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    patches: GarbagePatch[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    const combined: any[] = [...patches, ...features]
+    globe
+      .polygonsData(combined)
+      .polygonCapColor((d: any) => {
+        // Garbage patches retain their orange fill
+        if ((d as GarbagePatch).properties?.plasticTonnes !== undefined)
+          return "rgba(255,120,0,0.18)"
+        if (selected?.properties.name === d.properties.name) return "rgba(253,231,37,0.10)"
+        if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.06)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor((d: any) => {
+        if ((d as GarbagePatch).properties?.plasticTonnes !== undefined)
+          return "rgba(255,80,0,0.08)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonStrokeColor((d: any) => {
+        if ((d as GarbagePatch).properties?.plasticTonnes !== undefined)
+          return "rgba(255,100,20,0.55)"
+        if (selected?.properties.name === d.properties.name) return "rgba(253,231,37,0.9)"
+        if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.6)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude((d: any) => {
+        if ((d as GarbagePatch).properties?.plasticTonnes !== undefined) return 0.008
+        return 0.005
+      })
+      .polygonLabel((d: any) => {
+        const patch = d as GarbagePatch
+        if (patch.properties?.plasticTonnes !== undefined) {
+          return `<div style="font-family:sans-serif;padding:7px 11px;background:rgba(0,0,0,0.88);border-radius:9px;border:1px solid rgba(255,100,20,0.45);color:#fff;font-size:12px;">
+            <b style="color:#ff8844">${patch.properties.name}</b><br/>
+            ${(patch.properties.oceanKm2 / 1e6).toFixed(1)}M km² · ${(patch.properties.plasticTonnes / 1000).toFixed(0)}k tonnes<br/>
+            <span style="color:#aaa;font-size:11px">Discovered: ${patch.properties.discovered}</span>
+          </div>`
+        }
+        return ""
+      })
+      .onPolygonHover((d: any) => {
+        if (!d || (d as GarbagePatch).properties?.plasticTonnes !== undefined) return
+        setHoveredCountry(d as CountryFeature | null)
+      })
+      .onPolygonClick((d: any) => {
+        if ((d as GarbagePatch).properties?.plasticTonnes !== undefined) return
+        const f = d as CountryFeature
+        setSelectedCountry(prev => prev?.properties.name === f.properties.name ? null : f)
+        const { lat, lng } = featureCentroid(f.geometry)
+        globeInst.current?.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+      })
+  }
 
   // ── View mode switching ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -665,11 +762,8 @@ export default function UC25Page() {
           setSelectedTemp(null)
           globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.5 }, 700)
         })
-        .polygonsData(GARBAGE_PATCHES)
-        .polygonCapColor(() => "rgba(255,120,0,0.18)")
-        .polygonSideColor(() => "rgba(255,80,0,0.08)")
-        .polygonStrokeColor(() => "rgba(255,100,20,0.55)")
-        .arcsData(GYRE_ARCS)
+      applyCountries(g, countries, GARBAGE_PATCHES, hoveredCountry, selectedCountry)
+      g.arcsData(GYRE_ARCS)
         .arcColor("color")
         .arcStroke(0.4)
         .arcDashLength(0.35).arcDashGap(0.25).arcDashAnimateTime(5000)
@@ -699,8 +793,8 @@ export default function UC25Page() {
           setSelectedTemp(null)
           globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.4 }, 700)
         })
-        .polygonsData([])
-        .arcsData([])
+      applyCountries(g, countries, [], hoveredCountry, selectedCountry)
+      g.arcsData([])
 
       g.pointOfView({ lat: -10, lng: 150, altitude: 2.0 }, 900)
 
@@ -725,8 +819,8 @@ export default function UC25Page() {
           setSelectedBleach(null)
           globeInst.current?.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.5 }, 700)
         })
-        .polygonsData([])
-        .arcsData([])
+      applyCountries(g, countries, [], hoveredCountry, selectedCountry)
+      g.arcsData([])
 
       g.pointOfView({ lat: 45, lng: -30, altitude: 2.0 }, 900)
     }
@@ -743,6 +837,14 @@ export default function UC25Page() {
     globeInst.current.controls().autoRotate = isSpinning
   }, [isSpinning])
 
+  // ── Sync country borders on hover / select / countries load ─────────────────
+  useEffect(() => {
+    if (!globeInst.current || !globeReady || !countries.length) return
+    const patches = viewMode === "plastic" ? GARBAGE_PATCHES : []
+    applyCountries(globeInst.current, countries, patches, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries, globeReady, viewMode])
+
   // ── Bleaching pulse animation (change opacity periodically) ─────────────────
   useEffect(() => {
     if (!globeInst.current || !globeReady || viewMode !== "bleaching") return
@@ -751,6 +853,36 @@ export default function UC25Page() {
     g.pointAltitude(pulse ? 0.018 : 0.012)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animTick, globeReady])
+
+  // ── Country stats (computed when a country is selected) ─────────────────────
+  const countryStats = useMemo(() => {
+    if (!selectedCountry) return null
+    const bbox = featureBbox(selectedCountry.geometry)
+    const plasticCount = PLASTIC_POINTS.filter(p =>
+      p.lat >= bbox.minLat && p.lat <= bbox.maxLat &&
+      p.lng >= bbox.minLng && p.lng <= bbox.maxLng
+    ).length
+    const criticalPlastic = PLASTIC_POINTS.filter(p =>
+      p.lat >= bbox.minLat && p.lat <= bbox.maxLat &&
+      p.lng >= bbox.minLng && p.lng <= bbox.maxLng &&
+      p.concentration === "critical"
+    ).length
+    const bleachCount = BLEACHING_EVENTS.filter(e =>
+      e.lat >= bbox.minLat && e.lat <= bbox.maxLat &&
+      e.lng >= bbox.minLng && e.lng <= bbox.maxLng
+    ).length
+    const tempPts = TEMP_ANOMALIES.filter(t =>
+      t.lat >= bbox.minLat && t.lat <= bbox.maxLat &&
+      t.lng >= bbox.minLng && t.lng <= bbox.maxLng
+    )
+    const avgTemp = tempPts.length
+      ? (tempPts.reduce((s, t) => s + t.anomalyC, 0) / tempPts.length).toFixed(1)
+      : null
+    const maxTemp = tempPts.length
+      ? Math.max(...tempPts.map(t => t.anomalyC)).toFixed(1)
+      : null
+    return { plasticCount, criticalPlastic, bleachCount, avgTemp, maxTemp, tempPts: tempPts.length }
+  }, [selectedCountry])
 
   // ── Derived stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1067,6 +1199,87 @@ export default function UC25Page() {
                   </div>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Country stats panel ───────────────────────────────────────────────── */}
+      {selectedCountry && (
+        <div
+          className="absolute pointer-events-auto z-10"
+          style={{ width: 280, right: "1rem", bottom: selectedItem ? "calc(1rem + 270px)" : "1rem" }}>
+          <div className="rounded-xl p-4"
+               style={{ background: "rgba(0,0,0,0.92)", border: "1px solid rgba(253,231,37,0.35)", backdropFilter: "blur(16px)" }}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-xs font-semibold tracking-wider mb-0.5" style={{ color: "rgba(253,231,37,0.9)" }}>
+                  COUNTRY
+                </p>
+                <p className="text-base font-bold leading-tight" style={{ color: "var(--text)" }}>
+                  {selectedCountry.properties.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCountry(null)}
+                className="opacity-40 hover:opacity-80 text-sm"
+                style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-1.5 mb-3">
+              <div className="rounded-lg px-2 py-1.5"
+                   style={{ background: "rgba(255,112,32,0.08)", border: "1px solid rgba(255,112,32,0.2)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Plastic zones nearby</p>
+                <p className="text-sm font-bold" style={{ color: "#ff7020" }}>
+                  {countryStats?.plasticCount ?? 0}
+                  {(countryStats?.criticalPlastic ?? 0) > 0 && (
+                    <span className="text-xs ml-1" style={{ color: "#ff3030" }}>
+                      ({countryStats!.criticalPlastic} crit.)
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-lg px-2 py-1.5"
+                   style={{ background: "rgba(255,0,128,0.08)", border: "1px solid rgba(255,0,128,0.2)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Bleaching events</p>
+                <p className="text-sm font-bold" style={{ color: "#ff0080" }}>
+                  {countryStats?.bleachCount ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg px-2 py-1.5"
+                   style={{ background: "rgba(255,153,48,0.08)", border: "1px solid rgba(255,153,48,0.2)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Avg SST anomaly</p>
+                <p className="text-sm font-bold" style={{ color: "#ff9930" }}>
+                  {countryStats?.avgTemp ? `+${countryStats.avgTemp}°C` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg px-2 py-1.5"
+                   style={{ background: "rgba(255,153,48,0.08)", border: "1px solid rgba(255,153,48,0.2)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Peak SST anomaly</p>
+                <p className="text-sm font-bold" style={{ color: "#ff9930" }}>
+                  {countryStats?.maxTemp ? `+${countryStats.maxTemp}°C` : "—"}
+                </p>
+              </div>
+            </div>
+
+            {/* Crisis level bar */}
+            {countryStats && (countryStats.plasticCount > 0 || countryStats.bleachCount > 0 || countryStats.tempPts > 0) ? (
+              <>
+                <div className="h-1.5 rounded-full overflow-hidden mb-1"
+                     style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="h-full rounded-full"
+                       style={{
+                         width: `${Math.min(100, ((countryStats.plasticCount * 8) + (countryStats.bleachCount * 12) + (countryStats.tempPts * 5)))}%`,
+                         background: "linear-gradient(90deg, rgba(253,231,37,0.7), rgba(255,60,0,0.9))",
+                       }} />
+                </div>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Regional crisis indicators</p>
+              </>
+            ) : (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>No crisis data in this region's bounding area</p>
             )}
           </div>
         </div>

@@ -4,7 +4,7 @@ import Link from "next/link"
 export const metadata: Metadata = {
   title: "Ocean Crisis Atlas — Technical Details — GRIP 3D",
   description:
-    "Technical deep-dive: 5 ocean garbage patches (GeoJSON polygons), 80+ plastic concentration hotspots, 40 coral bleaching events from NOAA's 4th global mass bleaching (2024), 5 ocean gyre arcs, and 60 SST anomaly points — rendered on a WebGL globe using globe.gl.",
+    "Technical deep-dive: 5 ocean garbage patches (GeoJSON polygons), 80+ plastic concentration hotspots, 40 coral bleaching events from NOAA's 4th global mass bleaching (2024), 5 ocean gyre arcs, 60 SST anomaly points, and interactive country borders — rendered on a WebGL globe using globe.gl.",
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────────
@@ -15,6 +15,7 @@ const STATS = [
   { val: "40",     label: "Bleaching events (2024)" },
   { val: "5",      label: "Ocean current gyres" },
   { val: "60",     label: "SST anomaly points" },
+  { val: "177",    label: "Country borders rendered" },
   { val: "150M+",  label: "Tonnes plastic in ocean" },
   { val: "54%",    label: "Coral reefs bleached globally" },
   { val: "+3.2°C", label: "Peak N. Atlantic anomaly 2024" },
@@ -59,6 +60,12 @@ const PIPELINE = [
     desc: "Three view modes are available via the left panel: Plastic (garbage patches + hotspot points + gyre arcs), Bleaching (bleaching event points with pulse animation), and Temp Anomaly (SST anomaly heat map). On mode switch, globe.gl's layer data is swapped live — pointsData(), polygonsData(), and arcsData() are all updated simultaneously without remounting the globe. The camera smoothly repositions to the most relevant region for each mode: Pacific-centred for Plastic (the most dramatic garbage patch view), Indo-Pacific for Bleaching (GBR focus), and North Atlantic for Temperature (where the 2024 record anomalies are most pronounced).",
     tech: ["globe.gl hot-swap layer data", "pointsData + polygonsData + arcsData updated per mode", "Smooth pointOfView() camera transitions", "3 accent colour themes (orange / pink / amber)", "View-specific default camera positions"],
   },
+  {
+    n: "07", icon: "🗺", color: "#fde725",
+    title: "Interactive Country Borders",
+    desc: "All 177 country polygons from the Natural Earth 110m dataset are rendered as a persistent border overlay that stays active across all three view modes. Country borders use a subtle white stroke (18% opacity) by default, brightening on hover (60%) and turning gold on click (90%). Clicking a country flies the camera to the country's centroid, selects it, and opens a stats panel showing the number of plastic pollution zones, coral bleaching events, and SST anomaly readings within the country's bounding region. The country polygon layer is merged with garbage patches in plastic mode — both datasets are combined into a single polygonsData() call with type-discriminated colour/altitude callbacks, since globe.gl exposes a single polygon slot.",
+    tech: ["Natural Earth 110m GeoJSON (countries-110m.geojson)", "globe.gl polygonsData() merged with garbage patches", "Type-discriminated per-polygon colour callbacks", "featureCentroid() bounding-box centroid for camera fly-to", "featureBbox() for regional data filtering", "Country stats: plastic zones · bleaching events · SST anomalies"],
+  },
 ]
 
 // ── Tech stack ─────────────────────────────────────────────────────────────────
@@ -71,6 +78,7 @@ const TECH = [
   { icon: "🪸", label: "Bleaching data",      value: "40 events — NOAA Coral Reef Watch 2024" },
   { icon: "🌊", label: "Gyre arcs",           value: "5 gyres × 4 arc segments, globe.gl arcsData()" },
   { icon: "🌡", label: "SST anomalies",       value: "60 points — NOAA OISST / Copernicus 2024" },
+  { icon: "🗺", label: "Country borders",     value: "Natural Earth 110m — 177 countries, hover/click interactive" },
   { icon: "📐", label: "Framework",           value: "Next.js App Router — dynamic import (no SSR)" },
   { icon: "🎨", label: "Colour scheme",       value: "Deep red / orange / pink / thermal ramp on #000 background" },
   { icon: "⚡", label: "Animation",           value: "Gyre arc dash (5s), bleaching altitude pulse (800ms)" },
@@ -94,6 +102,10 @@ const HIGHLIGHTS = [
   {
     title: "Data sourcing and hardcoding rationale",
     body: "Unlike live-data UCs (GDP, FX), ocean plastic and bleaching data does not have a free real-time API. NOAA Coral Reef Watch provides point-in-time alerts but behind an authenticated query interface. The plastic density data comes from oceanographic surveys with multi-year lag times. Hardcoding the 2024 dataset provides a stable, accurate snapshot that tells the crisis story clearly without API latency or rate-limit issues. All data is clearly attributed and sourced from peer-reviewed literature and NOAA reports.",
+  },
+  {
+    title: "Why merge country borders with garbage patches in one polygonsData() call?",
+    body: "globe.gl exposes a single polygon layer via polygonsData() — there is no secondary polygon slot. To show both country borders and garbage patch outlines simultaneously, both feature sets are combined into one array and passed to a single polygonsData() call. Per-polygon colour, stroke, altitude, and label callbacks use a type guard (checking for the plasticTonnes property on GarbagePatch features) to apply distinct styles to each type. This merge-and-discriminate pattern avoids mounting additional Three.js geometries and keeps the globe's render loop single-pass.",
   },
 ]
 
@@ -133,7 +145,7 @@ export default function UC25DetailsPage() {
       </p>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-14">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-14">
         {STATS.map(s => (
           <div
             key={s.label}

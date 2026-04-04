@@ -51,6 +51,13 @@ interface SelectedItem {
   hub?: RailHub
 }
 
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Color scheme ───────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<RailType, [number, number, number]> = {
@@ -385,211 +392,244 @@ function fmtKm(km: number): string {
   return `${km.toLocaleString()} km`
 }
 
-// ── Earth polygon (full sphere background) ────────────────────────────────────
+// ── Country centroid helper ────────────────────────────────────────────────────
 
-const EARTH_POLYGON = {
-  contour: [
-    [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
-  ],
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+    } else {
+      for (const sub of c) walk(sub)
+    }
+  }
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
+}
+
+// ── Arc colour helpers ─────────────────────────────────────────────────────────
+
+function typeArcColor(type: RailType): string {
+  return TYPE_HEX[type]
+}
+
+function lineToArcData(line: RailLine) {
+  const pts = line.path
+  const src = pts[0]
+  const dst = pts[pts.length - 1]
+  return {
+    ...line,
+    srcLng: src[0], srcLat: src[1],
+    dstLng: dst[0], dstLat: dst[1],
+  }
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function UC24Page() {
-  const [filter, setFilter] = useState<FilterType>("all")
-  const [selected, setSelected] = useState<SelectedItem | null>(null)
-  const [deckLoaded, setDeckLoaded] = useState(false)
-  const [animTick, setAnimTick] = useState(0)
+  const globeRef  = useRef<HTMLDivElement>(null)
+  const globeInst = useRef<any>(null)
 
-  // Animation tick for arc width pulsing
-  useEffect(() => {
-    const id = setInterval(() => setAnimTick(t => t + 1), 80)
-    return () => clearInterval(id)
-  }, [])
+  const [globeReady,      setGlobeReady]      = useState(false)
+  const [filter,          setFilter]          = useState<FilterType>("all")
+  const [selected,        setSelected]        = useState<SelectedItem | null>(null)
+  const [isSpinning,      setIsSpinning]      = useState(true)
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
-  const deckRef = useRef<any>(null)
-  const deckContainerRef = useRef<HTMLDivElement>(null)
-
-  const filteredLines = useMemo(() =>
-    filter === "all" ? RAIL_LINES : RAIL_LINES.filter(l => l.type === filter),
-    [filter]
-  )
-
-  const totalKm = useMemo(() => getTotalKm(), [])
-  const countByType = useMemo(() => getCountByType(), [])
+  const totalKm      = useMemo(() => getTotalKm(), [])
+  const countByType  = useMemo(() => getCountByType(), [])
   const hsrByCountry = useMemo(() => getHsrByCountry(), [])
 
-  // deck.gl dynamic import
+  const filteredLines = useMemo(
+    () => filter === "all" ? RAIL_LINES : RAIL_LINES.filter(l => l.type === filter),
+    [filter],
+  )
+
+  // Country stats: lines passing through / hub count
+  const countryStats = useMemo(() => {
+    if (!selectedCountry) return null
+    const name = selectedCountry.properties.name
+    // Match lines (country field may contain "/")
+    const lines = RAIL_LINES.filter(l =>
+      l.country.split("/").some(c => c.trim().toLowerCase() === name.toLowerCase())
+    )
+    const hubs = RAIL_HUBS.filter(h => h.country.toLowerCase() === name.toLowerCase())
+    const totalLineKm = lines.reduce((s, l) => s + l.lengthKm, 0)
+    return { name, lines, hubs, totalLineKm }
+  }, [selectedCountry])
+
+  // ── Fetch countries GeoJSON ───────────────────────────────────────────────────
   useEffect(() => {
-    let destroyed = false
-    let deckInst: any
+    fetch("/countries-110m.geojson")
+      .then(r => r.json())
+      .then(geo => setCountries(geo.features as CountryFeature[]))
+      .catch(() => {/* non-fatal */})
+  }, [])
 
-    Promise.all([
-      import("@deck.gl/react"),
-      import("deck.gl"),
-      import("react-dom/client"),
-    ]).then(([deckReact, deckCore, reactDomClient]) => {
-      if (destroyed || !deckContainerRef.current) return
+  // ── Globe init ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeRef.current || globeInst.current) return
 
-      const { DeckGL } = deckReact
-      const {
-        _GlobeView,
-        PathLayer,
-        ArcLayer,
-        ScatterplotLayer,
-        SolidPolygonLayer,
-      } = deckCore
+    import("globe.gl").then(mod => {
+      if (!globeRef.current) return
+      const GlobeGL = (mod.default ?? mod) as any
+      const globe = new GlobeGL()
+      globe(globeRef.current)
+        .width(globeRef.current.clientWidth)
+        .height(globeRef.current.clientHeight)
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .atmosphereColor("#1a3fff")
+        .atmosphereAltitude(0.14)
+        .pointOfView({ lat: 30, lng: 60, altitude: 2.0 })
 
-      const INITIAL_VIEW_STATE = {
-        longitude: 60,
-        latitude: 30,
-        zoom: 1.5,
-      }
+      globe.controls().autoRotate      = true
+      globe.controls().autoRotateSpeed = 0.15
+      globe.controls().enableDamping   = true
+      globe.controls().dampingFactor   = 0.1
 
-      function buildLayers(
-        lines: RailLine[],
-        filterType: FilterType,
-        tick: number,
-        onSelectLine: (l: RailLine) => void,
-        onSelectHub: (h: RailHub) => void,
-      ) {
-        const pulse = 0.5 + 0.5 * Math.sin(tick * 0.15)
-
-        return [
-          // Earth background
-          new SolidPolygonLayer({
-            id: "earth-bg",
-            data: [EARTH_POLYGON],
-            getPolygon: (d: any) => d.contour,
-            getFillColor: [8, 20, 40, 255],
-            stroked: false,
-          }),
-
-          // Rail lines
-          new PathLayer({
-            id: "rail-lines",
-            data: lines,
-            getPath: (d: RailLine) => d.path,
-            getColor: (d: RailLine) => {
-              const [r, g, b] = d.color
-              const opacity = d.type === "planned" ? 160 : 220
-              return [r, g, b, opacity]
-            },
-            getWidth: (d: RailLine) => {
-              if (d.type === "high-speed") return 4
-              if (d.type === "planned")    return 2
-              return 2
-            },
-            widthUnits: "pixels",
-            widthScale: 1,
-            widthMinPixels: 1,
-            widthMaxPixels: 8,
-            capRounded: true,
-            jointRounded: true,
-            pickable: true,
-            autoHighlight: true,
-            highlightColor: [255, 255, 255, 80],
-            onClick: (info: any) => {
-              if (info.object) onSelectLine(info.object)
-            },
-          }),
-
-          // Flow arcs
-          new ArcLayer({
-            id: "flow-arcs",
-            data: filterType === "all" ? FLOW_ARCS : [],
-            getSourcePosition: (d: FlowArc) => [d.srcLng, d.srcLat],
-            getTargetPosition: (d: FlowArc) => [d.dstLng, d.dstLat],
-            getSourceColor: (d: FlowArc) => [...d.color, 180] as [number,number,number,number],
-            getTargetColor: (d: FlowArc) => [...d.color, 60]  as [number,number,number,number],
-            getWidth: (d: FlowArc) => {
-              const base = Math.max(1, Math.log10(d.weeklyPassengers) - 3.5)
-              return base * (1 + 0.3 * pulse)
-            },
-            widthUnits: "pixels",
-            widthMinPixels: 1,
-            widthMaxPixels: 6,
-            greatCircle: true,
-            pickable: false,
-            updateTriggers: { getWidth: tick },
-          }),
-
-          // Station hubs
-          new ScatterplotLayer({
-            id: "rail-hubs",
-            data: RAIL_HUBS,
-            getPosition: (d: RailHub) => [d.lng, d.lat],
-            getRadius: (d: RailHub) => {
-              const base = Math.sqrt(d.passengersMillion) * 15000
-              return Math.max(30000, Math.min(base, 200000))
-            },
-            radiusUnits: "meters",
-            getFillColor: (d: RailHub) => {
-              const intensity = Math.min(1, d.passengersMillion / 800)
-              return [
-                Math.round(51  + intensity * (255 - 51)),
-                Math.round(204 + intensity * (220 - 204)),
-                Math.round(221 + intensity * (60  - 221)),
-                200,
-              ] as [number,number,number,number]
-            },
-            getLineColor: [255, 255, 255, 120],
-            stroked: true,
-            lineWidthMinPixels: 1,
-            lineWidthMaxPixels: 2,
-            pickable: true,
-            autoHighlight: true,
-            highlightColor: [255, 255, 255, 100],
-            onClick: (info: any) => {
-              if (info.object) onSelectHub(info.object)
-            },
-          }),
-        ]
-      }
-
-      // We render into the container via React root
-      const root = reactDomClient.createRoot(deckContainerRef.current!)
-
-      function render(lines: RailLine[], filterType: FilterType, tick: number, sel: SelectedItem | null) {
-        const layers = buildLayers(
-          lines,
-          filterType,
-          tick,
-          (l) => { setSelected({ kind: "line", line: l }) },
-          (h) => { setSelected({ kind: "hub",  hub: h  }) },
-        )
-
-        root.render(
-          // @ts-ignore
-          <DeckGL
-            views={new _GlobeView({ id: "globe" })}
-            initialViewState={INITIAL_VIEW_STATE}
-            controller={true}
-            layers={layers}
-            parameters={{ clearColor: [0, 0, 0, 1] } as any}
-            style={{ position: "absolute", inset: "0" }}
-          />
-        )
-      }
-
-      deckRef.current = { render, root }
-      render(filteredLines, filter, animTick, selected)
-      setDeckLoaded(true)
+      globeInst.current = globe
+      setGlobeReady(true)
     })
 
     return () => {
-      destroyed = true
-      deckRef.current?.root?.unmount?.()
-      deckRef.current = null
+      globeInst.current?.controls()?.dispose?.()
+      globeInst.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Re-render deck when state changes
+  // ── Apply rail arcs ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!deckRef.current) return
-    deckRef.current.render(filteredLines, filter, animTick, selected)
-  }, [filteredLines, filter, animTick, selected])
+    if (!globeInst.current || !globeReady) return
+    const g = globeInst.current
+
+    // Rail line arcs (one per line, src→dst of path)
+    const arcData = filteredLines.map(lineToArcData)
+
+    g.arcsData(arcData)
+      .arcStartLat((d: any) => d.srcLat)
+      .arcStartLng((d: any) => d.srcLng)
+      .arcEndLat((d: any) => d.dstLat)
+      .arcEndLng((d: any) => d.dstLng)
+      .arcColor((d: any) => {
+        const col = typeArcColor(d.type as RailType)
+        return [col, col]
+      })
+      .arcStroke((d: any) => {
+        if (d.type === "high-speed") return 0.5
+        if (d.type === "planned")    return 0.25
+        return 0.35
+      })
+      .arcAltitudeAutoScale(0.3)
+      .arcDashLength((d: any) => d.type === "planned" ? 0.4 : 1)
+      .arcDashGap((d: any) => d.type === "planned" ? 0.3 : 0)
+      .arcDashAnimateTime((d: any) => d.type === "planned" ? 2500 : 0)
+      .arcLabel((d: any) => `<div style="background:rgba(0,0,0,0.85);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;border:1px solid ${typeArcColor(d.type)}60">
+        <b>${d.name}</b><br/>
+        <span style="color:${typeArcColor(d.type)}">${d.type === "high-speed" ? "HSR" : d.type}</span> · ${fmtKm(d.lengthKm)} · ${d.speedKmh} km/h
+      </div>`)
+      .onArcClick((d: any) => {
+        const line = RAIL_LINES.find(l => l.id === d.id) ?? null
+        if (line) setSelected({ kind: "line", line })
+      })
+  }, [filteredLines, globeReady])
+
+  // ── Apply hub points ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeInst.current || !globeReady) return
+    const g = globeInst.current
+
+    g.pointsData(RAIL_HUBS)
+      .pointLat("lat")
+      .pointLng("lng")
+      .pointAltitude(0.01)
+      .pointRadius((d: any) => Math.sqrt(d.passengersMillion) * 0.02)
+      .pointColor((d: any) => {
+        const intensity = Math.min(1, d.passengersMillion / 800)
+        const r = Math.round(51  + intensity * (255 - 51))
+        const gg = Math.round(204 + intensity * (220 - 204))
+        const b  = Math.round(221 + intensity * (60  - 221))
+        return `rgba(${r},${gg},${b},0.9)`
+      })
+      .pointsMerge(false)
+      .pointLabel((d: any) =>
+        `<div style="background:rgba(0,0,0,0.85);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;border:1px solid rgba(51,204,221,0.4)">
+          <b>${d.name}</b><br/>
+          <span style="color:var(--accent,#33ccdd)">${d.city}, ${d.country}</span><br/>
+          ${d.passengersMillion}M annual passengers
+        </div>`
+      )
+      .onPointClick((d: any) => {
+        const hub = RAIL_HUBS.find(h => h.id === d.id) ?? null
+        if (hub) setSelected({ kind: "hub", hub })
+      })
+  }, [globeReady])
+
+  // ── Apply country polygons ────────────────────────────────────────────────────
+  const applyCountries = useCallback((
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    sel: CountryFeature | null,
+  ) => {
+    const g = globeInst.current
+    if (!g || !features.length) return
+
+    g.polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (sel?.properties.name === d.properties.name)    return "rgba(253,231,37,0.10)"
+        if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.06)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (sel?.properties.name === d.properties.name)    return "rgba(253,231,37,0.9)"
+        if (hovered?.properties.name === d.properties.name) return "rgba(255,255,255,0.6)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.005)
+      .onPolygonHover((d: any) => setHoveredCountry(d as CountryFeature | null))
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev =>
+          prev?.properties.name === f.properties.name ? null : f
+        )
+        if (globeInst.current) {
+          const { lat, lng } = featureCentroid(f.geometry)
+          globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        }
+        setIsSpinning(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!globeReady || !countries.length) return
+    applyCountries(countries, hoveredCountry, selectedCountry)
+  }, [globeReady, countries, hoveredCountry, selectedCountry, applyCountries])
+
+  // ── Spin control ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeInst.current) return
+    globeInst.current.controls().autoRotate = isSpinning
+  }, [isSpinning])
+
+  // ── Resize ────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onResize = () => {
+      if (globeInst.current && globeRef.current)
+        globeInst.current.width(globeRef.current.clientWidth).height(globeRef.current.clientHeight)
+    }
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
 
   const handleFilterClick = useCallback((f: FilterType) => {
     setFilter(f)
@@ -599,155 +639,104 @@ export default function UC24Page() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ position: "relative", width: "100vw", height: "100vh", background: "#000508", overflow: "hidden" }}>
+    <div className="relative" style={{ minHeight: "calc(100vh - 64px)", background: "#000508", overflow: "hidden" }}>
 
-      {/* deck.gl canvas container */}
-      <div
-        ref={deckContainerRef}
-        style={{ position: "absolute", inset: 0, zIndex: 0 }}
-      />
+      {/* Globe canvas */}
+      <div ref={globeRef} className="absolute inset-0" />
 
       {/* Loading overlay */}
-      {!deckLoaded && (
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 10,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "#000508",
-        }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{
-              width: 48, height: 48, margin: "0 auto 16px",
-              borderRadius: "50%",
-              border: "2px solid transparent",
-              borderTopColor: "var(--accent)",
-              borderRightColor: "rgba(51,204,221,0.3)",
-              animation: "spin 1s linear infinite",
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <p style={{ color: "var(--text)", fontSize: 14, fontWeight: 600 }}>Loading rail network…</p>
-            <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 4 }}>deck.gl GlobeView initialising</p>
+      {!globeReady && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: "#000508" }}>
+          <div className="text-center">
+            <div className="mb-4 relative w-12 h-12 mx-auto">
+              <div className="absolute inset-0 rounded-full border-2 border-transparent animate-spin"
+                style={{ borderTopColor: "#ff3c3c", borderRightColor: "rgba(255,60,60,0.3)" }} />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Loading rail network…</p>
+            <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>globe.gl initialising</p>
           </div>
         </div>
       )}
 
       {/* ── Top-left: title + stats ─────────────────────────────────────────── */}
-      <div style={{
-        position: "absolute", top: 20, left: 20, zIndex: 5,
-        pointerEvents: "none",
-        maxWidth: 300,
-      }}>
-        {/* Badge */}
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-          padding: "3px 10px", borderRadius: 4, marginBottom: 8,
-          background: "var(--accent-dim)", color: "var(--accent)",
-          border: "1px solid rgba(51,204,221,0.25)",
-        }}>
+      <div className="absolute top-5 left-5 z-5 pointer-events-none" style={{ maxWidth: 300 }}>
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase px-2.5 py-1 rounded mb-2"
+          style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid rgba(51,204,221,0.25)" }}>
           UC24 · WORLD RAIL NETWORKS
         </div>
-
-        <h1 style={{
-          fontSize: 22, fontWeight: 800, color: "var(--text)",
-          margin: "0 0 4px", letterSpacing: "-0.02em",
-          textShadow: "0 2px 12px rgba(0,0,0,0.8)",
-        }}>
+        <h1 className="text-xl font-extrabold mb-1" style={{ color: "var(--text)", letterSpacing: "-0.02em", textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
           Global Railway Infrastructure
         </h1>
-        <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
-          {RAIL_LINES.length} corridors · {fmtKm(totalKm)} tracked · 30 major hubs
+        <p className="text-xs mb-3" style={{ color: "var(--muted)", lineHeight: 1.5 }}>
+          {RAIL_LINES.length} corridors · {fmtKm(totalKm)} tracked · {RAIL_HUBS.length} major hubs
         </p>
-
-        {/* Stat chips */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="flex flex-wrap gap-1.5">
           {(Object.entries(countByType) as [RailType, number][])
             .filter(([, n]) => n > 0)
             .map(([type, count]) => (
-              <div key={type} style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "3px 8px", borderRadius: 6, fontSize: 11,
-                background: "rgba(0,0,0,0.7)",
-                border: `1px solid ${TYPE_HEX[type]}40`,
-                backdropFilter: "blur(8px)",
-                color: "var(--text)",
-              }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: 2,
-                  background: TYPE_HEX[type], flexShrink: 0,
-                }} />
+              <div key={type} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs"
+                style={{ background: "rgba(0,0,0,0.70)", border: `1px solid ${TYPE_HEX[type]}40`, backdropFilter: "blur(8px)", color: "var(--text)" }}>
+                <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: TYPE_HEX[type] }} />
                 <span style={{ color: "var(--muted)" }}>
                   {type === "high-speed" ? "HSR" : type.charAt(0).toUpperCase() + type.slice(1)}:
                 </span>
-                <span style={{ fontWeight: 700 }}>{count}</span>
+                <span className="font-bold">{count}</span>
               </div>
-          ))}
+            ))}
         </div>
       </div>
 
-      {/* ── Top-right: Race to connect ──────────────────────────────────────── */}
-      <div style={{
-        position: "absolute", top: 20, right: 20, zIndex: 5,
-        width: 220,
-        background: "rgba(0,0,0,0.78)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: 12,
-        backdropFilter: "blur(14px)",
-        padding: "12px 14px",
-        pointerEvents: "auto",
-      }}>
-        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--muted)", marginBottom: 10, textTransform: "uppercase" }}>
-          Race to Connect — HSR km
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {hsrByCountry.map((entry, i) => {
-            const maxKm = hsrByCountry[0].km
-            const pct = (entry.km / maxKm) * 100
-            return (
-              <div key={entry.country}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 11, color: i < 3 ? "var(--text)" : "var(--muted)", fontWeight: i === 0 ? 700 : 400 }}>
-                    {i + 1}. {entry.country}
-                  </span>
-                  <span style={{ fontSize: 11, color: TYPE_HEX["high-speed"], fontWeight: 600 }}>
-                    {fmtKm(entry.km)}
-                  </span>
-                </div>
-                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", width: `${pct}%`, borderRadius: 2,
-                    background: `linear-gradient(to right, ${TYPE_HEX["high-speed"]}, rgba(255,150,150,0.6))`,
-                    transition: "width 0.4s ease",
-                  }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
-          <Link
-            href="/uc24/details"
-            style={{
-              display: "block", textAlign: "center",
-              fontSize: 11, fontWeight: 600, color: "var(--accent)",
-              textDecoration: "none",
-              padding: "5px 0",
-              borderRadius: 6,
-              background: "var(--accent-dim)",
-              border: "1px solid rgba(51,204,221,0.2)",
-            }}
-          >
-            Technical Details →
+      {/* ── Top-right: controls + HSR leaderboard ─────────────────────────────── */}
+      <div className="absolute top-5 right-5 z-5 w-56 pointer-events-auto">
+        {/* Spin / About buttons */}
+        <div className="flex gap-2 mb-3 justify-end">
+          <button onClick={() => setIsSpinning(s => !s)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", color: "var(--muted)", backdropFilter: "blur(8px)" }}>
+            {isSpinning ? "Pause" : "Spin"}
+          </button>
+          <Link href="/uc24/details"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(255,60,60,0.18)", border: "1px solid rgba(255,60,60,0.4)", color: "#ff3c3c", backdropFilter: "blur(8px)" }}>
+            About →
           </Link>
         </div>
+
+        {/* HSR leaderboard */}
+        <div className="rounded-xl p-3"
+          style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(14px)" }}>
+          <p className="text-xs font-bold tracking-widest uppercase mb-2.5" style={{ color: "var(--muted)" }}>
+            Race to Connect — HSR km
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {hsrByCountry.map((entry, i) => {
+              const maxKm = hsrByCountry[0].km
+              const pct = (entry.km / maxKm) * 100
+              return (
+                <div key={entry.country}>
+                  <div className="flex justify-between mb-0.5">
+                    <span className="text-xs" style={{ color: i < 3 ? "var(--text)" : "var(--muted)", fontWeight: i === 0 ? 700 : 400 }}>
+                      {i + 1}. {entry.country}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: TYPE_HEX["high-speed"] }}>
+                      {fmtKm(entry.km)}
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                    <div style={{
+                      height: "100%", width: `${pct}%`, borderRadius: 2,
+                      background: `linear-gradient(to right, ${TYPE_HEX["high-speed"]}, rgba(255,150,150,0.6))`,
+                    }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* ── Bottom-left: type filter buttons ───────────────────────────────── */}
-      <div style={{
-        position: "absolute", bottom: 24, left: 20, zIndex: 5,
-        display: "flex", flexWrap: "wrap", gap: 7,
-        maxWidth: 420,
-      }}>
+      {/* ── Bottom-left: type filter buttons ───────────────────────────────────── */}
+      <div className="absolute bottom-6 left-5 z-5 flex flex-wrap gap-1.5" style={{ maxWidth: 440 }}>
         {([
           { key: "all",          label: "All Lines"    },
           { key: "high-speed",   label: "High-Speed"   },
@@ -756,29 +745,20 @@ export default function UC24Page() {
           { key: "freight",      label: "Freight"      },
           { key: "metro",        label: "Metro"        },
         ] as { key: FilterType; label: string }[]).map(({ key, label }) => {
-          const active = filter === key
-          const color  = key === "all" ? "var(--accent)" : TYPE_HEX[key as RailType]
-          const colorDim = key === "all" ? "var(--accent-dim)" : `${TYPE_HEX[key as RailType]}20`
+          const active    = filter === key
+          const color     = key === "all" ? "var(--accent)" : TYPE_HEX[key as RailType]
+          const colorDim  = key === "all" ? "var(--accent-dim)" : `${TYPE_HEX[key as RailType]}20`
           return (
-            <button
-              key={key}
-              onClick={() => handleFilterClick(key)}
+            <button key={key} onClick={() => handleFilterClick(key)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all pointer-events-auto"
               style={{
-                padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                cursor: "pointer", transition: "all 0.15s",
-                border: `1px solid ${active ? color : "rgba(255,255,255,0.12)"}`,
-                background: active ? colorDim : "rgba(0,0,0,0.7)",
-                color: active ? color : "var(--muted)",
+                border:         `1px solid ${active ? color : "rgba(255,255,255,0.12)"}`,
+                background:     active ? colorDim : "rgba(0,0,0,0.70)",
+                color:          active ? color : "var(--muted)",
                 backdropFilter: "blur(8px)",
-                display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
+              }}>
               {key !== "all" && (
-                <span style={{
-                  width: 8, height: 8, borderRadius: 2,
-                  background: TYPE_HEX[key as RailType],
-                  flexShrink: 0,
-                }} />
+                <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: TYPE_HEX[key as RailType] }} />
               )}
               {label}
             </button>
@@ -786,163 +766,165 @@ export default function UC24Page() {
         })}
       </div>
 
-      {/* ── Bottom-right: selected item details ────────────────────────────── */}
-      {selected && (
-        <div style={{
-          position: "absolute", bottom: 24, right: 20, zIndex: 5,
-          width: 280,
-          background: "rgba(0,0,0,0.88)",
-          border: `1px solid ${selected.kind === "line" ? TYPE_HEX[selected.line!.type] + "60" : "rgba(51,204,221,0.35)"}`,
-          borderRadius: 12,
-          backdropFilter: "blur(14px)",
-          padding: "14px 16px",
-        }}>
-          {/* Close button */}
-          <button
-            onClick={() => setSelected(null)}
-            style={{
-              position: "absolute", top: 10, right: 10,
-              background: "none", border: "none", cursor: "pointer",
-              color: "var(--muted)", fontSize: 16, lineHeight: 1,
-              padding: "2px 4px",
-            }}
-          >
-            ✕
-          </button>
+      {/* ── Bottom-right: selected item / country stats panel ─────────────────── */}
+      <div className="absolute bottom-6 right-5 z-5 w-72 flex flex-col gap-2 items-end pointer-events-auto">
 
-          {selected.kind === "line" && selected.line && (() => {
-            const l = selected.line
-            const typeColor = TYPE_HEX[l.type]
-            return (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{
-                    width: 10, height: 10, borderRadius: 2,
-                    background: typeColor, flexShrink: 0,
-                  }} />
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: 0, lineHeight: 1.3 }}>
-                    {l.name}
-                  </p>
-                </div>
-                <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
-                  {l.country} · {l.operator}
+        {/* Country stats panel */}
+        {selectedCountry && (
+          <div className="w-full rounded-xl p-4"
+            style={{ background: "rgba(0,0,0,0.88)", border: "1px solid rgba(253,231,37,0.35)", backdropFilter: "blur(14px)" }}>
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#fde725" }}>{selectedCountry.properties.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                  {countryStats ? `${countryStats.lines.length} lines · ${fmtKm(countryStats.totalLineKm)} · ${countryStats.hubs.length} hub${countryStats.hubs.length !== 1 ? "s" : ""}` : "No rail data"}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[
-                    { label: "Type",     value: l.type === "high-speed" ? "High-Speed" : l.type.charAt(0).toUpperCase() + l.type.slice(1) },
-                    { label: "Length",   value: fmtKm(l.lengthKm)  },
-                    { label: "Top Speed",value: `${l.speedKmh} km/h` },
-                    { label: "Opened",   value: l.openedYear ? l.openedYear.toString() : "N/A" },
-                  ].map(m => (
-                    <div key={m.label} style={{
-                      padding: "8px 10px", borderRadius: 8,
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                    }}>
-                      <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 3px" }}>{m.label}</p>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", margin: 0 }}>{m.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div style={{
-                  marginTop: 10, padding: "5px 10px", borderRadius: 6,
-                  background: `${typeColor}10`,
-                  border: `1px solid ${typeColor}30`,
-                  display: "inline-flex", alignItems: "center", gap: 4,
-                }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: 2, background: typeColor,
-                  }} />
-                  <span style={{ fontSize: 11, color: typeColor, fontWeight: 600 }}>
-                    {l.type === "planned" ? `Expected ${l.openedYear ?? "TBD"}` : `Operating since ${l.openedYear}`}
-                  </span>
-                </div>
-              </>
-            )
-          })()}
-
-          {selected.kind === "hub" && selected.hub && (() => {
-            const h = selected.hub
-            return (
-              <>
-                <div style={{ marginBottom: 10 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: "0 0 2px" }}>
-                    {h.name}
-                  </p>
-                  <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
-                    {h.city}, {h.country}
-                  </p>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[
-                    { label: "Annual Pax",   value: `${h.passengersMillion}M` },
-                    { label: "Station Type", value: h.type.charAt(0).toUpperCase() + h.type.slice(1) },
-                    { label: "Latitude",     value: h.lat.toFixed(2) + "°" },
-                    { label: "Longitude",    value: h.lng.toFixed(2) + "°" },
-                  ].map(m => (
-                    <div key={m.label} style={{
-                      padding: "8px 10px", borderRadius: 8,
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                    }}>
-                      <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 3px" }}>{m.label}</p>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", margin: 0 }}>{m.value}</p>
-                    </div>
-                  ))}
-                </div>
-                {/* Pax bar */}
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${Math.min(100, (h.passengersMillion / 800) * 100)}%`,
-                      background: "linear-gradient(to right, var(--accent), rgba(51,204,221,0.4))",
-                      borderRadius: 2,
-                    }} />
+              </div>
+              <button onClick={() => setSelectedCountry(null)}
+                className="opacity-40 hover:opacity-80 text-base" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            {countryStats && countryStats.lines.length > 0 && (
+              <div className="flex flex-col gap-1 mt-2">
+                {countryStats.lines.slice(0, 4).map(l => (
+                  <div key={l.id} className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs"
+                    style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${TYPE_HEX[l.type]}25` }}>
+                    <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: TYPE_HEX[l.type] }} />
+                    <span className="flex-1 truncate" style={{ color: "var(--text)" }}>{l.name}</span>
+                    <span className="font-mono opacity-60" style={{ color: "var(--muted)" }}>{fmtKm(l.lengthKm)}</span>
                   </div>
-                  <p style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
-                    {h.passengersMillion}M annual passengers
+                ))}
+                {countryStats.lines.length > 4 && (
+                  <p className="text-xs text-center mt-0.5" style={{ color: "var(--muted)", opacity: 0.6 }}>
+                    +{countryStats.lines.length - 4} more lines
                   </p>
-                </div>
-              </>
-            )
-          })()}
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Selected rail line / hub panel */}
+        {selected && (
+          <div className="w-full rounded-xl p-4 relative"
+            style={{
+              background:     "rgba(0,0,0,0.88)",
+              border:         `1px solid ${selected.kind === "line" ? TYPE_HEX[selected.line!.type] + "60" : "rgba(51,204,221,0.35)"}`,
+              backdropFilter: "blur(14px)",
+            }}>
+            <button onClick={() => setSelected(null)}
+              className="absolute top-2.5 right-2.5 opacity-40 hover:opacity-80 text-base"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }}>
+              ✕
+            </button>
+
+            {selected.kind === "line" && selected.line && (() => {
+              const l = selected.line
+              const typeColor = TYPE_HEX[l.type]
+              return (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: typeColor }} />
+                    <p className="text-sm font-bold leading-snug pr-5" style={{ color: "var(--text)" }}>{l.name}</p>
+                  </div>
+                  <p className="text-xs mb-2.5" style={{ color: "var(--muted)" }}>
+                    {l.country} · {l.operator}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Type",      value: l.type === "high-speed" ? "High-Speed" : l.type.charAt(0).toUpperCase() + l.type.slice(1) },
+                      { label: "Length",    value: fmtKm(l.lengthKm) },
+                      { label: "Top Speed", value: `${l.speedKmh} km/h` },
+                      { label: "Opened",    value: l.openedYear ? l.openedYear.toString() : "N/A" },
+                    ].map(m => (
+                      <div key={m.label} className="px-2.5 py-2 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <p className="text-xs mb-0.5" style={{ color: "var(--muted)", fontSize: 10 }}>{m.label}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2.5 px-2.5 py-1.5 rounded-md inline-flex items-center gap-1.5"
+                    style={{ background: `${typeColor}10`, border: `1px solid ${typeColor}30` }}>
+                    <span className="w-2 h-2 rounded-sm" style={{ background: typeColor }} />
+                    <span className="text-xs font-semibold" style={{ color: typeColor }}>
+                      {l.type === "planned" ? `Expected ${l.openedYear ?? "TBD"}` : `Operating since ${l.openedYear}`}
+                    </span>
+                  </div>
+                </>
+              )
+            })()}
+
+            {selected.kind === "hub" && selected.hub && (() => {
+              const h = selected.hub
+              return (
+                <>
+                  <p className="text-sm font-bold mb-1 pr-5" style={{ color: "var(--text)" }}>{h.name}</p>
+                  <p className="text-xs mb-2.5" style={{ color: "var(--muted)" }}>{h.city}, {h.country}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Annual Pax",   value: `${h.passengersMillion}M` },
+                      { label: "Station Type", value: h.type.charAt(0).toUpperCase() + h.type.slice(1) },
+                      { label: "Latitude",     value: h.lat.toFixed(2) + "°" },
+                      { label: "Longitude",    value: h.lng.toFixed(2) + "°" },
+                    ].map(m => (
+                      <div key={m.label} className="px-2.5 py-2 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <p className="text-xs mb-0.5" style={{ color: "var(--muted)", fontSize: 10 }}>{m.label}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${Math.min(100, (h.passengersMillion / 800) * 100)}%`,
+                        background: "linear-gradient(to right, var(--accent,#33ccdd), rgba(51,204,221,0.4))",
+                        borderRadius: 2,
+                      }} />
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: "var(--muted)", fontSize: 10 }}>
+                      {h.passengersMillion}M annual passengers vs. 800M peak (Shinjuku)
+                    </p>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
+      </div>
+
+      {/* ── Hover country label ─────────────────────────────────────────────────── */}
+      {hoveredCountry && !selectedCountry && (
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-5 pointer-events-none">
+          <div className="px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.82)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(12px)", color: "var(--text)" }}>
+            {hoveredCountry.properties.name} · Click to explore
+          </div>
         </div>
       )}
 
-      {/* ── Legend ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        position: "absolute", bottom: 80, left: 20, zIndex: 5,
-        background: "rgba(0,0,0,0.72)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 8, backdropFilter: "blur(10px)",
-        padding: "8px 12px",
-        display: "flex", gap: 12, alignItems: "center",
-        flexWrap: "wrap",
-      }}>
-        <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          Legend
-        </span>
+      {/* ── Legend strip ───────────────────────────────────────────────────────── */}
+      <div className="absolute pointer-events-none"
+        style={{ bottom: 96, left: 20, zIndex: 5, background: "rgba(0,0,0,0.72)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, backdropFilter: "blur(10px)", padding: "7px 12px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--muted)" }}>Legend</span>
         {([
           { type: "high-speed",   label: "HSR"          },
           { type: "conventional", label: "Conventional" },
           { type: "planned",      label: "Planned"      },
         ] as { type: RailType; label: string }[]).map(({ type, label }) => (
-          <div key={type} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div key={type} className="flex items-center gap-1">
             <div style={{ width: 20, height: 3, borderRadius: 1, background: TYPE_HEX[type] }} />
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>{label}</span>
+            <span className="text-xs" style={{ color: "var(--muted)" }}>{label}</span>
           </div>
         ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{
-            width: 8, height: 8, borderRadius: "50%",
-            background: "var(--accent)", border: "1px solid rgba(255,255,255,0.3)",
-          }} />
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>Hub</span>
+        <div className="flex items-center gap-1">
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent,#33ccdd)", border: "1px solid rgba(255,255,255,0.3)" }} />
+          <span className="text-xs" style={{ color: "var(--muted)" }}>Hub</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 20, height: 2, borderRadius: 1, background: "rgba(255,80,80,0.7)" }} />
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>Flow arc</span>
+        <div className="flex items-center gap-1">
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(253,231,37,0.6)", border: "1px solid rgba(253,231,37,0.5)" }} />
+          <span className="text-xs" style={{ color: "var(--muted)" }}>Country</span>
         </div>
       </div>
 
