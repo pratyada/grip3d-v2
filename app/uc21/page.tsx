@@ -211,6 +211,11 @@ export default function UC21Page() {
   const [chartLoading, setChartLoading] = useState(false)
   const [chartError,   setChartError]   = useState("")
 
+  // Collapsible sidebar panels (collapsed by default for mobile)
+  const [fxOpen,       setFxOpen]       = useState(false)
+  const [indicesOpen,  setIndicesOpen]  = useState(false)
+  const [gdpOpen,      setGdpOpen]      = useState(false)
+
   // ── Fetch financial data ────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
@@ -296,19 +301,19 @@ export default function UC21Page() {
         .polygonAltitude(0.005)
         .polygonCapColor((feat: any) => {
           const props = feat?.properties ?? {}
-          const iso2  = (props.ISO_A2 ?? props.iso_a2 ?? "").toUpperCase()
-          const iso3  = (props.ISO_A3 ?? props.iso_a3 ?? props.ADM0_A3 ?? "").toUpperCase()
+          const iso2  = (props.ISO_A2 ?? props.ISO_A2_EH ?? props.iso_a2 ?? "").toUpperCase()
+          const iso3  = (props.ISO_A3 ?? props.ISO_A3_EH ?? props.iso_a3 ?? props.ADM0_A3 ?? props.ADM0_ISO ?? props.SOV_A3 ?? "").toUpperCase()
           const entry = gdpMapLocal.get(iso2) || gdpMapLocal.get(iso3)
           return entry ? gdpToColor(entry.gdpUsd, localMaxGdp) : "#1a1a1a"
         })
-        .polygonSideColor(() => "rgba(50,40,0,0.25)")
-        .polygonStrokeColor(() => "rgba(255,200,50,0.45)")
+        .polygonSideColor(() => "rgba(50,40,0,0.35)")
+        .polygonStrokeColor(() => "rgba(255,200,50,0.6)")
         .polygonLabel((feat: any) => {
           const props = feat?.properties ?? {}
-          const iso2  = (props.ISO_A2 ?? props.iso_a2 ?? "").toUpperCase()
-          const iso3  = (props.ISO_A3 ?? props.iso_a3 ?? props.ADM0_A3 ?? "").toUpperCase()
+          const iso2  = (props.ISO_A2 ?? props.ISO_A2_EH ?? props.iso_a2 ?? "").toUpperCase()
+          const iso3  = (props.ISO_A3 ?? props.ISO_A3_EH ?? props.iso_a3 ?? props.ADM0_A3 ?? props.ADM0_ISO ?? props.SOV_A3 ?? "").toUpperCase()
           const entry = gdpMapLocal.get(iso2) || gdpMapLocal.get(iso3)
-          const name  = props.ADMIN ?? props.NAME ?? props.name ?? "Unknown"
+          const name  = props.ADMIN ?? props.NAME ?? props.NAME_LONG ?? props.name ?? "Unknown"
           if (entry) {
             return `<div style="font-family:sans-serif;padding:6px 10px;background:rgba(0,0,0,0.85);border-radius:8px;border:1px solid rgba(255,200,50,0.3);color:#fff;font-size:12px;">
               <b style="color:#ffcc00">${name}</b><br/>
@@ -320,8 +325,8 @@ export default function UC21Page() {
         })
         .onPolygonClick((feat: any) => {
           const props = feat?.properties ?? {}
-          const iso2  = (props.ISO_A2 ?? props.iso_a2 ?? "").toUpperCase()
-          const iso3  = (props.ISO_A3 ?? props.iso_a3 ?? props.ADM0_A3 ?? "").toUpperCase()
+          const iso2  = (props.ISO_A2 ?? props.ISO_A2_EH ?? props.iso_a2 ?? "").toUpperCase()
+          const iso3  = (props.ISO_A3 ?? props.ISO_A3_EH ?? props.iso_a3 ?? props.ADM0_A3 ?? props.ADM0_ISO ?? props.SOV_A3 ?? "").toUpperCase()
           const entry = gdpMapLocal.get(iso2) || gdpMapLocal.get(iso3)
           if (entry) {
             setSelectedCountry(entry)
@@ -356,56 +361,64 @@ export default function UC21Page() {
         .arcDashAnimateTime(2500)
         .arcLabel((fl: any) => `<div style="font-family:sans-serif;padding:4px 8px;background:rgba(0,0,0,0.8);border-radius:6px;color:#ffcc00;font-size:11px;">${fl.label} · $${fl.valueBn}B</div>`)
 
-      // Fetch and load country GeoJSON for polygon choropleth.
-      // We use the three-globe bundled countries GeoJSON which globe.gl itself ships.
-      // This avoids a topojson-client dependency — three-globe exposes a pre-parsed file.
-      fetch("//unpkg.com/world-atlas@2.0.2/countries-110m.json")
+      // Fetch Natural Earth GeoJSON with ISO properties for proper country matching
+      fetch("//raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
         .then(r => r.json())
-        .then(world => {
-          // Inline minimal TopoJSON → GeoJSON arc expansion
-          // (avoids requiring topojson-client as an npm dep)
-          const topoToGeo = (topology: any, object: any) => {
-            const arcs: number[][][] = topology.arcs
-            const scale  = topology.transform?.scale  ?? [1, 1]
-            const transl = topology.transform?.translate ?? [0, 0]
-
-            function decodeArc(arcIdx: number): number[][] {
-              const raw  = arcIdx < 0 ? [...arcs[~arcIdx]].reverse() : arcs[arcIdx]
-              const pts: number[][] = []
-              let x = 0, y = 0
-              for (const [dx, dy] of raw) {
-                x += dx; y += dy
-                pts.push([x * scale[0] + transl[0], y * scale[1] + transl[1]])
-              }
-              return pts
-            }
-
-            const features = object.geometries.map((geom: any) => {
-              const toRings = (arcsArr: number[][]): number[][][] =>
-                arcsArr.map(ring => ring.flatMap(ai => decodeArc(ai)))
-
-              let geometry: any
-              if (geom.type === "Polygon") {
-                geometry = { type: "Polygon", coordinates: toRings(geom.arcs) }
-              } else if (geom.type === "MultiPolygon") {
-                geometry = { type: "MultiPolygon", coordinates: geom.arcs.map(toRings) }
-              } else {
-                return null
-              }
-              return { type: "Feature", id: geom.id, properties: geom.properties ?? {}, geometry }
-            }).filter(Boolean)
-
-            return { type: "FeatureCollection", features }
-          }
-
+        .then((geoJson: any) => {
           try {
-            const geoJson = topoToGeo(world, world.objects.countries)
             globe.polygonsData(geoJson.features)
           } catch {
             // choropleth unavailable
           }
         })
-        .catch(() => { /* choropleth unavailable */ })
+        .catch(() => {
+          // Fallback: try world-atlas TopoJSON
+          fetch("//unpkg.com/world-atlas@2.0.2/countries-110m.json")
+            .then(r => r.json())
+            .then(world => {
+              const topoToGeo = (topology: any, object: any) => {
+                const arcs: number[][][] = topology.arcs
+                const scale  = topology.transform?.scale  ?? [1, 1]
+                const transl = topology.transform?.translate ?? [0, 0]
+
+                function decodeArc(arcIdx: number): number[][] {
+                  const raw  = arcIdx < 0 ? [...arcs[~arcIdx]].reverse() : arcs[arcIdx]
+                  const pts: number[][] = []
+                  let x = 0, y = 0
+                  for (const [dx, dy] of raw) {
+                    x += dx; y += dy
+                    pts.push([x * scale[0] + transl[0], y * scale[1] + transl[1]])
+                  }
+                  return pts
+                }
+
+                const features = object.geometries.map((geom: any) => {
+                  const toRings = (arcsArr: number[][]): number[][][] =>
+                    arcsArr.map(ring => ring.flatMap(ai => decodeArc(ai)))
+
+                  let geometry: any
+                  if (geom.type === "Polygon") {
+                    geometry = { type: "Polygon", coordinates: toRings(geom.arcs) }
+                  } else if (geom.type === "MultiPolygon") {
+                    geometry = { type: "MultiPolygon", coordinates: geom.arcs.map(toRings) }
+                  } else {
+                    return null
+                  }
+                  return { type: "Feature", id: geom.id, properties: geom.properties ?? {}, geometry }
+                }).filter(Boolean)
+
+                return { type: "FeatureCollection", features }
+              }
+
+              try {
+                const geoJson = topoToGeo(world, world.objects.countries)
+                globe.polygonsData(geoJson.features)
+              } catch {
+                // choropleth unavailable
+              }
+            })
+            .catch(() => { /* choropleth unavailable */ })
+        })
 
       const ctrl = globe.controls()
       ctrl.autoRotate      = true
@@ -519,14 +532,15 @@ export default function UC21Page() {
       <div ref={globeRef} className="absolute inset-0" />
 
       {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
-      <div className="absolute top-4 left-4 bottom-4 w-72 flex flex-col gap-3 pointer-events-none">
+      <div className="uc21-sidebar absolute top-4 left-4 bottom-4 flex flex-col gap-2 pointer-events-none"
+        style={{ width: "clamp(200px, 22vw, 288px)", maxHeight: "calc(100vh - 96px)", overflowY: "auto", overflowX: "hidden" }}>
 
         {/* Title */}
-        <div className="rounded-xl p-4 pointer-events-auto"
+        <div className="rounded-xl p-3 pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,200,50,0.2)", backdropFilter: "blur(14px)" }}>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-base font-bold" style={{ color: "#ffcc00" }}>Financial Globe</span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+            <span className="text-sm font-bold" style={{ color: "#ffcc00" }}>Financial Globe</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
               style={{ background: "rgba(255,200,0,0.15)", color: "#ffcc00", border: "1px solid rgba(255,200,0,0.3)" }}>
               LIVE
             </span>
@@ -535,9 +549,9 @@ export default function UC21Page() {
         </div>
 
         {/* View toggle */}
-        <div className="rounded-xl p-3 pointer-events-auto"
+        <div className="rounded-xl p-2.5 pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
-          <p className="text-xs font-semibold tracking-wider mb-2" style={{ color: "var(--muted)" }}>VIEW</p>
+          <p className="text-xs font-semibold tracking-wider mb-1.5" style={{ color: "var(--muted)" }}>VIEW</p>
           <div className="flex flex-col gap-1">
             {([
               { id: "gdp"       as ViewMode, label: "GDP Choropleth",  icon: "🌍" },
@@ -545,7 +559,7 @@ export default function UC21Page() {
               { id: "flows"     as ViewMode, label: "Capital Flows",    icon: "⚡" },
             ]).map(v => (
               <button key={v.id} onClick={() => setViewMode(v.id)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-all"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all"
                 style={{
                   background: viewMode === v.id ? "rgba(255,200,0,0.12)" : "transparent",
                   border:     viewMode === v.id ? "1px solid rgba(255,200,0,0.35)" : "1px solid transparent",
@@ -558,69 +572,99 @@ export default function UC21Page() {
           </div>
         </div>
 
-        {/* FX Rates */}
-        <div className="rounded-xl p-3 pointer-events-auto"
+        {/* FX Rates - Collapsible */}
+        <div className="rounded-xl pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold tracking-wider" style={{ color: "var(--muted)" }}>FX RATES</p>
-            <span className="text-xs" style={{ color: "rgba(255,200,0,0.5)" }}>
-              {data?.fx?.date ?? ""}
+          <button onClick={() => setFxOpen(o => !o)}
+            className="flex items-center justify-between w-full px-3 py-2.5 text-left"
+            style={{ color: "var(--muted)" }}>
+            <span className="text-xs font-semibold tracking-wider flex items-center gap-2">
+              FX RATES
+              <span className="text-xs font-normal" style={{ color: "rgba(255,200,0,0.5)" }}>
+                {data?.fx?.date ?? ""}
+              </span>
             </span>
-          </div>
-          <div className="flex flex-col gap-1">
-            {FX_PAIRS.map(pair => (
-              <div key={pair.label} className="flex items-center justify-between px-2 py-1 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <span className="text-xs flex items-center gap-1.5">
-                  <span>{pair.flag}</span>
-                  <span style={{ color: "var(--muted)" }}>{pair.label}</span>
-                </span>
-                <span className="text-xs font-mono font-semibold" style={{ color: "#ffdd88" }}>
-                  {fxVal(pair.key, pair.invert)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Stock Indices */}
-        <div className="rounded-xl p-3 pointer-events-auto"
-          style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
-          <p className="text-xs font-semibold tracking-wider mb-2" style={{ color: "var(--muted)" }}>INDICES
-            <span className="ml-1.5 text-xs font-normal opacity-50">(indicative)</span>
-          </p>
-          <div className="flex flex-col gap-1">
-            {INDICES.map(idx => (
-              <div key={idx.label} className="flex items-center justify-between px-2 py-1 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <span className="text-xs flex items-center gap-1.5">
-                  <span>{idx.region}</span>
-                  <span style={{ color: "var(--muted)" }}>{idx.label}</span>
-                </span>
-                <span className="text-xs font-mono font-semibold flex items-center gap-1">
-                  <span style={{ color: "#ffdd88" }}>{fmtIndex(idx.value)}</span>
-                  <span style={{ color: idx.change >= 0 ? "#44ff88" : "#ff5555", fontSize: "10px" }}>
-                    {idx.change >= 0 ? "▲" : "▼"}{Math.abs(idx.change).toFixed(2)}%
+            <span className="text-xs transition-transform" style={{ transform: fxOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+              ▼
+            </span>
+          </button>
+          {fxOpen && (
+            <div className="flex flex-col gap-1 px-3 pb-2.5">
+              {FX_PAIRS.map(pair => (
+                <div key={pair.label} className="flex items-center justify-between px-2 py-1 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <span className="text-xs flex items-center gap-1.5">
+                    <span>{pair.flag}</span>
+                    <span style={{ color: "var(--muted)" }}>{pair.label}</span>
                   </span>
-                </span>
-              </div>
-            ))}
-          </div>
+                  <span className="text-xs font-mono font-semibold" style={{ color: "#ffdd88" }}>
+                    {fxVal(pair.key, pair.invert)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* GDP Legend */}
-        <div className="rounded-xl p-3 pointer-events-auto"
+        {/* Stock Indices - Collapsible */}
+        <div className="rounded-xl pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
-          <p className="text-xs font-semibold tracking-wider mb-2" style={{ color: "var(--muted)" }}>GDP SCALE</p>
-          <div className="flex items-center gap-0.5 mb-1.5">
-            {GDP_LEGEND_STEPS.map(step => (
-              <div key={step.label} className="flex-1 h-3 rounded-sm" style={{ background: step.color }} />
-            ))}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs" style={{ color: "var(--muted)" }}>Low</span>
-            <span className="text-xs" style={{ color: "#ffcc00" }}>High</span>
-          </div>
+          <button onClick={() => setIndicesOpen(o => !o)}
+            className="flex items-center justify-between w-full px-3 py-2.5 text-left"
+            style={{ color: "var(--muted)" }}>
+            <span className="text-xs font-semibold tracking-wider">
+              INDICES
+              <span className="ml-1.5 text-xs font-normal opacity-50">(indicative)</span>
+            </span>
+            <span className="text-xs transition-transform" style={{ transform: indicesOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+              ▼
+            </span>
+          </button>
+          {indicesOpen && (
+            <div className="flex flex-col gap-1 px-3 pb-2.5">
+              {INDICES.map(idx => (
+                <div key={idx.label} className="flex items-center justify-between px-2 py-1 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <span className="text-xs flex items-center gap-1.5">
+                    <span>{idx.region}</span>
+                    <span style={{ color: "var(--muted)" }}>{idx.label}</span>
+                  </span>
+                  <span className="text-xs font-mono font-semibold flex items-center gap-1">
+                    <span style={{ color: "#ffdd88" }}>{fmtIndex(idx.value)}</span>
+                    <span style={{ color: idx.change >= 0 ? "#44ff88" : "#ff5555", fontSize: "10px" }}>
+                      {idx.change >= 0 ? "▲" : "▼"}{Math.abs(idx.change).toFixed(2)}%
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* GDP Legend - Collapsible */}
+        <div className="rounded-xl pointer-events-auto"
+          style={{ background: "rgba(0,0,0,0.78)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(14px)" }}>
+          <button onClick={() => setGdpOpen(o => !o)}
+            className="flex items-center justify-between w-full px-3 py-2.5 text-left"
+            style={{ color: "var(--muted)" }}>
+            <span className="text-xs font-semibold tracking-wider">GDP SCALE</span>
+            <span className="text-xs transition-transform" style={{ transform: gdpOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+              ▼
+            </span>
+          </button>
+          {gdpOpen && (
+            <div className="px-3 pb-2.5">
+              <div className="flex items-center gap-0.5 mb-1.5">
+                {GDP_LEGEND_STEPS.map(step => (
+                  <div key={step.label} className="flex-1 h-3 rounded-sm" style={{ background: step.color }} />
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--muted)" }}>Low</span>
+                <span className="text-xs" style={{ color: "#ffcc00" }}>High</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Attribution */}
@@ -869,11 +913,24 @@ export default function UC21Page() {
         </div>
       </div>
 
-      {/* Ticker animation keyframes */}
+      {/* Ticker animation keyframes + mobile sidebar */}
       <style>{`
         @keyframes tickerScroll {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+        /* Hide scrollbar on sidebar */
+        .uc21-sidebar::-webkit-scrollbar { display: none; }
+        .uc21-sidebar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Mobile: shrink sidebar so globe is visible */
+        @media (max-width: 640px) {
+          .uc21-sidebar {
+            width: 180px !important;
+            left: 8px !important;
+            top: 8px !important;
+            gap: 4px !important;
+            max-height: calc(100vh - 80px) !important;
+          }
         }
       `}</style>
     </div>
