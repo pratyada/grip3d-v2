@@ -265,13 +265,12 @@ export default function UC18Page() {
       .pointsData(filteredEvents)
       .pointLat("lat")
       .pointLng("lng")
-      .pointAltitude((d: HazardEvent) =>
-        d.severity === "critical" ? 0.04 : d.severity === "high" ? 0.025 : 0.015
-      )
+      .pointAltitude(0.005)
       .pointRadius((d: HazardEvent) =>
-        d.severity === "critical" ? 0.12 : d.severity === "high" ? 0.08 : 0.05
+        d.severity === "critical" ? 0.55 : d.severity === "high" ? 0.4 : d.severity === "moderate" ? 0.28 : 0.18
       )
       .pointColor((d: HazardEvent) => CATEGORY_CONFIG[d.category].color)
+      .pointResolution(24)
       .pointsMerge(false)
       .pointLabel((d: HazardEvent) => `
         <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.9);border-radius:8px;border:1px solid ${CATEGORY_CONFIG[d.category].color}40;color:#fff;font-size:12px;max-width:260px;">
@@ -330,10 +329,10 @@ export default function UC18Page() {
     let frame = 0
     const id = setInterval(() => {
       frame++
-      const pulse = 1 + 0.3 * Math.sin(frame * 0.15)
+      const pulse = 1 + 0.15 * Math.sin(frame * 0.12)
       globeInst.current
-        ?.pointAltitude((d: HazardEvent) => {
-          const base = d.severity === "critical" ? 0.04 : d.severity === "high" ? 0.025 : 0.015
+        ?.pointRadius((d: HazardEvent) => {
+          const base = d.severity === "critical" ? 0.55 : d.severity === "high" ? 0.4 : d.severity === "moderate" ? 0.28 : 0.18
           return base * pulse
         })
     }, 80)

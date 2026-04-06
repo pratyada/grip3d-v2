@@ -12,60 +12,92 @@ export interface HazardEvent {
   severity: "critical" | "high" | "moderate" | "low"
   source: string
   sourceUrl: string
-  magnitude?: string  // e.g. "5.4 Richter", "Category 3", "1500 acres"
+  magnitude?: string
   country?: string
   description?: string
 }
 
 export async function GET() {
   try {
-    const [eonetRes, gdacsRes] = await Promise.allSettled([
-      // NASA EONET — wildfires + severe storms + volcanoes + sea ice
-      fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300", {
-        next: { revalidate: 900 }
+    // Fetch 3 sources in parallel:
+    // 1. EONET wildfires specifically (up to 500)
+    // 2. EONET storms/volcanoes/ice (all non-wildfire open events)
+    // 3. GDACS multi-hazard (earthquakes, cyclones, floods, volcanoes, droughts, wildfires)
+    const [eonetFiresRes, eonetOtherRes, gdacsRes] = await Promise.allSettled([
+      fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=wildfires&limit=500", {
+        next: { revalidate: 900 },
       }),
-      // GDACS — earthquakes, tropical cyclones, floods, volcanoes, droughts, wildfires
+      fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=severeStorms,volcanoes,seaLakeIce,earthquakes,floods&limit=100", {
+        next: { revalidate: 900 },
+      }),
       fetch("https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtype=EQ,TC,FL,VO,DR,WF&fromDate=2025-01-01", {
-        next: { revalidate: 900 }
+        next: { revalidate: 900 },
       }),
     ])
 
     const events: HazardEvent[] = []
+    const seen = new Set<string>() // track lat,lng keys for dedup
 
-    // Parse NASA EONET
-    if (eonetRes.status === "fulfilled" && eonetRes.value.ok) {
-      const eonet = await eonetRes.value.json()
-      for (const ev of eonet.events ?? []) {
-        const cat = ev.categories?.[0]?.id ?? ""
-        let category: HazardEvent["category"] = "wildfire"
-        if (cat === "severeStorms") category = "storm"
-        else if (cat === "volcanoes") category = "volcano"
-        else if (cat === "seaLakeIce") category = "iceberg"
-        else if (cat === "earthquakes") category = "earthquake"
-        else if (cat === "floods") category = "flood"
-        else if (cat !== "wildfires") continue // skip other types
-
-        // Get the most recent geometry point
-        const geom = ev.geometry?.slice(-1)?.[0]
-        if (!geom?.coordinates) continue
-        const [lng, lat] = geom.coordinates
-        if (!isFinite(lat) || !isFinite(lng)) continue
-
-        events.push({
-          id: ev.id ?? `eonet-${events.length}`,
-          title: ev.title ?? "Unknown Event",
-          lat, lng,
-          date: geom.date?.substring(0, 10) ?? "",
-          category,
-          severity: geom.magnitudeValue > 80 ? "critical" : geom.magnitudeValue > 50 ? "high" : geom.magnitudeValue > 20 ? "moderate" : "low",
-          source: ev.sources?.[0]?.id ?? "NASA EONET",
-          sourceUrl: ev.sources?.[0]?.url ?? ev.link ?? "",
-          magnitude: geom.magnitudeValue ? `${geom.magnitudeValue} ${geom.magnitudeUnit ?? ""}`.trim() : undefined,
-        })
-      }
+    function addKey(lat: number, lng: number): string {
+      return `${lat.toFixed(2)},${lng.toFixed(2)}`
     }
 
-    // Parse GDACS GeoJSON
+    // ── Parse EONET wildfires ──────────────────────────────────────────────────
+    function parseEonet(res: PromiseSettledResult<Response>) {
+      if (res.status !== "fulfilled" || !res.value.ok) return Promise.resolve([])
+      return res.value.json().then((data: any) => {
+        for (const ev of data.events ?? []) {
+          const cat = ev.categories?.[0]?.id ?? ""
+          let category: HazardEvent["category"] = "wildfire"
+          if (cat === "severeStorms") category = "storm"
+          else if (cat === "volcanoes") category = "volcano"
+          else if (cat === "seaLakeIce") category = "iceberg"
+          else if (cat === "earthquakes") category = "earthquake"
+          else if (cat === "floods") category = "flood"
+          else if (cat !== "wildfires") continue
+
+          // Use most recent geometry point
+          const geom = ev.geometry?.slice(-1)?.[0]
+          if (!geom?.coordinates) continue
+          const [lng, lat] = geom.coordinates
+          if (!isFinite(lat) || !isFinite(lng)) continue
+
+          const key = addKey(lat, lng)
+          if (seen.has(key)) continue
+          seen.add(key)
+
+          // Severity: use magnitude if available, else infer from title
+          const mag = geom.magnitudeValue
+          const title: string = ev.title ?? "Unknown Event"
+          const isWild = title.toLowerCase().includes("wildfire")
+          let severity: HazardEvent["severity"] = "low"
+          if (mag != null && mag > 80) severity = "critical"
+          else if (mag != null && mag > 50) severity = "high"
+          else if (mag != null && mag > 20) severity = "moderate"
+          else if (isWild) severity = "moderate" // actual wildfires are at least moderate
+          // prescribed fires stay "low"
+
+          events.push({
+            id: ev.id ?? `eonet-${events.length}`,
+            title,
+            lat, lng,
+            date: geom.date?.substring(0, 10) ?? "",
+            category,
+            severity,
+            source: ev.sources?.[0]?.id ?? "NASA EONET",
+            sourceUrl: ev.sources?.[0]?.url ?? ev.link ?? "",
+            magnitude: mag ? `${mag} ${geom.magnitudeUnit ?? ""}`.trim() : undefined,
+          })
+        }
+      })
+    }
+
+    await Promise.all([
+      parseEonet(eonetFiresRes),
+      parseEonet(eonetOtherRes),
+    ])
+
+    // ── Parse GDACS GeoJSON ──────────────────────────────────────────────────
     if (gdacsRes.status === "fulfilled" && gdacsRes.value.ok) {
       const gdacs = await gdacsRes.value.json()
       for (const feat of gdacs.features ?? []) {
@@ -76,20 +108,17 @@ export async function GET() {
         if (!isFinite(lat) || !isFinite(lng)) continue
 
         const typeMap: Record<string, HazardEvent["category"]> = {
-          EQ: "earthquake", TC: "storm", FL: "flood", VO: "volcano", DR: "wildfire", WF: "wildfire"
+          EQ: "earthquake", TC: "storm", FL: "flood", VO: "volcano", DR: "wildfire", WF: "wildfire",
         }
         const category = typeMap[props.eventtype] ?? "wildfire"
 
-        // Dedupe: skip if we already have an event very close in location
-        const isDupe = events.some(e =>
-          e.category === category &&
-          Math.abs(e.lat - lat) < 0.5 &&
-          Math.abs(e.lng - lng) < 0.5
-        )
-        if (isDupe) continue
+        // Dedupe by proximity
+        const key = addKey(lat, lng)
+        if (seen.has(key)) continue
+        seen.add(key)
 
         const alertMap: Record<string, HazardEvent["severity"]> = {
-          Red: "critical", Orange: "high", Green: "moderate"
+          Red: "critical", Orange: "high", Green: "moderate",
         }
 
         events.push({
@@ -109,9 +138,9 @@ export async function GET() {
     }
 
     return NextResponse.json(events, {
-      headers: { "Cache-Control": "public, max-age=900, stale-while-revalidate=1800" }
+      headers: { "Cache-Control": "public, max-age=900, stale-while-revalidate=1800" },
     })
-  } catch (err) {
+  } catch {
     return NextResponse.json([], { status: 500 })
   }
 }
