@@ -1190,37 +1190,52 @@ export default function LearningPage() {
   /* -- Current card --------------------------------------------------- */
   const card = deck[cardIndex] as QuizCard | undefined
 
-  /* -- Init globe.gl via ref callback (fires when div mounts) ---------- */
-  const initGlobe = useCallback((node: HTMLDivElement | null) => {
-    globeRef.current = node
-    if (!node || globeInst.current) return
+  /* -- Init globe.gl -------------------------------------------------- */
+  const [globeReady, setGlobeReady] = useState(false)
 
-    // Small delay to ensure CSS layout is complete
-    requestAnimationFrame(() => {
-      if (!node.isConnected || globeInst.current) return
-
+  useEffect(() => {
+    if (!ageGroup) return
+    // Short delay guarantees the globe container div is fully laid out
+    const timer = setTimeout(() => {
+      if (!globeRef.current || globeInst.current) return
       import("globe.gl").then((mod) => {
-        if (!node.isConnected || globeInst.current) return
-        const GlobeGL = (mod.default ?? mod) as any
-        const globe = new GlobeGL()
-        globe(node)
-          .width(node.clientWidth || 600)
-          .height(node.clientHeight || 380)
-          .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-          .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-          .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-          .atmosphereColor("#33ccdd")
-          .atmosphereAltitude(0.15)
-          .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
+        if (!globeRef.current || globeInst.current) return
+        try {
+          const GlobeGL = (mod.default ?? mod) as any
+          const globe = new GlobeGL()
+          globe(globeRef.current)
+            .width(globeRef.current.clientWidth || 600)
+            .height(globeRef.current.clientHeight || 380)
+            .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+            .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+            .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+            .atmosphereColor("#33ccdd")
+            .atmosphereAltitude(0.15)
+            .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
 
-        globe.controls().autoRotate = false
-        globe.controls().enableDamping = true
-        globe.controls().dampingFactor = 0.1
+          globe.controls().autoRotate = false
+          globe.controls().enableDamping = true
+          globe.controls().dampingFactor = 0.1
 
-        globeInst.current = globe
+          globeInst.current = globe
+          setGlobeReady(true)
+        } catch {
+          // WebGL not available — show fallback message
+          if (globeRef.current) {
+            globeRef.current.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;text-align:center;padding:20px;">
+              <div>🌍 3D Globe requires WebGL.<br/><span style="font-size:12px;opacity:0.7">Enable hardware acceleration in your browser settings.</span></div>
+            </div>`
+          }
+        }
       })
-    })
-  }, [])
+    }, 150)
+    return () => {
+      clearTimeout(timer)
+      globeInst.current?.controls()?.dispose?.()
+      globeInst.current = null
+      setGlobeReady(false)
+    }
+  }, [ageGroup])
 
   /* -- Resize handler ------------------------------------------------- */
   useEffect(() => {
@@ -1604,8 +1619,7 @@ export default function LearningPage() {
       {/* -- Globe: always mounted when quiz view is active --------------- */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <div
-          ref={initGlobe}
-          key={ageGroup ?? "none"}
+          ref={globeRef}
           className="globe-learning-container"
           style={{
             width: "100%",
