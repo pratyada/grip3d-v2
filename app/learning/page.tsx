@@ -1197,10 +1197,13 @@ export default function LearningPage() {
   }, [])
 
   /* -- Init globe.gl -------------------------------------------------- */
+  // The globe container div is inside {card && ...} which only renders
+  // after the deck is populated (a separate useEffect). So we also depend
+  // on deck.length — when it goes from 0→N the card mounts, the ref
+  // becomes available, and this effect re-runs to initialise the globe.
   useEffect(() => {
-    if (!mounted || !globeRef.current || !ageGroup) return
-    // Already initialised for this container
-    if (globeInst.current) return
+    if (!mounted || !ageGroup || !deck.length) return
+    if (!globeRef.current || globeInst.current) return
 
     import("globe.gl").then((mod) => {
       if (!globeRef.current || globeInst.current) return
@@ -1221,27 +1224,6 @@ export default function LearningPage() {
       globe.controls().dampingFactor = 0.1
 
       globeInst.current = globe
-
-      // Apply the current card's layer immediately
-      if (card) {
-        const layer = card.globeLayer
-        const catColor = CATEGORY_COLORS[card.category]
-        globe.atmosphereColor(catColor)
-        if (layer.type === "points") {
-          globe.pointsData(layer.data)
-            .pointLat("lat").pointLng("lng")
-            .pointColor(() => layer.pointColor ?? catColor)
-            .pointRadius(layer.pointRadius ?? 0.5)
-            .pointAltitude(layer.pointAltitude ?? 0.04)
-            .pointLabel("label")
-        } else if (layer.type === "arcs") {
-          globe.arcsData(layer.data)
-            .arcStartLat("startLat").arcStartLng("startLng")
-            .arcEndLat("endLat").arcEndLng("endLng")
-            .arcColor(() => layer.arcColor ?? catColor)
-            .arcStroke(1.5).arcDashLength(0.6).arcDashGap(0.3).arcDashAnimateTime(2000)
-        }
-      }
     })
 
     return () => {
@@ -1631,16 +1613,34 @@ export default function LearningPage() {
         </p>
       </div>
 
+      {/* -- Globe: always mounted when quiz view is active --------------- */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        <div
+          ref={globeRef}
+          style={{
+            width: "100%",
+            height: isKindergarten ? "min(60vw, 450px)" : "min(55vw, 420px)",
+            background: "#000",
+            borderRadius: "16px 16px 0 0",
+            cursor: "grab",
+            overflow: "hidden",
+            border: `1px solid ${catColor}33`,
+            borderBottom: "none",
+          }}
+        />
+      </div>
+
       {/* -- Card --------------------------------------------------------- */}
       {card && (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
           <div
-            className="rounded-2xl overflow-hidden pop-in"
+            className="rounded-b-2xl overflow-hidden pop-in"
             style={{
               background: "var(--surface)",
               border: isKindergarten
                 ? "2px solid transparent"
                 : `1px solid ${catColor}33`,
+              borderTop: "none",
               boxShadow: isKindergarten
                 ? "0 0 0 2px #ff6b9d44, 0 0 0 4px #fbbf2444, 0 0 40px #ff6b9d15"
                 : `0 0 40px ${catColor}15`,
@@ -1669,17 +1669,6 @@ export default function LearningPage() {
                 {diffInfo.label}
               </span>
             </div>
-
-            {/* Globe container */}
-            <div
-              ref={globeRef}
-              style={{
-                width: "100%",
-                height: isKindergarten ? "min(60vw, 450px)" : "min(55vw, 420px)",
-                background: "#000",
-                cursor: "grab",
-              }}
-            />
 
             {/* Question */}
             <div className="px-5 pt-5 pb-3">
