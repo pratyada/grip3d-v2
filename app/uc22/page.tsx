@@ -64,29 +64,8 @@ const CROPS: { key: CropKey; label: string; icon: string }[] = [
   { key: "cotton",    label: "Cotton",    icon: "🌿" },
 ]
 
-// Dark-to-bright blue gradient — highlights against green earth
-const COLOR_SCALE = [
-  { t: 0.00, r: 10,  g: 10,  b: 30  },  // #0a0a1e – near black (minimal)
-  { t: 0.15, r: 15,  g: 30,  b: 80  },  // #0f1e50 – deep navy
-  { t: 0.40, r: 30,  g: 60,  b: 160 },  // #1e3ca0 – royal blue
-  { t: 0.70, r: 50,  g: 120, b: 220 },  // #3278dc – bright blue
-  { t: 1.00, r: 80,  g: 180, b: 255 },  // #50b4ff – vivid sky blue
-]
-
-function lerpColor(t: number): string {
-  const clamped = Math.max(0, Math.min(1, t))
-  let i = COLOR_SCALE.length - 2
-  for (let j = 0; j < COLOR_SCALE.length - 1; j++) {
-    if (clamped <= COLOR_SCALE[j + 1].t) { i = j; break }
-  }
-  const lo = COLOR_SCALE[i]
-  const hi = COLOR_SCALE[i + 1]
-  const f  = (clamped - lo.t) / (hi.t - lo.t)
-  const r  = Math.round(lo.r + f * (hi.r - lo.r))
-  const g  = Math.round(lo.g + f * (hi.g - lo.g))
-  const b  = Math.round(lo.b + f * (hi.b - lo.b))
-  return `rgb(${r},${g},${b})`
-}
+// Country choropleth: blue scale computed inline in applyCountries
+// Dark navy (low production) → vivid sky blue (high production)
 
 function fmtNum(n: number, decimals = 0): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: decimals })
@@ -208,38 +187,16 @@ export default function UC22Page() {
     })
   }, [agData, selectedCrop, viewMode])
 
-  // ── Apply points via globe.gl native pointsData ─────────────────────────────
-
-  useEffect(() => {
-    if (!globeInst.current || !displayPoints.length) return
-    const g = globeInst.current
-    const maxRadius = viewMode === "arable" ? 0.8 : 1.2
-
-    g.pointsData(displayPoints)
-      .pointLat("lat")
-      .pointLng("lng")
-      .pointAltitude(0.005)  // ON the surface, not floating
-      .pointRadius((d: PointDatum) => 0.08 + d.value * maxRadius)  // SIZE = value
-      .pointColor((d: PointDatum) => lerpColor(d.value > 0 ? 0.1 + d.value * 0.9 : 0))
-      .pointsMerge(false)
-      .pointLabel((d: PointDatum) => `
-        <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.9);border-radius:8px;border:1px solid rgba(76,175,80,0.4);color:#fff;font-size:12px;max-width:220px;">
-          <b style="color:#8bc34a">${d.country}</b><br/>
-          ${d.rawLabel}<br/>
-          ${d.worldPct > 0 ? `<span style="color:#aaa;font-size:11px">${d.worldPct.toFixed(1)}% of world</span>` : ""}
-        </div>
-      `)
-      .onPointClick((d: PointDatum) => {
-        setSelectedPt(d)
-        setIsSpinning(false)
-        g.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.6 }, 700)
-      })
-      .onPointHover((d: PointDatum | null) => {
-        if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
-      })
-  }, [displayPoints, viewMode])
+  // ── No separate pointsData — countries are colored directly via polygonCapColor
 
   // ── Apply country polygons ─────────────────────────────────────────────────
+
+  // Build country→point lookup for choropleth + click detail
+  const countryPointMap = useMemo(() => {
+    const m: Record<string, PointDatum> = {}
+    for (const p of displayPoints) m[p.country] = p
+    return m
+  }, [displayPoints])
 
   function applyCountries(
     globe: any,
@@ -248,7 +205,7 @@ export default function UC22Page() {
     selected: CountryFeature | null,
     points?: PointDatum[],
   ) {
-    // Build a country→value lookup for choropleth fill
+    // Build a country→value lookup for full choropleth fill
     const countryValue: Record<string, number> = {}
     if (points && points.length > 0) {
       for (const p of points) {
@@ -261,14 +218,21 @@ export default function UC22Page() {
       .polygonCapColor((d: any) => {
         const name = d.properties.name
         if (selected && name === selected.properties.name)
-          return "rgba(253,231,37,0.15)"
-        if (hovered && name === hovered.properties.name)
-          return "rgba(255,255,255,0.08)"
-        // Choropleth: color countries with data based on production scale
+          return "rgba(253,231,37,0.25)"
+        if (hovered && name === hovered.properties.name) {
+          const v = countryValue[name]
+          if (v != null && v > 0) return `rgba(255,255,255,0.15)`
+          return "rgba(255,255,255,0.06)"
+        }
+        // Full choropleth: fill entire country with color based on value
         const v = countryValue[name]
         if (v != null && v > 0) {
-          const intensity = Math.round(v * 180)
-          return `rgba(30,${60 + intensity},255,${(0.08 + v * 0.18).toFixed(2)})`
+          // Blue scale: dark navy (low) → vivid blue (high) — strong solid fill
+          const r = Math.round(10 + v * 70)
+          const g = Math.round(10 + v * 170)
+          const b = Math.round(30 + v * 225)
+          const a = (0.35 + v * 0.55).toFixed(2)  // 0.35 to 0.90 opacity
+          return `rgba(${r},${g},${b},${a})`
         }
         return "rgba(0,0,0,0)"
       })
@@ -278,21 +242,45 @@ export default function UC22Page() {
         if (selected && name === selected.properties.name)
           return "rgba(253,231,37,0.9)"
         if (hovered && name === hovered.properties.name)
-          return "rgba(255,255,255,0.6)"
-        // Highlight countries with data
-        if (countryValue[name] != null && countryValue[name] > 0)
-          return "rgba(80,180,255,0.35)"
-        return "rgba(255,255,255,0.12)"
+          return "rgba(255,255,255,0.7)"
+        const v = countryValue[name]
+        if (v != null && v > 0)
+          return `rgba(80,180,255,${(0.3 + v * 0.5).toFixed(2)})`
+        return "rgba(255,255,255,0.10)"
       })
-      .polygonAltitude(0.005)
+      .polygonAltitude((d: any) => {
+        // Slight elevation for high-value countries
+        const v = countryValue[d.properties.name]
+        if (v != null && v > 0.5) return 0.006 + v * 0.008
+        return 0.004
+      })
+      .polygonLabel((d: any) => {
+        const name = d.properties.name
+        const pt = countryPointMap[name]
+        if (!pt) return ""
+        return `
+          <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.92);border-radius:8px;border:1px solid rgba(76,175,80,0.4);color:#fff;font-size:12px;max-width:240px;">
+            <b style="color:#50b4ff">${name}</b><br/>
+            ${pt.rawLabel}<br/>
+            ${pt.worldPct > 0 ? `World share: <b>${pt.worldPct.toFixed(1)}%</b><br/>` : ""}
+            ${pt.area > 0 ? `Harvested: ${fmtNum(pt.area)}K ha<br/>` : ""}
+            <span style="color:#aaa;font-size:11px">Click for details</span>
+          </div>
+        `
+      })
       .onPolygonHover((d: any) => {
         setHoveredCountry(d as CountryFeature | null)
+        if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
       })
       .onPolygonClick((d: any) => {
         const f = d as CountryFeature
         setSelectedCountry(prev =>
           prev?.properties.name === f.properties.name ? null : f
         )
+        // Also select the data point for detail panel
+        const pt = countryPointMap[f.properties.name]
+        if (pt) setSelectedPt(pt)
+
         if (globeInst.current) {
           const { lat, lng } = featureCentroid(f.geometry)
           globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
@@ -345,33 +333,8 @@ export default function UC22Page() {
       globe.controls().dampingFactor = 0.1
 
       globeInst.current = globe
+      // Apply country choropleth with initial wheat data
       applyCountries(globe, countries, null, null, displayPoints)
-
-      // Apply initial wheat data immediately so markers show on first load
-      if (displayPoints.length) {
-        const maxR = viewMode === "arable" ? 0.8 : 1.2
-        globe.pointsData(displayPoints)
-          .pointLat("lat").pointLng("lng")
-          .pointAltitude(0.005)
-          .pointRadius((d: PointDatum) => 0.08 + d.value * maxR)
-          .pointColor((d: PointDatum) => lerpColor(d.value > 0 ? 0.1 + d.value * 0.9 : 0))
-          .pointsMerge(false)
-          .pointLabel((d: PointDatum) => `
-            <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.9);border-radius:8px;border:1px solid rgba(76,175,80,0.4);color:#fff;font-size:12px;max-width:220px;">
-              <b style="color:#8bc34a">${d.country}</b><br/>
-              ${d.rawLabel}<br/>
-              ${d.worldPct > 0 ? `<span style="color:#aaa;font-size:11px">${d.worldPct.toFixed(1)}% of world</span>` : ""}
-            </div>
-          `)
-          .onPointClick((d: PointDatum) => {
-            setSelectedPt(d)
-            setIsSpinning(false)
-            globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.6 }, 700)
-          })
-          .onPointHover((d: PointDatum | null) => {
-            if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
-          })
-      }
     })
 
     return () => {
