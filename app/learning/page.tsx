@@ -1190,37 +1190,37 @@ export default function LearningPage() {
   /* -- Current card --------------------------------------------------- */
   const card = deck[cardIndex] as QuizCard | undefined
 
-  /* -- Init globe.gl -------------------------------------------------- */
-  useEffect(() => {
-    if (!ageGroup || !globeRef.current || globeInst.current) return
+  /* -- Init globe.gl via ref callback (fires when div mounts) ---------- */
+  const initGlobe = useCallback((node: HTMLDivElement | null) => {
+    globeRef.current = node
+    if (!node || globeInst.current) return
 
-    import("globe.gl").then((mod) => {
-      if (!globeRef.current || globeInst.current) return
-      const GlobeGL = (mod.default ?? mod) as any
-      const globe = new GlobeGL()
-      globe(globeRef.current)
-        .width(globeRef.current.clientWidth)
-        .height(globeRef.current.clientHeight)
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-        .atmosphereColor("#33ccdd")
-        .atmosphereAltitude(0.15)
-        .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
+    // Small delay to ensure CSS layout is complete
+    requestAnimationFrame(() => {
+      if (!node.isConnected || globeInst.current) return
 
-      globe.controls().autoRotate = false
-      globe.controls().enableDamping = true
-      globe.controls().dampingFactor = 0.1
+      import("globe.gl").then((mod) => {
+        if (!node.isConnected || globeInst.current) return
+        const GlobeGL = (mod.default ?? mod) as any
+        const globe = new GlobeGL()
+        globe(node)
+          .width(node.clientWidth || 600)
+          .height(node.clientHeight || 380)
+          .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+          .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+          .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+          .atmosphereColor("#33ccdd")
+          .atmosphereAltitude(0.15)
+          .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
 
-      globeInst.current = globe
+        globe.controls().autoRotate = false
+        globe.controls().enableDamping = true
+        globe.controls().dampingFactor = 0.1
+
+        globeInst.current = globe
+      })
     })
-
-    return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ageGroup])
+  }, [])
 
   /* -- Resize handler ------------------------------------------------- */
   useEffect(() => {
@@ -1604,7 +1604,8 @@ export default function LearningPage() {
       {/* -- Globe: always mounted when quiz view is active --------------- */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <div
-          ref={globeRef}
+          ref={initGlobe}
+          key={ageGroup ?? "none"}
           className="globe-learning-container"
           style={{
             width: "100%",
