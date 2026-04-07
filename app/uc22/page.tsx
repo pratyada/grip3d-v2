@@ -44,6 +44,13 @@ interface PointDatum {
   worldPct:   number
 }
 
+interface CountryFeature {
+  type: "Feature"
+  id: string
+  properties: { name: string }
+  geometry: any
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CROPS: { key: CropKey; label: string; icon: string }[] = [
@@ -91,102 +98,57 @@ function fmtProduction(kt: number): string {
   return `${fmtNum(kt)}K t`
 }
 
-type StatusT = "loading" | "ready" | "error"
-
-// ── Three.js helper ───────────────────────────────────────────────────────────
-
-const GLOBE_R = 100
-
-function latLngToXYZ(lat: number, lng: number, altFrac: number): [number, number, number] {
-  const r     = GLOBE_R * (1 + altFrac)
-  const phi   = (90 - lat)  * (Math.PI / 180)
-  const theta = (90 - lng) * (Math.PI / 180)
-  return [
-    r * Math.sin(phi) * Math.cos(theta),
-    r * Math.cos(phi),
-    r * Math.sin(phi) * Math.sin(theta),
-  ]
-}
-
-function makeDotTexture(THREE: any): any {
-  const sz  = 32
-  const cv  = document.createElement("canvas")
-  cv.width  = cv.height = sz
-  const ctx = cv.getContext("2d")!
-  const cx  = sz / 2
-  const grd = ctx.createRadialGradient(cx, cx, 0, cx, cx, sz / 2)
-  grd.addColorStop(0,    "rgba(220,255,160,1)")
-  grd.addColorStop(0.35, "rgba(140,220,80,0.85)")
-  grd.addColorStop(0.65, "rgba(60,160,40,0.4)")
-  grd.addColorStop(1,    "rgba(0,80,20,0)")
-  ctx.fillStyle = grd
-  ctx.fillRect(0, 0, sz, sz)
-  return new THREE.CanvasTexture(cv)
-}
-
-function updatePointBuffer(
-  data: PointDatum[],
-  THREE: any,
-  points: any,
-  viewMode: ViewMode,
-): void {
-  if (!points) return
-  const n    = data.length
-  const pos  = new Float32Array(n * 3)
-  const cols = new Float32Array(n * 3)
-
-  for (let i = 0; i < n; i++) {
-    const d     = data[i]
-    const alt   = viewMode === "arable" ? d.value * 0.25 : d.value * 0.6
-    const [x, y, z] = latLngToXYZ(d.lat, d.lng, alt + 0.005)
-    pos[i * 3]     = x
-    pos[i * 3 + 1] = y
-    pos[i * 3 + 2] = z
-
-    const hex   = lerpColor(d.value > 0 ? 0.1 + d.value * 0.9 : 0)
-    const color = new THREE.Color(hex)
-    cols[i * 3]     = color.r
-    cols[i * 3 + 1] = color.g
-    cols[i * 3 + 2] = color.b
+// Compute bounding-box centroid from any GeoJSON geometry (coords are [lng, lat])
+function featureCentroid(geometry: any): { lat: number; lng: number } {
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+  function walk(c: any) {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === "number") {
+      const [lng, lat] = c
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+    } else {
+      for (const sub of c) walk(sub)
+    }
   }
-
-  const geo = points.geometry
-  geo.setAttribute("position", new THREE.BufferAttribute(pos,  3))
-  geo.setAttribute("color",    new THREE.BufferAttribute(cols, 3))
-  geo.setDrawRange(0, n)
-  geo.computeBoundingSphere()
+  walk(geometry?.coordinates)
+  return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
 }
+
+type StatusT = "loading" | "ready" | "error"
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function UC22Page() {
   const globeRef    = useRef<HTMLDivElement>(null)
   const globeInst   = useRef<any>(null)
-  const pointsRef   = useRef<any>(null)
-  const threeRef    = useRef<any>(null)
-  const pointsData  = useRef<PointDatum[]>([])
-  const viewModeRef = useRef<ViewMode>("production")
 
-  const [status,      setStatus]      = useState<StatusT>("loading")
-  const [errorMsg,    setErrorMsg]    = useState("")
-  const [agData,      setAgData]      = useState<AgricultureData | null>(null)
-  const [selectedCrop, setSelectedCrop] = useState<CropKey>("wheat")
-  const [viewMode,    setViewMode]    = useState<ViewMode>("production")
-  const [selectedPt,  setSelectedPt]  = useState<PointDatum | null>(null)
-  const [isSpinning,  setIsSpinning]  = useState(true)
-  const [tooltip,     setTooltip]     = useState<{ x: number; y: number; pt: PointDatum } | null>(null)
-
-  // Keep ref in sync for use inside Three.js callbacks
-  useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
+  const [status,          setStatus]          = useState<StatusT>("loading")
+  const [errorMsg,        setErrorMsg]        = useState("")
+  const [agData,          setAgData]          = useState<AgricultureData | null>(null)
+  const [selectedCrop,    setSelectedCrop]    = useState<CropKey>("wheat")
+  const [viewMode,        setViewMode]        = useState<ViewMode>("production")
+  const [selectedPt,      setSelectedPt]      = useState<PointDatum | null>(null)
+  const [isSpinning,      setIsSpinning]      = useState(true)
+  const [countries,       setCountries]       = useState<CountryFeature[]>([])
+  const [hoveredCountry,  setHoveredCountry]  = useState<CountryFeature | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
 
   // ── Fetch data ──────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/agriculture-data")
+      const [res, geoRes] = await Promise.all([
+        fetch("/api/agriculture-data"),
+        fetch("/countries-110m.geojson"),
+      ])
       if (!res.ok) throw new Error(`API error ${res.status}`)
       const json: AgricultureData = await res.json()
+      const geo = await geoRes.json()
       setAgData(json)
+      setCountries(geo.features as CountryFeature[])
       setStatus("ready")
     } catch (err: any) {
       setErrorMsg(err?.message ?? "Unknown error")
@@ -246,140 +208,131 @@ export default function UC22Page() {
     })
   }, [agData, selectedCrop, viewMode])
 
-  // Keep ref in sync for raycaster
-  useEffect(() => {
-    pointsData.current = displayPoints
-  }, [displayPoints])
-
-  // ── Update globe points when data changes ──────────────────────────────────
+  // ── Apply points via globe.gl native pointsData ─────────────────────────────
 
   useEffect(() => {
-    if (pointsRef.current && threeRef.current) {
-      updatePointBuffer(displayPoints, threeRef.current, pointsRef.current, viewMode)
-    }
+    if (!globeInst.current || !displayPoints.length) return
+    const g = globeInst.current
+    const maxRadius = viewMode === "arable" ? 0.8 : 1.2
+
+    g.pointsData(displayPoints)
+      .pointLat("lat")
+      .pointLng("lng")
+      .pointAltitude(0.005)  // ON the surface, not floating
+      .pointRadius((d: PointDatum) => 0.08 + d.value * maxRadius)  // SIZE = value
+      .pointColor((d: PointDatum) => lerpColor(d.value > 0 ? 0.1 + d.value * 0.9 : 0))
+      .pointsMerge(false)
+      .pointLabel((d: PointDatum) => `
+        <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.9);border-radius:8px;border:1px solid rgba(76,175,80,0.4);color:#fff;font-size:12px;max-width:220px;">
+          <b style="color:#8bc34a">${d.country}</b><br/>
+          ${d.rawLabel}<br/>
+          ${d.worldPct > 0 ? `<span style="color:#aaa;font-size:11px">${d.worldPct.toFixed(1)}% of world</span>` : ""}
+        </div>
+      `)
+      .onPointClick((d: PointDatum) => {
+        setSelectedPt(d)
+        setIsSpinning(false)
+        g.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.6 }, 700)
+      })
+      .onPointHover((d: PointDatum | null) => {
+        if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
+      })
   }, [displayPoints, viewMode])
+
+  // ── Apply country polygons ─────────────────────────────────────────────────
+
+  function applyCountries(
+    globe: any,
+    features: CountryFeature[],
+    hovered: CountryFeature | null,
+    selected: CountryFeature | null,
+  ) {
+    globe
+      .polygonsData(features)
+      .polygonCapColor((d: any) => {
+        if (selected && d.properties.name === selected.properties.name)
+          return "rgba(253,231,37,0.10)"
+        if (hovered && d.properties.name === hovered.properties.name)
+          return "rgba(255,255,255,0.06)"
+        return "rgba(0,0,0,0)"
+      })
+      .polygonSideColor(() => "rgba(0,0,0,0)")
+      .polygonStrokeColor((d: any) => {
+        if (selected && d.properties.name === selected.properties.name)
+          return "rgba(253,231,37,0.9)"
+        if (hovered && d.properties.name === hovered.properties.name)
+          return "rgba(255,255,255,0.6)"
+        return "rgba(255,255,255,0.18)"
+      })
+      .polygonAltitude(0.005)
+      .onPolygonHover((d: any) => {
+        setHoveredCountry(d as CountryFeature | null)
+      })
+      .onPolygonClick((d: any) => {
+        const f = d as CountryFeature
+        setSelectedCountry(prev =>
+          prev?.properties.name === f.properties.name ? null : f
+        )
+        if (globeInst.current) {
+          const { lat, lng } = featureCentroid(f.geometry)
+          globeInst.current.pointOfView({ lat, lng, altitude: 2.0 }, 800)
+        }
+        setIsSpinning(false)
+      })
+  }
+
+  // ── Sync country polygons when hover/selection changes ─────────────────────
+
+  useEffect(() => {
+    if (!globeInst.current || !countries.length) return
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredCountry, selectedCountry, countries])
+
+  // ── Country stats ─────────────────────────────────────────────────────────
+
+  const countryStats = useMemo(() => {
+    if (!selectedCountry || !agData) return null
+    const name = selectedCountry.properties.name
+    // Find matching point for the selected country
+    const pt = displayPoints.find(p => p.country === name)
+    if (!pt) return null
+    return { name, pt }
+  }, [selectedCountry, agData, displayPoints])
 
   // ── Globe init ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (status !== "ready" || !globeRef.current || globeInst.current) return
-    let globe: any, animId: number
 
-    Promise.all([import("globe.gl"), import("three")]).then(([globeMod, THREE]) => {
+    import("globe.gl").then((mod) => {
       if (!globeRef.current) return
-      threeRef.current = THREE
-
-      const GlobeGL = (globeMod.default ?? globeMod) as any
-      globe = new GlobeGL()
+      const GlobeGL = (mod.default ?? mod) as any
+      const globe = new GlobeGL()
       globe(globeRef.current)
         .width(globeRef.current.clientWidth)
         .height(globeRef.current.clientHeight)
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-day.jpg")  // GREEN day texture
         .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-        .atmosphereColor("#4caf50")
-        .atmosphereAltitude(0.1)
+        .atmosphereColor("#4caf50")  // green atmosphere
+        .atmosphereAltitude(0.12)
         .pointOfView({ lat: 20, lng: 10, altitude: 2.0 })
 
-      const ctrl = globe.controls()
-      ctrl.autoRotate      = true
-      ctrl.autoRotateSpeed = 0.15
-      ctrl.enableDamping   = true
-      ctrl.dampingFactor   = 0.1
-      globeInst.current    = globe
+      globe.controls().autoRotate = true
+      globe.controls().autoRotateSpeed = 0.15
+      globe.controls().enableDamping = true
+      globe.controls().dampingFactor = 0.1
 
-      // Build particle system
-      const geo = new THREE.BufferGeometry()
-      const mat = new THREE.PointsMaterial({
-        size:           14,
-        map:            makeDotTexture(THREE),
-        vertexColors:   true,
-        transparent:    true,
-        alphaTest:      0.01,
-        sizeAttenuation: false,
-        depthWrite:     false,
-      })
-      const pts = new THREE.Points(geo, mat)
-      pts.renderOrder = 999
-      globe.scene().add(pts)
-      pointsRef.current = pts
-
-      // Initial render
-      updatePointBuffer(pointsData.current, THREE, pts, viewModeRef.current)
-
-      // Gentle pulse animation
-      let t = 0
-      const pulse = () => {
-        animId         = requestAnimationFrame(pulse)
-        t             += 0.03
-        mat.opacity    = 0.7 + 0.3 * Math.abs(Math.sin(t))
-        mat.needsUpdate = true
-      }
-      animId = requestAnimationFrame(pulse)
-
-      // Click / hover handler
-      const canvas = globeRef.current!
-      const onMove = (e: MouseEvent) => {
-        const rect  = canvas.getBoundingClientRect()
-        const mouse = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1,
-        )
-        const rc = new THREE.Raycaster()
-        rc.params.Points = { threshold: 4 }
-        rc.setFromCamera(mouse, globe.camera())
-        const hits = rc.intersectObject(pts)
-        if (hits.length > 0 && hits[0].index != null) {
-          const pt = pointsData.current[hits[0].index]
-          if (pt) {
-            setTooltip({ x: e.clientX, y: e.clientY, pt })
-            canvas.style.cursor = "pointer"
-            return
-          }
-        }
-        setTooltip(null)
-        canvas.style.cursor = "default"
-      }
-      const onClick = (e: MouseEvent) => {
-        const rect  = canvas.getBoundingClientRect()
-        const mouse = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1,
-        )
-        const rc = new THREE.Raycaster()
-        rc.params.Points = { threshold: 4 }
-        rc.setFromCamera(mouse, globe.camera())
-        const hits = rc.intersectObject(pts)
-        if (hits.length > 0 && hits[0].index != null) {
-          const pt = pointsData.current[hits[0].index]
-          if (pt) {
-            setSelectedPt(pt)
-            setIsSpinning(false)
-            globe.pointOfView({ lat: pt.lat, lng: pt.lng, altitude: 1.6 }, 700)
-          }
-        }
-      }
-      canvas.addEventListener("mousemove", onMove)
-      canvas.addEventListener("click",     onClick)
-      ;(canvas as any)._agMove  = onMove
-      ;(canvas as any)._agClick = onClick
+      globeInst.current = globe
+      applyCountries(globe, countries, null, null)
     })
 
     return () => {
-      cancelAnimationFrame(animId)
-      const canvas = globeRef.current
-      if (canvas) {
-        if ((canvas as any)._agMove)  canvas.removeEventListener("mousemove", (canvas as any)._agMove)
-        if ((canvas as any)._agClick) canvas.removeEventListener("click",     (canvas as any)._agClick)
-      }
-      if (pointsRef.current) {
-        pointsRef.current.geometry?.dispose?.()
-        pointsRef.current.material?.dispose?.()
-        pointsRef.current = null
-      }
-      globe?.controls()?.dispose?.()
+      globeInst.current?.controls()?.dispose?.()
       globeInst.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
   // Sync autoRotate
@@ -442,24 +395,6 @@ export default function UC22Page() {
     <div className="relative" style={{ minHeight: "calc(100vh - 64px)", background: "#000" }}>
       {/* Globe canvas */}
       <div ref={globeRef} className="absolute inset-0" />
-
-      {/* Floating tooltip on hover */}
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none px-3 py-2 rounded-lg text-xs"
-          style={{
-            left:       tooltip.x + 14,
-            top:        tooltip.y - 10,
-            background: "rgba(0,0,0,0.85)",
-            border:     "1px solid rgba(76,175,80,0.4)",
-            backdropFilter: "blur(8px)",
-            color:      "var(--text)",
-          }}
-        >
-          <p className="font-semibold">{tooltip.pt.country}</p>
-          <p style={{ color: "#7ec850" }}>{tooltip.pt.rawLabel}</p>
-        </div>
-      )}
 
       {/* Top bar */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-4 pointer-events-none">
@@ -610,7 +545,48 @@ export default function UC22Page() {
         </div>
       </div>
 
-      {/* Selected country panel */}
+      {/* Country stats panel */}
+      {countryStats && (
+        <div className="absolute bottom-4 left-4 pointer-events-auto"
+             style={{ width: 250 }}>
+          <div className="rounded-xl p-4"
+               style={{ background: "rgba(0,0,0,0.88)", border: "1px solid rgba(253,231,37,0.35)", backdropFilter: "blur(14px)" }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="min-w-0 pr-2">
+                <p className="text-sm font-bold leading-tight" style={{ color: "#fde725" }}>{countryStats.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{cropInfo.label} stats</p>
+              </div>
+              <button onClick={() => setSelectedCountry(null)}
+                      className="opacity-40 hover:opacity-80 text-base flex-shrink-0"
+                      style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            {viewMode !== "arable" ? (
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { label: "Production",    val: fmtProduction(countryStats.pt.production) },
+                  { label: "Yield",         val: `${countryStats.pt.yield.toFixed(2)} t/ha` },
+                  { label: "Harvested Area",val: `${fmtNum(countryStats.pt.area)}K ha` },
+                  { label: "% World Total", val: `${countryStats.pt.worldPct.toFixed(1)}%` },
+                ].map(m => (
+                  <div key={m.label} className="rounded-lg px-2 py-1.5"
+                       style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>{m.label}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{m.val}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg px-3 py-2"
+                   style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.2)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>Arable Land</p>
+                <p className="text-xl font-bold" style={{ color: "#7ec850" }}>{countryStats.pt.rawLabel}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected point detail panel */}
       {selectedPt && (
         <div className="absolute bottom-4 right-4 pointer-events-auto"
              style={{ width: 250 }}>
