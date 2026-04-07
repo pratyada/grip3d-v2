@@ -1196,23 +1196,33 @@ export default function LearningPage() {
 
     import("globe.gl").then((mod) => {
       if (!globeRef.current || globeInst.current) return
-      const GlobeGL = (mod.default ?? mod) as any
-      const globe = new GlobeGL()
-      globe(globeRef.current)
-        .width(globeRef.current.clientWidth || 600)
-        .height(globeRef.current.clientHeight || 380)
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-        .atmosphereColor("#33ccdd")
-        .atmosphereAltitude(0.15)
-        .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
+      try {
+        const GlobeGL = (mod.default ?? mod) as any
+        const globe = new GlobeGL()
+        globe(globeRef.current)
+          .width(globeRef.current.clientWidth || 600)
+          .height(globeRef.current.clientHeight || 380)
+          .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+          .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+          .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+          .atmosphereColor("#33ccdd")
+          .atmosphereAltitude(0.15)
+          .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
 
-      globe.controls().autoRotate = false
-      globe.controls().enableDamping = true
-      globe.controls().dampingFactor = 0.1
+        globe.controls().autoRotate = false
+        globe.controls().enableDamping = true
+        globe.controls().dampingFactor = 0.1
 
-      globeInst.current = globe
+        globeInst.current = globe
+      } catch {
+        if (globeRef.current) {
+          globeRef.current.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;text-align:center;padding:20px;flex-direction:column;gap:8px;">
+            <span style="font-size:32px">🌍</span>
+            <div><b>3D Globe requires WebGL</b></div>
+            <div style="font-size:12px;opacity:0.7;max-width:280px;">Enable hardware acceleration in your browser settings, or try a different browser.</div>
+          </div>`
+        }
+      }
     })
 
     return () => {
