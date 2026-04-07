@@ -1164,7 +1164,6 @@ export default function LearningPage() {
   const [attempted, setAttempted] = useState(0)
   const [shakeIdx, setShakeIdx] = useState<number | null>(null)
   const [confetti, setConfetti] = useState(false)
-  const [mounted, setMounted] = useState(false)
 
   /* -- Refs ----------------------------------------------------------- */
   const globeRef = useRef<HTMLDivElement>(null)
@@ -1191,19 +1190,9 @@ export default function LearningPage() {
   /* -- Current card --------------------------------------------------- */
   const card = deck[cardIndex] as QuizCard | undefined
 
-  /* -- Mount flag ------------------------------------------------------ */
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   /* -- Init globe.gl -------------------------------------------------- */
-  // The globe container div is inside {card && ...} which only renders
-  // after the deck is populated (a separate useEffect). So we also depend
-  // on deck.length — when it goes from 0→N the card mounts, the ref
-  // becomes available, and this effect re-runs to initialise the globe.
   useEffect(() => {
-    if (!mounted || !ageGroup || !deck.length) return
-    if (!globeRef.current || globeInst.current) return
+    if (!ageGroup || !globeRef.current || globeInst.current) return
 
     import("globe.gl").then((mod) => {
       if (!globeRef.current || globeInst.current) return
@@ -1231,7 +1220,7 @@ export default function LearningPage() {
       globeInst.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, ageGroup])
+  }, [ageGroup])
 
   /* -- Resize handler ------------------------------------------------- */
   useEffect(() => {
@@ -1381,7 +1370,6 @@ export default function LearningPage() {
   const isKindergarten = ageGroup === "kindergarten"
 
   /* -- Render --------------------------------------------------------- */
-  if (!mounted) return null
 
   /* ============ AGE GROUP SELECTION SCREEN ============ */
   if (ageGroup === null) {
@@ -1617,14 +1605,15 @@ export default function LearningPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <div
           ref={globeRef}
+          className="globe-learning-container"
           style={{
             width: "100%",
-            height: isKindergarten ? "min(60vw, 450px)" : "min(55vw, 420px)",
+            height: 380,
             background: "#000",
             borderRadius: "16px 16px 0 0",
             cursor: "grab",
             overflow: "hidden",
-            border: `1px solid ${catColor}33`,
+            border: "1px solid rgba(255,255,255,0.1)",
             borderBottom: "none",
           }}
         />
