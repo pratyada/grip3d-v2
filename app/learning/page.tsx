@@ -1190,52 +1190,36 @@ export default function LearningPage() {
   /* -- Current card --------------------------------------------------- */
   const card = deck[cardIndex] as QuizCard | undefined
 
-  /* -- Init globe.gl -------------------------------------------------- */
-  const [globeReady, setGlobeReady] = useState(false)
-
+  /* -- Init globe.gl — runs once on mount, div is always in DOM ------- */
   useEffect(() => {
-    if (!ageGroup) return
-    // Short delay guarantees the globe container div is fully laid out
-    const timer = setTimeout(() => {
+    if (!globeRef.current || globeInst.current) return
+
+    import("globe.gl").then((mod) => {
       if (!globeRef.current || globeInst.current) return
-      import("globe.gl").then((mod) => {
-        if (!globeRef.current || globeInst.current) return
-        try {
-          const GlobeGL = (mod.default ?? mod) as any
-          const globe = new GlobeGL()
-          globe(globeRef.current)
-            .width(globeRef.current.clientWidth || 600)
-            .height(globeRef.current.clientHeight || 380)
-            .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-            .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-            .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
-            .atmosphereColor("#33ccdd")
-            .atmosphereAltitude(0.15)
-            .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
+      const GlobeGL = (mod.default ?? mod) as any
+      const globe = new GlobeGL()
+      globe(globeRef.current)
+        .width(globeRef.current.clientWidth || 600)
+        .height(globeRef.current.clientHeight || 380)
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .atmosphereColor("#33ccdd")
+        .atmosphereAltitude(0.15)
+        .pointOfView({ lat: 20, lng: 0, altitude: 2.5 })
 
-          globe.controls().autoRotate = false
-          globe.controls().enableDamping = true
-          globe.controls().dampingFactor = 0.1
+      globe.controls().autoRotate = false
+      globe.controls().enableDamping = true
+      globe.controls().dampingFactor = 0.1
 
-          globeInst.current = globe
-          setGlobeReady(true)
-        } catch {
-          // WebGL not available — show fallback message
-          if (globeRef.current) {
-            globeRef.current.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;text-align:center;padding:20px;">
-              <div>🌍 3D Globe requires WebGL.<br/><span style="font-size:12px;opacity:0.7">Enable hardware acceleration in your browser settings.</span></div>
-            </div>`
-          }
-        }
-      })
-    }, 150)
+      globeInst.current = globe
+    })
+
     return () => {
-      clearTimeout(timer)
       globeInst.current?.controls()?.dispose?.()
       globeInst.current = null
-      setGlobeReady(false)
     }
-  }, [ageGroup])
+  }, [])
 
   /* -- Resize handler ------------------------------------------------- */
   useEffect(() => {
@@ -1249,6 +1233,20 @@ export default function LearningPage() {
     window.addEventListener("resize", onResize)
     return () => window.removeEventListener("resize", onResize)
   }, [])
+
+  /* -- Resize globe when switching to quiz view ----------------------- */
+  useEffect(() => {
+    if (!ageGroup || !globeInst.current || !globeRef.current) return
+    // Small delay for CSS to apply new dimensions
+    const t = setTimeout(() => {
+      if (globeRef.current && globeInst.current) {
+        globeInst.current
+          .width(globeRef.current.clientWidth)
+          .height(globeRef.current.clientHeight)
+      }
+    }, 50)
+    return () => clearTimeout(t)
+  }, [ageGroup])
 
   /* -- Update globe layers when card changes -------------------------- */
   useEffect(() => {
@@ -1384,11 +1382,16 @@ export default function LearningPage() {
   const currentAgeGroupInfo = AGE_GROUPS.find((g) => g.key === ageGroup)
   const isKindergarten = ageGroup === "kindergarten"
 
-  /* -- Render --------------------------------------------------------- */
+  /* -- Derived (safe even when ageGroup is null) ---------------------- */
+  const catColor = card ? CATEGORY_COLORS[card.category] : "#33ccdd"
+  const diffInfo = card ? DIFFICULTY_LABELS[card.difficulty] : DIFFICULTY_LABELS.easy
+  const agModeLabel = ageGroup === "university" ? "\u{1F4DA} Study Mode" : ageGroup === "adult" ? "\u{1F9E0} Curiosity Mode" : null
 
-  /* ============ AGE GROUP SELECTION SCREEN ============ */
-  if (ageGroup === null) {
-    return (
+  /* -- Render --------------------------------------------------------- */
+  return (
+    <>
+    {/* ============ AGE GROUP SELECTION SCREEN ============ */}
+    {ageGroup === null && (
       <div style={{ background: "linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0a0a1a 100%)", minHeight: "100vh" }}>
         <style>{`
           @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
@@ -1480,15 +1483,24 @@ export default function LearningPage() {
           </p>
         </div>
       </div>
-    )
-  }
+    )}
 
-  /* ============ QUIZ VIEW ============ */
-  const catColor = card ? CATEGORY_COLORS[card.category] : "#33ccdd"
-  const diffInfo = card ? DIFFICULTY_LABELS[card.difficulty] : DIFFICULTY_LABELS.easy
-  const agModeLabel = ageGroup === "university" ? "\u{1F4DA} Study Mode" : ageGroup === "adult" ? "\u{1F9E0} Curiosity Mode" : null
+    {/* Globe container — ALWAYS in DOM, hidden offscreen when selection screen shows */}
+    <div style={ageGroup ? { maxWidth: "896px", margin: "0 auto", padding: "0 16px" } : { position: "fixed", left: -9999, top: -9999 }}>
+      <div ref={globeRef} style={{
+        width: ageGroup ? "100%" : 600,
+        height: 380,
+        background: "#000",
+        borderRadius: ageGroup ? "16px 16px 0 0" : 0,
+        cursor: "grab",
+        overflow: "hidden",
+        border: ageGroup ? "1px solid rgba(255,255,255,0.1)" : "none",
+        borderBottom: "none",
+      }} />
+    </div>
 
-  return (
+    {/* ============ QUIZ VIEW ============ */}
+    {ageGroup !== null && (
     <div
       style={{ background: "var(--bg)", minHeight: "100vh" }}
       onTouchStart={onTouchStart}
@@ -1616,22 +1628,8 @@ export default function LearningPage() {
         </p>
       </div>
 
-      {/* -- Globe: always mounted when quiz view is active --------------- */}
+      {/* -- Globe is above, always in DOM -------------------------------- */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div
-          ref={globeRef}
-          className="globe-learning-container"
-          style={{
-            width: "100%",
-            height: 380,
-            background: "#000",
-            borderRadius: "16px 16px 0 0",
-            cursor: "grab",
-            overflow: "hidden",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderBottom: "none",
-          }}
-        />
       </div>
 
       {/* -- Card --------------------------------------------------------- */}
@@ -1889,5 +1887,7 @@ export default function LearningPage() {
         </div>
       )}
     </div>
+    )}
+    </>
   )
 }
