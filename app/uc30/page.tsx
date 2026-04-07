@@ -19,6 +19,7 @@ interface HeritageSite {
   description: string
   criteria: string
   endangered: boolean
+  imageUrl?: string
 }
 
 interface CountryFeature {
@@ -30,9 +31,9 @@ interface CountryFeature {
 // ── Colours ──────────────────────────────────────────────────────────────────
 
 const CAT_COLORS: Record<SiteCategory, string> = {
-  cultural: "#f59e0b",
-  natural: "#22c55e",
-  mixed: "#a78bfa",
+  cultural: "#fbbf24",
+  natural: "#10b981",
+  mixed: "#8b5cf6",
 }
 
 const ENDANGERED_COLOR = "#ef4444"
@@ -288,6 +289,24 @@ function featureCentroid(geo: { type: string; coordinates: unknown[] }): { lat: 
   return { lat: latS / coords.length, lng: lngS / coords.length }
 }
 
+function getSatelliteTiles(lat: number, lng: number): string[] {
+  const zoom = 15
+  const n = Math.pow(2, zoom)
+  const centerX = Math.floor((lng + 180) / 360 * n)
+  const centerY = Math.floor(
+    (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n
+  )
+  const tiles: string[] = []
+  for (let dy = -1; dy <= 0; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      tiles.push(
+        `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${centerY + dy}/${centerX + dx}`
+      )
+    }
+  }
+  return tiles
+}
+
 function choroplethColor(count: number): string {
   if (count === 0) return "rgba(0,0,0,0)"
   if (count <= 2) return "rgba(6,182,212,0.05)"
@@ -313,6 +332,7 @@ export default function UC30Page() {
   const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
   const [hoveredCountry, setHoveredCountry] = useState<CountryFeature | null>(null)
   const [isSpinning, setIsSpinning] = useState(true)
+  const [globeReady, setGlobeReady] = useState(false)
 
   // ── Filtered sites ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -379,7 +399,7 @@ export default function UC30Page() {
       globe(globeRef.current)
         .width(globeRef.current.clientWidth)
         .height(globeRef.current.clientHeight)
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-day.jpg")
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
         .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .atmosphereColor("#06b6d4")
@@ -394,6 +414,7 @@ export default function UC30Page() {
       globeInst.current = globe
       applyPoints(globe, filtered)
       applyCountries(globe, countries, null, null)
+      setGlobeReady(true)
     })
 
     return () => {
@@ -410,9 +431,9 @@ export default function UC30Page() {
       .pointLat((d: any) => d.lat)
       .pointLng((d: any) => d.lng)
       .pointColor((d: any) => d.endangered ? ENDANGERED_COLOR : CAT_COLORS[d.category as SiteCategory])
-      .pointAltitude(0.008)
+      .pointAltitude((d: any) => d.category === "natural" ? 0.025 : 0.015)
       .pointRadius((d: any) => d.endangered ? 0.25 : 0.15)
-      .pointResolution(8)
+      .pointResolution(6)
       .pointLabel((d: any) => {
         const site = d as HeritageSite
         const catColor = CAT_COLORS[site.category]
@@ -516,6 +537,21 @@ export default function UC30Page() {
     return () => window.removeEventListener("resize", onResize)
   }, [])
 
+  // ── Pulse animation for endangered sites ──────────────────────────────────
+  useEffect(() => {
+    if (!globeReady || !globeInst.current) return
+    let frame = 0
+    const id = setInterval(() => {
+      frame++
+      const pulse = 1 + 0.3 * Math.sin(frame * 0.15)
+      globeInst.current?.pointRadius((d: any) => {
+        if (d.endangered) return 0.25 * pulse
+        return 0.15
+      })
+    }, 80)
+    return () => clearInterval(id)
+  }, [globeReady])
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-screen overflow-hidden" style={{ background: "#0a0f1e" }}>
@@ -538,25 +574,37 @@ export default function UC30Page() {
         </div>
       </div>
 
-      {/* ── Top-right: Stats ─────────────────────────────────────────────── */}
+      {/* ── Top-right: Stats + Spin toggle ──────────────────────────────── */}
       <div className="absolute top-4 right-4 z-10">
         <div className="rounded-2xl px-5 py-4" style={{ background: "rgba(15,23,42,0.88)", backdropFilter: "blur(12px)", border: "1px solid rgba(6,182,212,0.2)" }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: "#94a3b8" }}>OVERVIEW</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold" style={{ color: "#94a3b8" }}>OVERVIEW</p>
+            <button onClick={() => setIsSpinning(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={{
+                background: isSpinning ? "rgba(6,182,212,0.2)" : "rgba(239,68,68,0.15)",
+                color: isSpinning ? "#06b6d4" : "#ef4444",
+                border: `1px solid ${isSpinning ? "rgba(6,182,212,0.5)" : "rgba(239,68,68,0.4)"}`,
+              }}>
+              <span style={{ fontSize: 14 }}>{isSpinning ? "\u23F8" : "\u25B6"}</span>
+              {isSpinning ? "Spinning" : "Paused"}
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-x-5 gap-y-2 text-center">
             <div>
               <p className="text-lg font-bold" style={{ color: "#06b6d4" }}>{stats.total}</p>
               <p className="text-[10px]" style={{ color: "#64748b" }}>Total Sites</p>
             </div>
             <div>
-              <p className="text-lg font-bold" style={{ color: "#f59e0b" }}>{stats.cultural}</p>
+              <p className="text-lg font-bold" style={{ color: "#fbbf24" }}>{stats.cultural}</p>
               <p className="text-[10px]" style={{ color: "#64748b" }}>Cultural</p>
             </div>
             <div>
-              <p className="text-lg font-bold" style={{ color: "#22c55e" }}>{stats.natural}</p>
+              <p className="text-lg font-bold" style={{ color: "#10b981" }}>{stats.natural}</p>
               <p className="text-[10px]" style={{ color: "#64748b" }}>Natural</p>
             </div>
             <div>
-              <p className="text-lg font-bold" style={{ color: "#a78bfa" }}>{stats.mixed}</p>
+              <p className="text-lg font-bold" style={{ color: "#8b5cf6" }}>{stats.mixed}</p>
               <p className="text-[10px]" style={{ color: "#64748b" }}>Mixed</p>
             </div>
             <div>
@@ -644,12 +692,6 @@ export default function UC30Page() {
             </div>
           </div>
 
-          {/* Spin toggle */}
-          <button onClick={() => setIsSpinning(v => !v)}
-            className="w-full px-3 py-2 rounded-lg text-xs font-medium"
-            style={{ background: "rgba(30,41,59,0.6)", color: isSpinning ? "#06b6d4" : "#64748b", border: "1px solid rgba(51,65,85,0.5)" }}>
-            {isSpinning ? "Pause Rotation" : "Resume Rotation"}
-          </button>
         </div>
       </div>
 
@@ -679,33 +721,77 @@ export default function UC30Page() {
 
       {/* ── Bottom-right: Selected site detail ───────────────────────────── */}
       {selectedSite && (
-        <div className="absolute bottom-4 right-4 z-10 w-80">
-          <div className="rounded-2xl px-5 py-4" style={{ background: "rgba(15,23,42,0.92)", backdropFilter: "blur(14px)", border: `1px solid ${CAT_COLORS[selectedSite.category]}44` }}>
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="text-sm font-bold pr-4" style={{ color: "#f1f5f9" }}>{selectedSite.name}</h3>
-              <button onClick={() => setSelectedSite(null)} className="text-xs" style={{ color: "#64748b" }}>x</button>
+        <div className="absolute bottom-4 right-4 z-10 w-96 max-h-[calc(100vh-100px)] overflow-y-auto">
+          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(15,23,42,0.92)", backdropFilter: "blur(14px)", border: `1px solid ${CAT_COLORS[selectedSite.category]}44` }}>
+            {/* Satellite image tiles */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", width: "100%", height: 160, overflow: "hidden" }}>
+              {getSatelliteTiles(selectedSite.lat, selectedSite.lng).map((url, i) => (
+                <img key={i} src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect fill='%23172033' width='100' height='100'/></svg>" }} />
+              ))}
             </div>
-            <p className="text-xs mb-2" style={{ color: "#94a3b8" }}>{selectedSite.country} &middot; Inscribed {selectedSite.year}</p>
-            <div className="flex gap-1.5 mb-3">
-              <span className="px-2 py-0.5 rounded-full text-[10px]"
-                style={{ background: CAT_COLORS[selectedSite.category] + "22", color: CAT_COLORS[selectedSite.category], border: `1px solid ${CAT_COLORS[selectedSite.category]}44` }}>
-                {selectedSite.category}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px]"
-                style={{ background: "rgba(6,182,212,0.1)", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.3)" }}>
-                {selectedSite.region}
-              </span>
-              {selectedSite.endangered && (
+
+            <div className="px-5 py-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{selectedSite.category === "cultural" ? "\uD83C\uDFDB\uFE0F" : selectedSite.category === "natural" ? "\uD83C\uDF3F" : "\uD83C\uDFD4\uFE0F"}</span>
+                  <h3 className="text-sm font-bold pr-2" style={{ color: "#f1f5f9" }}>{selectedSite.name}</h3>
+                </div>
+                <button onClick={() => setSelectedSite(null)}
+                  className="w-6 h-6 flex items-center justify-center rounded-full text-xs flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.1)", color: "#94a3b8" }}>
+                  x
+                </button>
+              </div>
+              <p className="text-xs mb-2" style={{ color: "#94a3b8" }}>{selectedSite.country} &middot; Inscribed {selectedSite.year}</p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
                 <span className="px-2 py-0.5 rounded-full text-[10px]"
-                  style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.4)" }}>
-                  Endangered
+                  style={{ background: CAT_COLORS[selectedSite.category] + "22", color: CAT_COLORS[selectedSite.category], border: `1px solid ${CAT_COLORS[selectedSite.category]}44` }}>
+                  {selectedSite.category}
                 </span>
-              )}
-            </div>
-            <p className="text-xs leading-relaxed mb-3" style={{ color: "#cbd5e1" }}>{selectedSite.description}</p>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono" style={{ color: "#64748b" }}>Criteria: ({selectedSite.criteria})</span>
-              <span className="text-[10px] font-mono" style={{ color: "#64748b" }}>{selectedSite.lat.toFixed(2)}, {selectedSite.lng.toFixed(2)}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px]"
+                  style={{ background: "rgba(6,182,212,0.1)", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.3)" }}>
+                  {selectedSite.region}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                  style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", border: "1px solid rgba(100,116,139,0.3)" }}>
+                  ({selectedSite.criteria})
+                </span>
+                {selectedSite.endangered && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px]"
+                    style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.4)" }}>
+                    Endangered
+                  </span>
+                )}
+              </div>
+              <p className="text-xs leading-relaxed mb-4" style={{ color: "#cbd5e1" }}>{selectedSite.description}</p>
+              <div className="text-[10px] font-mono mb-4" style={{ color: "#64748b" }}>
+                {selectedSite.lat.toFixed(4)}, {selectedSite.lng.toFixed(4)}
+              </div>
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <a
+                  href={`https://www.google.com/maps/@${selectedSite.lat},${selectedSite.lng},500m/data=!3m1!1e3`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:brightness-110"
+                  style={{ background: "rgba(6,182,212,0.15)", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.3)" }}>
+                  <span>{"\uD83D\uDDFA\uFE0F"}</span> 3D Map
+                </a>
+                <a
+                  href={`https://en.wikipedia.org/wiki/${encodeURIComponent(selectedSite.name.replace(/ /g, "_"))}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:brightness-110"
+                  style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>
+                  <span>{"\uD83D\uDCD6"}</span> Wiki
+                </a>
+                <a
+                  href={`https://news.google.com/search?q=${encodeURIComponent(selectedSite.name + " UNESCO")}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:brightness-110"
+                  style={{ background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>
+                  <span>{"\uD83D\uDCF0"}</span> News
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -725,9 +811,9 @@ export default function UC30Page() {
             {countrySites.length > 0 && (
               <>
                 <div className="flex gap-2 mb-3 text-[10px]">
-                  <span style={{ color: "#f59e0b" }}>{countrySites.filter(s => s.category === "cultural").length} Cultural</span>
-                  <span style={{ color: "#22c55e" }}>{countrySites.filter(s => s.category === "natural").length} Natural</span>
-                  <span style={{ color: "#a78bfa" }}>{countrySites.filter(s => s.category === "mixed").length} Mixed</span>
+                  <span style={{ color: "#fbbf24" }}>{countrySites.filter(s => s.category === "cultural").length} Cultural</span>
+                  <span style={{ color: "#10b981" }}>{countrySites.filter(s => s.category === "natural").length} Natural</span>
+                  <span style={{ color: "#8b5cf6" }}>{countrySites.filter(s => s.category === "mixed").length} Mixed</span>
                 </div>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {countrySites.map(s => (
@@ -753,9 +839,9 @@ export default function UC30Page() {
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
         <div className="flex items-center gap-4 rounded-full px-5 py-2" style={{ background: "rgba(15,23,42,0.88)", backdropFilter: "blur(12px)", border: "1px solid rgba(6,182,212,0.2)" }}>
           {([
-            { label: "Cultural", color: "#f59e0b" },
-            { label: "Natural", color: "#22c55e" },
-            { label: "Mixed", color: "#a78bfa" },
+            { label: "Cultural", color: "#fbbf24" },
+            { label: "Natural", color: "#10b981" },
+            { label: "Mixed", color: "#8b5cf6" },
             { label: "Endangered", color: "#ef4444" },
           ] as const).map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
