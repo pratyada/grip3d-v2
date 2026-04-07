@@ -246,23 +246,43 @@ export default function UC22Page() {
     features: CountryFeature[],
     hovered: CountryFeature | null,
     selected: CountryFeature | null,
+    points?: PointDatum[],
   ) {
+    // Build a country→value lookup for choropleth fill
+    const countryValue: Record<string, number> = {}
+    if (points && points.length > 0) {
+      for (const p of points) {
+        if (p.value > (countryValue[p.country] ?? 0)) countryValue[p.country] = p.value
+      }
+    }
+
     globe
       .polygonsData(features)
       .polygonCapColor((d: any) => {
-        if (selected && d.properties.name === selected.properties.name)
-          return "rgba(253,231,37,0.10)"
-        if (hovered && d.properties.name === hovered.properties.name)
-          return "rgba(255,255,255,0.06)"
+        const name = d.properties.name
+        if (selected && name === selected.properties.name)
+          return "rgba(253,231,37,0.15)"
+        if (hovered && name === hovered.properties.name)
+          return "rgba(255,255,255,0.08)"
+        // Choropleth: color countries with data based on production scale
+        const v = countryValue[name]
+        if (v != null && v > 0) {
+          const intensity = Math.round(v * 180)
+          return `rgba(30,${60 + intensity},255,${(0.08 + v * 0.18).toFixed(2)})`
+        }
         return "rgba(0,0,0,0)"
       })
       .polygonSideColor(() => "rgba(0,0,0,0)")
       .polygonStrokeColor((d: any) => {
-        if (selected && d.properties.name === selected.properties.name)
+        const name = d.properties.name
+        if (selected && name === selected.properties.name)
           return "rgba(253,231,37,0.9)"
-        if (hovered && d.properties.name === hovered.properties.name)
+        if (hovered && name === hovered.properties.name)
           return "rgba(255,255,255,0.6)"
-        return "rgba(255,255,255,0.18)"
+        // Highlight countries with data
+        if (countryValue[name] != null && countryValue[name] > 0)
+          return "rgba(80,180,255,0.35)"
+        return "rgba(255,255,255,0.12)"
       })
       .polygonAltitude(0.005)
       .onPolygonHover((d: any) => {
@@ -285,9 +305,9 @@ export default function UC22Page() {
 
   useEffect(() => {
     if (!globeInst.current || !countries.length) return
-    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
+    applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry, displayPoints)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoveredCountry, selectedCountry, countries])
+  }, [hoveredCountry, selectedCountry, countries, displayPoints])
 
   // ── Country stats ─────────────────────────────────────────────────────────
 
@@ -325,7 +345,33 @@ export default function UC22Page() {
       globe.controls().dampingFactor = 0.1
 
       globeInst.current = globe
-      applyCountries(globe, countries, null, null)
+      applyCountries(globe, countries, null, null, displayPoints)
+
+      // Apply initial wheat data immediately so markers show on first load
+      if (displayPoints.length) {
+        const maxR = viewMode === "arable" ? 0.8 : 1.2
+        globe.pointsData(displayPoints)
+          .pointLat("lat").pointLng("lng")
+          .pointAltitude(0.005)
+          .pointRadius((d: PointDatum) => 0.08 + d.value * maxR)
+          .pointColor((d: PointDatum) => lerpColor(d.value > 0 ? 0.1 + d.value * 0.9 : 0))
+          .pointsMerge(false)
+          .pointLabel((d: PointDatum) => `
+            <div style="font-family:sans-serif;padding:8px 12px;background:rgba(0,0,0,0.9);border-radius:8px;border:1px solid rgba(76,175,80,0.4);color:#fff;font-size:12px;max-width:220px;">
+              <b style="color:#8bc34a">${d.country}</b><br/>
+              ${d.rawLabel}<br/>
+              ${d.worldPct > 0 ? `<span style="color:#aaa;font-size:11px">${d.worldPct.toFixed(1)}% of world</span>` : ""}
+            </div>
+          `)
+          .onPointClick((d: PointDatum) => {
+            setSelectedPt(d)
+            setIsSpinning(false)
+            globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.6 }, 700)
+          })
+          .onPointHover((d: PointDatum | null) => {
+            if (globeRef.current) globeRef.current.style.cursor = d ? "pointer" : "default"
+          })
+      }
     })
 
     return () => {
