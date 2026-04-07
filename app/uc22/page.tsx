@@ -64,13 +64,13 @@ const CROPS: { key: CropKey; label: string; icon: string }[] = [
   { key: "cotton",    label: "Cotton",    icon: "🌿" },
 ]
 
-// Green gradient — no data → very high production
+// Dark-to-bright blue gradient — highlights against green earth
 const COLOR_SCALE = [
-  { t: 0.00, r: 26,  g: 26,  b: 46  },  // #1a1a2e – no data / ocean
-  { t: 0.15, r: 26,  g: 95,  b: 42  },  // #1a5f2a – low
-  { t: 0.40, r: 61,  g: 145, b: 66  },  // #3d9142 – medium
-  { t: 0.70, r: 126, g: 200, b: 80  },  // #7ec850 – high
-  { t: 1.00, r: 200, g: 240, b: 112 },  // #c8f070 – very high
+  { t: 0.00, r: 10,  g: 10,  b: 30  },  // #0a0a1e – near black (minimal)
+  { t: 0.15, r: 15,  g: 30,  b: 80  },  // #0f1e50 – deep navy
+  { t: 0.40, r: 30,  g: 60,  b: 160 },  // #1e3ca0 – royal blue
+  { t: 0.70, r: 50,  g: 120, b: 220 },  // #3278dc – bright blue
+  { t: 1.00, r: 80,  g: 180, b: 255 },  // #50b4ff – vivid sky blue
 ]
 
 function lerpColor(t: number): string {
