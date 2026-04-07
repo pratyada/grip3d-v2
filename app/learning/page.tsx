@@ -1198,10 +1198,12 @@ export default function LearningPage() {
 
   /* -- Init globe.gl -------------------------------------------------- */
   useEffect(() => {
-    if (!mounted || !globeRef.current || globeInst.current) return
+    if (!mounted || !globeRef.current || !ageGroup) return
+    // Already initialised for this container
+    if (globeInst.current) return
 
     import("globe.gl").then((mod) => {
-      if (!globeRef.current) return
+      if (!globeRef.current || globeInst.current) return
       const GlobeGL = (mod.default ?? mod) as any
       const globe = new GlobeGL()
       globe(globeRef.current)
@@ -1219,6 +1221,27 @@ export default function LearningPage() {
       globe.controls().dampingFactor = 0.1
 
       globeInst.current = globe
+
+      // Apply the current card's layer immediately
+      if (card) {
+        const layer = card.globeLayer
+        const catColor = CATEGORY_COLORS[card.category]
+        globe.atmosphereColor(catColor)
+        if (layer.type === "points") {
+          globe.pointsData(layer.data)
+            .pointLat("lat").pointLng("lng")
+            .pointColor(() => layer.pointColor ?? catColor)
+            .pointRadius(layer.pointRadius ?? 0.5)
+            .pointAltitude(layer.pointAltitude ?? 0.04)
+            .pointLabel("label")
+        } else if (layer.type === "arcs") {
+          globe.arcsData(layer.data)
+            .arcStartLat("startLat").arcStartLng("startLng")
+            .arcEndLat("endLat").arcEndLng("endLng")
+            .arcColor(() => layer.arcColor ?? catColor)
+            .arcStroke(1.5).arcDashLength(0.6).arcDashGap(0.3).arcDashAnimateTime(2000)
+        }
+      }
     })
 
     return () => {
@@ -1226,7 +1249,7 @@ export default function LearningPage() {
       globeInst.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted])
+  }, [mounted, ageGroup])
 
   /* -- Resize handler ------------------------------------------------- */
   useEffect(() => {
@@ -1363,6 +1386,9 @@ export default function LearningPage() {
   }, [])
 
   const handleChangeLevel = useCallback(() => {
+    // Dispose globe before unmounting its container
+    globeInst.current?.controls()?.dispose?.()
+    globeInst.current = null
     setAgeGroup(null)
     setScore(0)
     setAttempted(0)
