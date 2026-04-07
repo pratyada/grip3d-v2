@@ -164,8 +164,8 @@ export default function HomePage() {
                 {/* Trust row */}
                 <div style={{ display: "flex", gap: "32px", flexWrap: "wrap", justifyContent: "center", marginTop: "4px" }}>
                   {[
-                    { n: "12+", label: "Live Demos" },
-                    { n: "8", label: "Industries" },
+                    { n: "30+", label: "Live Globe Demos" },
+                    { n: "12", label: "Industries" },
                     { n: "Real-time", label: "3D Globe Engine" },
                   ].map(({ n, label }) => (
                     <div key={label} style={{ textAlign: "center" }}>
@@ -223,12 +223,12 @@ export default function HomePage() {
           gap: "32px",
         }}>
           {[
-            { n: "12+", label: "Live Globe Demos", sub: "and growing" },
-            { n: "46", label: "Data Layers", sub: "Demographics alone" },
-            { n: "35K+", label: "Power Plants", sub: "geolocated UC12" },
-            { n: "26K+", label: "Radio Stations", sub: "playable UC11" },
-            { n: "60", label: "Satellite Passes", sub: "NTN UC10" },
-            { n: "25", label: "AI GPU Clusters", sub: "UC14 Inference Grid" },
+            { n: "30+", label: "Live Globe Demos", sub: "and growing" },
+            { n: "100+", label: "Data Layers", sub: "across all use cases" },
+            { n: "6,000+", label: "Satellites Tracked", sub: "Starlink + debris" },
+            { n: "500+", label: "Natural Hazards", sub: "real-time monitoring" },
+            { n: "243", label: "UNESCO Heritage Sites", sub: "across 168 countries" },
+            { n: "8.98M", label: "Cell Towers Mapped", sub: "global density" },
           ].map(({ n, label, sub }) => (
             <div key={label}>
               <div style={{ fontSize: "clamp(28px, 3vw, 42px)", fontWeight: 900, color: "var(--accent)", lineHeight: 1, letterSpacing: "-0.02em" }}>{n}</div>
