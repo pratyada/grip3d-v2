@@ -1501,7 +1501,9 @@ export default function LearningPage() {
         borderRadius: ageGroup ? "16px 16px 0 0" : 0,
         cursor: "grab",
         overflow: "hidden",
-        border: ageGroup ? "1px solid rgba(255,255,255,0.1)" : "none",
+        borderTop: ageGroup ? "1px solid rgba(255,255,255,0.1)" : "none",
+        borderLeft: ageGroup ? "1px solid rgba(255,255,255,0.1)" : "none",
+        borderRight: ageGroup ? "1px solid rgba(255,255,255,0.1)" : "none",
         borderBottom: "none",
       }} />
     </div>
