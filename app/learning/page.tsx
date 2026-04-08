@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    Types
@@ -1225,10 +1226,7 @@ export default function LearningPage() {
       }
     })
 
-    return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
-    }
+    return () => { disposeGlobe(globeInst, globeRef) }
   }, [])
 
   /* -- Resize handler ------------------------------------------------- */
@@ -1381,8 +1379,7 @@ export default function LearningPage() {
 
   const handleChangeLevel = useCallback(() => {
     // Dispose globe before unmounting its container
-    globeInst.current?.controls()?.dispose?.()
-    globeInst.current = null
+    disposeGlobe(globeInst, globeRef)
     setAgeGroup(null)
     setScore(0)
     setAttempted(0)

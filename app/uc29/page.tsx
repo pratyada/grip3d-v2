@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 /* ── Types ───────────────────────────────────────────────────────────────────── */
 
@@ -231,8 +232,7 @@ export default function CryptoBlockchainGlobe() {
     })
 
     return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])

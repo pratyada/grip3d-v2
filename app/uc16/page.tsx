@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -580,8 +581,7 @@ export default function UC16Page() {
         })
         orbitLineRef.current = null
       }
-      globe?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   }, [status])
 

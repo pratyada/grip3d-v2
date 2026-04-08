@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -287,8 +288,7 @@ export default function UC20Page() {
     return () => {
       cancelAnimationFrame(animId)
       if (pointsRef.current) { pointsRef.current.geometry?.dispose?.(); pointsRef.current.material?.dispose?.(); pointsRef.current = null }
-      globe?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   }, [status])
 

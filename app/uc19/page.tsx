@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -221,8 +222,7 @@ export default function UC19Page() {
     })
 
     return () => {
-      globe?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   }, [status, data]) // eslint-disable-line react-hooks/exhaustive-deps
 

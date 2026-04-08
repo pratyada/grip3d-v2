@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -1013,8 +1014,7 @@ export default function UC23Page() {
       setGlobeReady(true)
     })
     return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   }, [])
 

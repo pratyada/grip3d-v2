@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid,
@@ -521,8 +522,7 @@ export default function UC21Page() {
         window.removeEventListener("resize", (canvas as any)._resizeHandler)
       }
       globe?._destructor?.()
-      globe?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])

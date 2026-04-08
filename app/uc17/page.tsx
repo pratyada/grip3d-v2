@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -327,8 +328,7 @@ export default function UC17Page() {
       const canvas = globeRef.current
       if (canvas && (canvas as any)._acClick) canvas.removeEventListener("click", (canvas as any)._acClick)
       if (pointsRef.current) { pointsRef.current.geometry?.dispose?.(); pointsRef.current.material?.dispose?.(); pointsRef.current = null }
-      globe?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
   }, [status])
 

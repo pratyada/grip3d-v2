@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -571,8 +572,7 @@ export default function UC27Page() {
     })
 
     return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

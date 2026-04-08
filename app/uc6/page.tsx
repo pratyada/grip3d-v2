@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 type RadioKey  = "GSM" | "UMTS" | "LTE" | "NR"
 type FilterKey = "all" | RadioKey
@@ -250,8 +251,7 @@ export default function UC06Page() {
     })
 
     return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])

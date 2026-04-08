@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -418,8 +419,7 @@ export default function UC30Page() {
     })
 
     return () => {
-      globeInst.current?.controls()?.dispose?.()
-      globeInst.current = null
+      disposeGlobe(globeInst, globeRef)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
