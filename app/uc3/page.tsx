@@ -402,9 +402,8 @@ export default function UC3Page() {
       scene.add(orionGroup)
       orionRef.current = orionGroup
 
-      // ── KSC launch marker (use globe.gl getCoords for correct positioning) ──
-      // Use globe.gl's labelsData to render markers via its built-in API
-      // — guarantees correct lat/lng → scene XYZ conversion
+      // ── KSC + Splashdown markers via globe.gl htmlElementsData ──
+      // pointer-events: none on wrapper so mouse wheel passes through to globe
       globe
         .htmlElementsData([
           { lat: 28.5, lng: -80.6, label: "KSC", color: "#ff8800", desc: "Kennedy Space Center · Launch Site" },
@@ -414,7 +413,7 @@ export default function UC3Page() {
           const el = document.createElement("div")
           el.style.cssText = `
             display: flex; flex-direction: column; align-items: center; gap: 4px;
-            transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
+            transform: translate(-50%, -100%); pointer-events: none;
           `
           el.innerHTML = `
             <div style="
@@ -423,18 +422,25 @@ export default function UC3Page() {
               box-shadow: 0 0 12px ${d.color}, 0 0 24px ${d.color}aa, 0 0 6px #fff inset;
               border: 2px solid #fff;
               animation: pulse 2s ease-in-out infinite;
+              pointer-events: none;
             "></div>
             <div style="
               padding: 2px 8px; border-radius: 6px; font-family: ui-monospace, monospace;
               font-size: 10px; font-weight: 700; color: #fff;
               background: rgba(0,0,0,0.85); border: 1px solid ${d.color}88;
               white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+              pointer-events: none;
             ">${d.label}</div>
           `
-          el.title = d.desc
           return el
         })
         .htmlAltitude(0.01)
+
+      // Explicitly enable zoom on OrbitControls
+      ctrl.enableZoom = true
+      ctrl.minDistance = 110
+      ctrl.maxDistance = 1500
+      ctrl.zoomSpeed = 1.2
 
       // ── Trail line for Orion's flown path ─────────────────────────────
       const trailGeo = new THREE.BufferGeometry()
@@ -1041,6 +1047,40 @@ export default function UC3Page() {
                 {opt.label}
               </button>
             ))}
+            <div className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-white/5">FLY TO</div>
+            <button
+              onClick={() => {
+                cameraModeRef.current = "orbit"
+                globeInst.current?.pointOfView({ lat: 32.7, lng: -117.2, altitude: 0.6 }, 1500)
+              }}
+              className="w-full text-left text-xs px-2 py-1.5 rounded transition-colors flex items-center gap-2"
+              style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e" }}
+            >
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              🌊 Splashdown Zone
+            </button>
+            <button
+              onClick={() => {
+                cameraModeRef.current = "orbit"
+                globeInst.current?.pointOfView({ lat: 28.5, lng: -80.6, altitude: 0.6 }, 1500)
+              }}
+              className="w-full text-left text-xs px-2 py-1.5 rounded transition-colors flex items-center gap-2"
+              style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.3)", color: "#f97316" }}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-400" />
+              🚀 Kennedy Space Center
+            </button>
+            <button
+              onClick={() => {
+                cameraModeRef.current = "orbit"
+                globeInst.current?.pointOfView({ lat: 0, lng: -80, altitude: 2.8 }, 1500)
+              }}
+              className="w-full text-left text-xs px-2 py-1.5 rounded transition-colors flex items-center gap-2"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              🌍 Reset Globe View
+            </button>
           </div>
         </div>
       )}
