@@ -131,8 +131,8 @@ export default function UC3Page() {
   const [dataSource,  setDataSource]  = useState("interpolated")
   const [activePanel, setActivePanel] = useState<string | null>(null)
 
-  // NASA TV panel state
-  const [showNasaTv, setShowNasaTv] = useState(false)
+  // NASA TV panel state — open by default
+  const [showNasaTv, setShowNasaTv] = useState(true)
   const [nasaTvMuted, setNasaTvMuted] = useState(true)
 
   // Units toggle (km vs mi), persisted to localStorage
@@ -833,13 +833,14 @@ export default function UC3Page() {
           </div>
           <iframe
             key={nasaTvMuted ? "muted" : "unmuted"}
-            src={`https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}`}
+            src={`https://www.youtube.com/embed/m3kR2KK8TEs?si=i8sUw9uyCmeQZNRQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}`}
             width="400"
             height="248"
             frameBorder={0}
-            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
-            title="NASA Live TV"
+            title="NASA Live TV — Artemis II"
           />
         </div>
       )}
