@@ -23,10 +23,11 @@ const TOTAL_DISTANCE_KM  = 1_118_800
 // Scale: 1 Three.js unit = 5 000 km
 const KM_PER_UNIT  = 5000
 const EARTH_R_KM   = 6371
-const MOON_R_KM    = 1737
 const EARTH_R      = EARTH_R_KM / KM_PER_UNIT
-const MOON_R       = MOON_R_KM  / KM_PER_UNIT
 const CRAFT_RADIUS = 1.8
+
+// Approximate Moon distance (not rendered, but g-force calc uses it)
+const APPROX_MOON_DIST = 384400 // km
 
 // ── Crew ──────────────────────────────────────────────────────────────────────
 const CREW = [
@@ -104,7 +105,6 @@ const RECORDS: string[] = [
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface MoonPos   { x: number; y: number; z: number; distKm: number; fallback?: boolean }
 interface OrionPos  {
   x: number | null; y: number | null; z: number | null
   distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string
@@ -116,9 +116,8 @@ interface NewsItem  { title: string; description: string; date: string; thumb: s
 export default function UC3Page() {
   const mountRef    = useRef<HTMLDivElement>(null)
   const sceneRef    = useRef<any>(null)
-  const cameraModeRef = useRef<"orbit" | "orion" | "moon">("orbit")
+  const cameraModeRef = useRef<"orbit" | "orion">("orbit")
 
-  const [moonData,  setMoonData]  = useState<MoonPos | null>(null)
   const [orionData, setOrionData] = useState<OrionPos | null>(null)
   const [news,      setNews]      = useState<NewsItem[]>([])
   const [missionT,  setMissionT]  = useState(0)          // hours since launch
@@ -126,7 +125,6 @@ export default function UC3Page() {
   const [countdown, setCountdown] = useState("")
   const [selected,  setSelected]  = useState<string | null>(null)
   const [distEarth, setDistEarth] = useState<number | null>(null)
-  const [distMoon,  setDistMoon]  = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
   const [dataSource,  setDataSource]  = useState("interpolated")
   const [activePanel, setActivePanel] = useState<string | null>(null)
@@ -152,14 +150,6 @@ export default function UC3Page() {
   }, [])
 
   const togglePanel = (id: string) => setActivePanel(p => p === id ? null : id)
-
-  // ── Fetch moon position ───────────────────────────────────────────────────
-  useEffect(() => {
-    fetch("/api/moon-position")
-      .then(r => r.json())
-      .then(setMoonData)
-      .catch(() => setMoonData({ x: 384400, y: 0, z: 0, distKm: 384400 }))
-  }, [])
 
   // ── Fetch Orion real-time position ────────────────────────────────────────
   useEffect(() => {
@@ -217,7 +207,7 @@ export default function UC3Page() {
   const telemetry = useMemo(() => {
     const speed = velKms ?? 0
     const de    = distEarth ?? 0
-    const dm    = distMoon  ?? 0
+    const dm    = APPROX_MOON_DIST
 
     const altitudeAboveEarth = Math.max(0, de - EARTH_R_KM)
     const speedKmh           = speed * 3600
@@ -252,7 +242,6 @@ export default function UC3Page() {
 
     return {
       distEarth: de,
-      distMoon:  dm,
       speed,
       altitudeAboveEarth,
       speedKmh,
@@ -267,7 +256,7 @@ export default function UC3Page() {
       cabinTemp,
       heatshieldTemp,
     }
-  }, [velKms, distEarth, distMoon, missionT])
+  }, [velKms, distEarth, missionT])
 
   // ── Current phase / next event ────────────────────────────────────────────
   const currentEventIndex = useMemo(() => {
@@ -299,12 +288,12 @@ export default function UC3Page() {
 
   // ── Three.js scene ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mountRef.current || !moonData) return
+    if (!mountRef.current) return
 
     let THREE: any
     let renderer: any, scene: any, camera: any
-    let earthMesh: any, moonMesh: any, craftMesh: any
-    let flownLine: any, upcomingLine: any, moonOrbitLine: any
+    let earthMesh: any, craftMesh: any
+    let flownLine: any
     let trailPositions: any[] = []
     let trailLine: any
     let starField: any
@@ -327,7 +316,7 @@ export default function UC3Page() {
 
       scene  = new THREE.Scene()
       camera = new THREE.PerspectiveCamera(45, mountRef.current!.clientWidth / mountRef.current!.clientHeight, 0.1, 5000)
-      camera.position.set(60, 40, 60)
+      camera.position.set(0, 30, 80)
       camera.lookAt(0, 0, 0)
 
       // ── Lighting — explicit sun direction so the terminator looks right ───
@@ -401,41 +390,6 @@ export default function UC3Page() {
       splashDot.position.copy(splashPos)
       scene.add(splashDot)
 
-      // ── Moon ──────────────────────────────────────────────────────────
-      const md = moonData!
-      const moonScenePos = new THREE.Vector3(
-        md.x / KM_PER_UNIT,
-        md.y / KM_PER_UNIT,
-        md.z / KM_PER_UNIT,
-      )
-      const moonGeo = new THREE.SphereGeometry(MOON_R, 32, 32)
-      const moonMat = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, emissive: 0x111111, shininess: 5 })
-      moonMesh = new THREE.Mesh(moonGeo, moonMat)
-      moonMesh.position.copy(moonScenePos)
-      scene.add(moonMesh)
-
-      const ringGeo = new THREE.TorusGeometry(MOON_R * 1.5, 0.04, 8, 32)
-      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x8888ff, transparent: true, opacity: 0.4 }))
-      ring.position.copy(moonScenePos)
-      scene.add(ring)
-
-      // Moon orbit path
-      const orbitPts: any[] = []
-      const orbitDist = md.distKm / KM_PER_UNIT
-      for (let i = 0; i <= 128; i++) {
-        const a = (i / 128) * Math.PI * 2
-        const inc = 23.4 * Math.PI / 180
-        const x = orbitDist * Math.cos(a)
-        const y = orbitDist * Math.sin(a) * Math.sin(inc)
-        const z = orbitDist * Math.sin(a) * Math.cos(inc)
-        orbitPts.push(new THREE.Vector3(x, y, z))
-      }
-      moonOrbitLine = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(orbitPts),
-        new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.35 }),
-      )
-      scene.add(moonOrbitLine)
-
       // ── Orion spacecraft ───────────────────────────────────────────────
       craftMesh = new THREE.Group()
       craftMesh.position.copy(kscPos)
@@ -494,40 +448,13 @@ export default function UC3Page() {
       craftMesh.add(craftLight)
       scene.add(craftMesh)
 
-      // ── Trajectory: flown (cyan solid) + upcoming (amber dashed) ───────
-      const earthToMoon = moonScenePos.clone().normalize()
-      const flybyPt = moonScenePos.clone().sub(earthToMoon.clone().multiplyScalar(CLOSEST_APPROACH_KM / KM_PER_UNIT))
-
-      const outbound = new THREE.CatmullRomCurve3([
-        kscPos.clone(),
-        kscPos.clone().add(earthToMoon.clone().multiplyScalar(20)).add(new THREE.Vector3(0, 8, 0)),
-        moonScenePos.clone().sub(earthToMoon.clone().multiplyScalar(30)).add(new THREE.Vector3(0, 4, 0)),
-        flybyPt,
-      ])
-      const returnPath = new THREE.CatmullRomCurve3([
-        flybyPt,
-        flybyPt.clone().add(new THREE.Vector3(-10, 5, -10)),
-        splashPos.clone().add(new THREE.Vector3(-15, 10, 5)),
-        splashPos.clone(),
-      ])
-      const outPts = outbound.getPoints(120)
-      const retPts = returnPath.getPoints(120)
-      const allPts: any[] = [...outPts, ...retPts]
-
-      const flownGeo = new THREE.BufferGeometry().setFromPoints([allPts[0]])
+      // ── Trajectory: flown path (cyan solid) ─────────────────────────────
+      const flownGeo = new THREE.BufferGeometry().setFromPoints([kscPos.clone()])
       flownLine = new THREE.Line(
         flownGeo,
         new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 }),
       )
       scene.add(flownLine)
-
-      const upcomingGeo = new THREE.BufferGeometry().setFromPoints(allPts)
-      upcomingLine = new THREE.Line(
-        upcomingGeo,
-        new THREE.LineDashedMaterial({ color: 0xffaa33, transparent: true, opacity: 0.7, dashSize: 2, gapSize: 1 }),
-      )
-      ;(upcomingLine as any).computeLineDistances?.()
-      scene.add(upcomingLine)
 
       // Fading trail behind craft
       const trailGeo = new THREE.BufferGeometry()
@@ -539,7 +466,7 @@ export default function UC3Page() {
       )
       scene.add(trailLine)
 
-      sceneRef.current = { trajPts: allPts, orionPos: null, flownLine, upcomingLine, trailArr }
+      sceneRef.current = { orionPos: null, flownLine, flownPts: [kscPos.clone()], trailArr }
 
       // ── Controls ───────────────────────────────────────────────────────
       const el = renderer.domElement
@@ -594,7 +521,6 @@ export default function UC3Page() {
         craftMesh.rotation.y += 0.008
 
         const liveOrion = sceneRef.current?.orionPos
-        const trajPts2  = sceneRef.current?.trajPts
         const useRealPos = liveOrion?.source === "horizons" && liveOrion.x != null && liveOrion.y != null
 
         if (useRealPos) {
@@ -603,32 +529,17 @@ export default function UC3Page() {
             liveOrion.y / KM_PER_UNIT,
             liveOrion.z / KM_PER_UNIT,
           )
-          const dM = craftMesh.position.distanceTo(moonMesh.position) * KM_PER_UNIT
-          setDistMoon(dM)
-        } else if (trajPts2 && trajPts2.length > 0) {
-          const elapsedH = (Date.now() - LAUNCH_DATE.getTime()) / 3_600_000
-          let t: number
-          if (elapsedH < 0) {
-            t = (frame % 600) / 600
-          } else {
-            t = Math.min(1, elapsedH / DURATION_HOURS)
-          }
-          const idx = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
-          craftMesh.position.copy(trajPts2[idx])
 
-          const p = craftMesh.position
-          setDistEarth(Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT)
-          setDistMoon(p.distanceTo(moonMesh.position) * KM_PER_UNIT)
-
-          // Update flown vs upcoming geometry
-          if (sceneRef.current?.flownLine && sceneRef.current?.upcomingLine) {
-            const flownPts = trajPts2.slice(0, idx + 1)
-            const upPts    = trajPts2.slice(idx)
-            sceneRef.current.flownLine.geometry.dispose()
-            sceneRef.current.flownLine.geometry = new THREE.BufferGeometry().setFromPoints(flownPts)
-            sceneRef.current.upcomingLine.geometry.dispose()
-            sceneRef.current.upcomingLine.geometry = new THREE.BufferGeometry().setFromPoints(upPts)
-            sceneRef.current.upcomingLine.computeLineDistances?.()
+          // Append to flown path (cyan line) — sample every ~30 frames to keep it light
+          if (frame % 30 === 0 && sceneRef.current?.flownPts && sceneRef.current?.flownLine) {
+            const fp = sceneRef.current.flownPts as any[]
+            const last = fp[fp.length - 1]
+            if (!last || last.distanceTo(craftMesh.position) > 0.05) {
+              fp.push(craftMesh.position.clone())
+              if (fp.length > 4000) fp.shift()
+              sceneRef.current.flownLine.geometry.dispose()
+              sceneRef.current.flownLine.geometry = new THREE.BufferGeometry().setFromPoints(fp)
+            }
           }
         }
 
@@ -653,10 +564,6 @@ export default function UC3Page() {
           targetX = craftMesh.position.x
           targetY = craftMesh.position.y
           targetZ = craftMesh.position.z
-        } else if (mode === "moon") {
-          targetX = moonMesh.position.x
-          targetY = moonMesh.position.y
-          targetZ = moonMesh.position.z
         }
         camFocus.x += (targetX - camFocus.x) * 0.06
         camFocus.y += (targetY - camFocus.y) * 0.06
@@ -686,7 +593,7 @@ export default function UC3Page() {
     let cleanup: (() => void) | undefined
     init().then(fn => { cleanup = fn })
     return () => { cleanup?.() }
-  }, [moonData])
+  }, [])
 
   // ── Formatting helpers ────────────────────────────────────────────────────
   const kmToDisp = useCallback((km: number | null): string => {
@@ -926,7 +833,6 @@ export default function UC3Page() {
           <div className="grid grid-cols-2 gap-1.5 text-xs">
             {[
               { label: "Dist. Earth",   val: kmToDisp(telemetry.distEarth),        color: "#60a5fa" },
-              { label: "Dist. Moon",    val: kmToDisp(telemetry.distMoon),         color: "#a5b4fc" },
               { label: "Altitude",      val: kmToDisp(telemetry.altitudeAboveEarth), color: "#7dd3fc" },
               { label: "Speed km/s",    val: `${telemetry.speed.toFixed(2)} km/s`, color: "#fbbf24" },
               { label: "Speed km/h",    val: `${Math.round(telemetry.speedKmh).toLocaleString()} km/h`, color: "#fbbf24" },
@@ -1140,7 +1046,6 @@ export default function UC3Page() {
             {[
               { id: "orbit", label: "Earth View" },
               { id: "orion", label: "Lock on Orion" },
-              { id: "moon",  label: "Follow Moon" },
             ].map(opt => (
               <button
                 key={opt.id}
@@ -1163,17 +1068,15 @@ export default function UC3Page() {
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-400 px-4 py-2 rounded-lg"
         style={{ background: "rgba(0,5,20,0.75)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 opacity-70 inline-block" /> Earth</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-400 opacity-70 inline-block" /> Moon</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-400 opacity-70 inline-block" /> Orion</span>
         <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-cyan-400 opacity-90" style={{ width: 12 }} /> Flown</span>
-        <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-orange-400 opacity-80" style={{ width: 12 }} /> Upcoming</span>
         <span className="text-gray-600 hidden sm:inline">|</span>
         <span className="hidden sm:inline">Drag · Scroll to zoom</span>
       </div>
 
       {/* Attribution */}
       <div className="absolute bottom-3 right-3 z-10 text-xs text-gray-700 hidden sm:block">
-        {dataSource === "horizons" ? "JPL Horizons -1032" : "MET interp."} · Moon: JPL · News: NASA
+        {dataSource === "horizons" ? "JPL Horizons -1032" : "MET interp."} · News: NASA
       </div>
     </div>
   )
