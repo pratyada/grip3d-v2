@@ -259,7 +259,6 @@
       '      </div>' +
       '    </div>' +
       '  </div>' +
-      '  <button class="wp-chat-collapse" id="wp-collapse" aria-label="Collapse chat">&times;</button>' +
       '</div>' +
       '<div class="wp-chat-messages" id="wp-messages">' +
       '  <div class="wp-chat-empty" id="wp-empty">No messages yet. Be the first to say hi!</div>' +
@@ -267,12 +266,7 @@
       inputRow;
 
     document.body.appendChild(chat);
-
-    document.getElementById("wp-collapse").addEventListener("click", function () {
-      chatExpanded = false;
-      chat.remove();
-      renderToggle();
-    });
+    // Chat is always-on — no collapse button
 
     if (canChat) {
       document.getElementById("wp-input-form").addEventListener("submit", function (e) {
@@ -441,11 +435,20 @@
   function boot() {
     waitForFirebase(function () {
       initFirebase();
-      // If returning user already joined, skip the modal
-      if (session.joined) {
-        showChatWidget();
-        registerPresence();
-      } else {
+      // ALWAYS show the chat widget immediately as a viewer (read-only).
+      // The modal still appears 5 seconds later for those who haven't joined
+      // properly with a nick name + email.
+      if (!session.joined) {
+        // Default to viewer mode so chat is visible right away
+        session.canChat = false;
+        session.name = "Viewer";
+        session.joined = true;
+        saveSession(session);
+      }
+      showChatWidget();
+      registerPresence();
+      // If they're still in viewer-only mode, prompt them to join after 5s
+      if (session.canChat === false) {
         setTimeout(showJoinModal, 5000);
       }
     });

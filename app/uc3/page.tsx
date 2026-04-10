@@ -177,6 +177,76 @@ export default function UC3Page() {
   const [nasaTvPos, setNasaTvPos] = useState<{ x: number; y: number } | null>(null)
   const dragStateRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
 
+  // ── Radio stations (US + Canada, 5 languages) ──────────────────────────────
+  const radioStations = useMemo(() => [
+    { id: "wnyc",     name: "WNYC FM",        city: "New York, USA",      lang: "🇺🇸 English",     flag: "#3b82f6", url: "https://fm939.wnyc.org/wnycfm.aac" },
+    { id: "wbur",     name: "WBUR Boston",    city: "Boston, USA",        lang: "🇺🇸 English",     flag: "#3b82f6", url: "https://wbur-hls.streamguys1.com/wbur-32bit/playlist.m3u8" },
+    { id: "kexp",     name: "KEXP 90.3",      city: "Seattle, USA",       lang: "🇺🇸 English",     flag: "#3b82f6", url: "https://kexp-mp3-128.streamguys1.com/kexp128.mp3" },
+    { id: "cbcradio", name: "CBC Radio One",  city: "Toronto, Canada",    lang: "🇨🇦 English",     flag: "#dc2626", url: "https://cbcliveradio-lh.akamaihd.net/i/CBCR1_TOR@375785/master.m3u8" },
+    { id: "icir",     name: "Ici Musique",    city: "Montréal, Canada",   lang: "🇨🇦 Français",    flag: "#dc2626", url: "https://rcavliveaudio.akamaized.net/hls/live/2006980/M-EM/master.m3u8" },
+    { id: "klve",     name: "K-Love 107.5",   city: "Los Angeles, USA",   lang: "🇺🇸 Español",     flag: "#fbbf24", url: "https://playerservices.streamtheworld.com/api/livestream-redirect/KLVEFMAAC.aac" },
+    { id: "wynr",     name: "Radio Manão",    city: "Toronto, Canada",    lang: "🇧🇷 Português",   flag: "#22c55e", url: "https://stream.zeno.fm/27dt7d9et7zuv" },
+    { id: "cinaam",   name: "CINA 1650 AM",   city: "Mississauga, Canada",lang: "🇮🇳 हिन्दी (Hindi)",  flag: "#a855f7", url: "https://stream.zeno.fm/wgwyfdxehz8uv" },
+  ], [])
+
+  const [activeRadio, setActiveRadio] = useState<string | null>(null)
+  const [radioLoading, setRadioLoading] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const playRadio = useCallback((stationId: string) => {
+    const station = radioStations.find(s => s.id === stationId)
+    if (!station) return
+    // Stop current
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ""
+      audioRef.current = null
+    }
+    // If clicking the active one, just stop
+    if (activeRadio === stationId) {
+      setActiveRadio(null)
+      return
+    }
+    setRadioLoading(true)
+    const audio = new Audio()
+    audio.crossOrigin = "anonymous"
+    audio.src = station.url
+    audio.volume = 0.7
+    audio.addEventListener("playing", () => setRadioLoading(false))
+    audio.addEventListener("error", () => {
+      setRadioLoading(false)
+      setActiveRadio(null)
+    })
+    audioRef.current = audio
+    setActiveRadio(stationId)
+    audio.play().catch(() => {
+      setRadioLoading(false)
+      setActiveRadio(null)
+    })
+  }, [activeRadio, radioStations])
+
+  const stopRadio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ""
+      audioRef.current = null
+    }
+    setActiveRadio(null)
+    setRadioLoading(false)
+  }, [])
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
+
+  const [showRadio, setShowRadio] = useState(false)
+
   const onNasaTvDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect()
@@ -749,7 +819,132 @@ export default function UC3Page() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50%      { transform: scale(1.15); opacity: 0.85; }
         }
+        @keyframes radioWave {
+          0%, 100% { transform: scaleY(0.4); }
+          50%      { transform: scaleY(1); }
+        }
       `}</style>
+
+      {/* ── BIG RADIO STATIONS button (floating, top-right under NASA TV) ──── */}
+      <button
+        onClick={() => setShowRadio(v => !v)}
+        className="absolute z-30 flex items-center gap-2 px-3 py-2 rounded-xl transition-all"
+        style={{
+          top: 116,
+          right: 12,
+          background: activeRadio
+            ? "linear-gradient(135deg, rgba(34,197,94,0.95), rgba(16,185,129,0.92))"
+            : "linear-gradient(135deg, rgba(139,92,246,0.95), rgba(99,102,241,0.92))",
+          border: `1.5px solid ${activeRadio ? "rgba(134,239,172,0.85)" : "rgba(196,181,253,0.75)"}`,
+          boxShadow: activeRadio
+            ? "0 0 18px rgba(34,197,94,0.55), 0 0 34px rgba(34,197,94,0.3)"
+            : "0 0 18px rgba(139,92,246,0.55), 0 0 34px rgba(139,92,246,0.3)",
+          color: "#fff",
+          fontWeight: 700,
+        }}
+        title="Tune in to live radio"
+      >
+        {activeRadio ? (
+          <span className="flex items-end gap-0.5" style={{ height: 12 }}>
+            <span style={{ width: 3, background: "#fff", animation: "radioWave 0.6s ease-in-out infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+            <span style={{ width: 3, background: "#fff", animation: "radioWave 0.6s ease-in-out 0.15s infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+            <span style={{ width: 3, background: "#fff", animation: "radioWave 0.6s ease-in-out 0.3s infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+            <span style={{ width: 3, background: "#fff", animation: "radioWave 0.6s ease-in-out 0.45s infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+          </span>
+        ) : (
+          <span style={{ fontSize: 16 }}>📻</span>
+        )}
+        <span className="text-xs tracking-widest">{activeRadio ? "ON AIR" : "RADIO"}</span>
+      </button>
+
+      {/* ── Radio stations panel ──────────────────────────────────────────── */}
+      {showRadio && (
+        <div className="absolute z-30 rounded-2xl overflow-hidden"
+          style={{
+            top: 168, right: 12, width: 340,
+            background: "linear-gradient(180deg, rgba(20,15,40,0.97), rgba(5,5,20,0.98))",
+            border: "1px solid rgba(139,92,246,0.45)",
+            boxShadow: "0 0 50px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.6)",
+            backdropFilter: "blur(14px)",
+          }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(139,92,246,0.25)" }}>
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: 18 }}>📻</span>
+              <div>
+                <div className="text-xs font-bold tracking-widest text-purple-300">LIVE RADIO</div>
+                <div className="text-[10px] text-gray-500">US & Canada · 5 languages</div>
+              </div>
+            </div>
+            <button onClick={() => setShowRadio(false)} className="text-gray-500 hover:text-white text-lg leading-none">✕</button>
+          </div>
+
+          <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+            {radioStations.map(station => {
+              const isActive = activeRadio === station.id
+              const isLoading = isActive && radioLoading
+              return (
+                <button
+                  key={station.id}
+                  onClick={() => playRadio(station.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+                  style={{
+                    background: isActive
+                      ? "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(16,185,129,0.12))"
+                      : "rgba(255,255,255,0.04)",
+                    border: isActive
+                      ? "1.5px solid rgba(34,197,94,0.7)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {/* Big play/stop circle */}
+                  <div className="flex-shrink-0 flex items-center justify-center"
+                    style={{
+                      width: 44, height: 44, borderRadius: "50%",
+                      background: isActive
+                        ? "linear-gradient(135deg, #22c55e, #10b981)"
+                        : `linear-gradient(135deg, ${station.flag}, #6366f1)`,
+                      boxShadow: isActive
+                        ? "0 0 18px rgba(34,197,94,0.6)"
+                        : `0 0 12px ${station.flag}50`,
+                      color: "#fff",
+                      fontSize: 18,
+                    }}>
+                    {isLoading ? (
+                      <span className="animate-spin" style={{ fontSize: 14 }}>⏳</span>
+                    ) : isActive ? (
+                      <span style={{ marginLeft: 0, lineHeight: 1 }}>⏸</span>
+                    ) : (
+                      <span style={{ marginLeft: 2, lineHeight: 1 }}>▶</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{station.name}</div>
+                    <div className="text-[10px] text-gray-400 truncate">{station.city}</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: station.flag }}>{station.lang}</div>
+                  </div>
+
+                  {isActive && (
+                    <div className="flex items-end gap-0.5 flex-shrink-0" style={{ height: 16 }}>
+                      <span style={{ width: 2.5, background: "#22c55e", animation: "radioWave 0.7s ease-in-out infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+                      <span style={{ width: 2.5, background: "#22c55e", animation: "radioWave 0.7s ease-in-out 0.18s infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+                      <span style={{ width: 2.5, background: "#22c55e", animation: "radioWave 0.7s ease-in-out 0.36s infinite", display: "inline-block", height: "100%", borderRadius: 1 }} />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {activeRadio && (
+            <div className="px-4 py-2 flex items-center justify-between" style={{ borderTop: "1px solid rgba(139,92,246,0.25)", background: "rgba(34,197,94,0.05)" }}>
+              <span className="text-[10px] text-green-400 font-semibold tracking-widest">● ON AIR</span>
+              <button onClick={stopRadio} className="text-[11px] font-semibold text-red-400 hover:text-red-300">STOP</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── NASA TV panel (floating middle-right, vertically centered) ───── */}
       {showNasaTv && (
