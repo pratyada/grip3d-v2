@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
+import { disposeGlobe } from "@/lib/globe-cleanup"
 
 // ── Mission constants (corrected) ─────────────────────────────────────────────
 // Artemis II — first crewed Artemis lunar flyby
@@ -20,11 +21,8 @@ const PEAK_EARTH_KM      = 406771
 const PEAK_EARTH_MI      = 252756
 const TOTAL_DISTANCE_KM  = 1_118_800
 
-// Scale: 1 Three.js unit = 5 000 km
-const KM_PER_UNIT  = 5000
+// Earth radius (km) — used for km→globe-unit conversion for Orion position
 const EARTH_R_KM   = 6371
-const EARTH_R      = EARTH_R_KM / KM_PER_UNIT
-const CRAFT_RADIUS = 1.8
 
 // Approximate Moon distance (not rendered, but g-force calc uses it)
 const APPROX_MOON_DIST = 384400 // km
@@ -115,7 +113,11 @@ interface NewsItem  { title: string; description: string; date: string; thumb: s
 
 export default function UC3Page() {
   const mountRef    = useRef<HTMLDivElement>(null)
-  const sceneRef    = useRef<any>(null)
+  const globeInst   = useRef<any>(null)
+  const orionRef    = useRef<any>(null)
+  const trailRef    = useRef<any>(null)
+  const trailPositionsRef = useRef<any[]>([])
+  const threeRef    = useRef<any>(null)
   const cameraModeRef = useRef<"orbit" | "orion">("orbit")
 
   const [orionData, setOrionData] = useState<OrionPos | null>(null)
@@ -161,7 +163,6 @@ export default function UC3Page() {
           setDataSource(d.source)
           setDistEarth(d.distEarth)
           setVelKms(parseFloat(d.velKms.toFixed(2)))
-          if (sceneRef.current) sceneRef.current.orionPos = d
         })
         .catch(() => {})
     }
@@ -286,313 +287,183 @@ export default function UC3Page() {
     return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`
   }, [nextMilestone, missionT])
 
-  // ── Three.js scene ────────────────────────────────────────────────────────
+  // ── Globe.gl scene ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mountRef.current) return
+    if (!mountRef.current || globeInst.current) return
 
-    let THREE: any
-    let renderer: any, scene: any, camera: any
-    let earthMesh: any, craftMesh: any
-    let flownLine: any
-    let trailPositions: any[] = []
-    let trailLine: any
-    let starField: any
-    let animId = 0
-    let isDragging = false, prevMouse = { x: 0, y: 0 }
-    const spherical = { theta: 0.4, phi: 1.1, r: 110 }
-    // Smooth camera focus target
-    const camFocus = { x: 0, y: 0, z: 0 }
+    Promise.all([import("globe.gl"), import("three")]).then(([globeMod, THREE]) => {
+      if (!mountRef.current) return
+      threeRef.current = THREE
 
-    async function init() {
-      const mod = await import("three")
-      THREE = mod
-      ;(window as any).__THREE__ = THREE
+      const GlobeGL = (globeMod.default ?? globeMod) as any
+      const globe = new GlobeGL()
+      globe(mountRef.current)
+        .width(mountRef.current.clientWidth)
+        .height(mountRef.current.clientHeight)
+        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
+        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .atmosphereColor("#3b82f6")
+        .atmosphereAltitude(0.18)
+        .pointOfView({ lat: 0, lng: -80, altitude: 2.8 })
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      renderer.setSize(mountRef.current!.clientWidth, mountRef.current!.clientHeight)
-      renderer.setClearColor(0x000005)
-      mountRef.current!.appendChild(renderer.domElement)
+      const ctrl = globe.controls()
+      ctrl.autoRotate = false
+      ctrl.enableDamping = true
+      ctrl.dampingFactor = 0.1
+      globeInst.current = globe
 
-      scene  = new THREE.Scene()
-      camera = new THREE.PerspectiveCamera(45, mountRef.current!.clientWidth / mountRef.current!.clientHeight, 0.1, 5000)
-      camera.position.set(0, 30, 80)
-      camera.lookAt(0, 0, 0)
+      const scene = globe.scene()
+      const GLOBE_R = 100
 
-      // ── Lighting — explicit sun direction so the terminator looks right ───
-      scene.add(new THREE.AmbientLight(0x1a2233, 0.8))
-      const sunLight = new THREE.DirectionalLight(0xffffff, 2.6)
-      // Sun in roughly +X+Y direction of ECI frame (chosen for aesthetics)
-      sunLight.position.set(1200, 400, 600)
-      scene.add(sunLight)
-      // Subtle fill from the opposite side
-      const fill = new THREE.DirectionalLight(0x4466aa, 0.35)
-      fill.position.set(-1000, -200, -500)
-      scene.add(fill)
+      // ── Orion craft group ──────────────────────────────────────────────
+      const orionGroup = new THREE.Group()
 
-      // ── Stars ──────────────────────────────────────────────────────────
-      const starGeo = new THREE.BufferGeometry()
-      const starCount = 3000
-      const starPos = new Float32Array(starCount * 3)
-      for (let i = 0; i < starCount; i++) {
-        const r = 2000 + Math.random() * 1000
-        const th = Math.random() * Math.PI * 2
-        const ph = Math.acos(2 * Math.random() - 1)
-        starPos[i*3]   = r * Math.sin(ph) * Math.cos(th)
-        starPos[i*3+1] = r * Math.cos(ph)
-        starPos[i*3+2] = r * Math.sin(ph) * Math.sin(th)
-      }
-      starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3))
-      starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, sizeAttenuation: true }))
-      scene.add(starField)
+      // Capsule body (cone — pointing up)
+      const capsuleGeo = new THREE.ConeGeometry(2, 4, 12)
+      const capsuleMat = new THREE.MeshPhongMaterial({ color: 0xcccccc, emissive: 0x444444 })
+      const capsule = new THREE.Mesh(capsuleGeo, capsuleMat)
+      orionGroup.add(capsule)
 
-      // ── Earth ──────────────────────────────────────────────────────────
-      const earthGeo = new THREE.SphereGeometry(EARTH_R, 64, 64)
-      const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a6ba0, emissive: 0x0a2030, shininess: 60 })
-      earthMesh = new THREE.Mesh(earthGeo, earthMat)
-      scene.add(earthMesh)
+      // Service module
+      const smGeo = new THREE.CylinderGeometry(1.5, 1.5, 3, 12)
+      const smMat = new THREE.MeshPhongMaterial({ color: 0x888888 })
+      const sm = new THREE.Mesh(smGeo, smMat)
+      sm.position.y = -3.5
+      orionGroup.add(sm)
 
-      const atmGeo = new THREE.SphereGeometry(EARTH_R * 1.04, 32, 32)
-      const atmMat = new THREE.MeshPhongMaterial({ color: 0x4488cc, transparent: true, opacity: 0.12, side: THREE.FrontSide })
-      scene.add(new THREE.Mesh(atmGeo, atmMat))
-
-      const wireGeo = new THREE.SphereGeometry(EARTH_R * 1.001, 18, 12)
-      const wireMat = new THREE.MeshBasicMaterial({ color: 0x336699, wireframe: true, transparent: true, opacity: 0.08 })
-      scene.add(new THREE.Mesh(wireGeo, wireMat))
-
-      // KSC marker
-      const kscPhi   = (90 - 28.6)  * Math.PI / 180
-      const kscTheta = (90 - (-80.6)) * Math.PI / 180
-      const kscPos   = new THREE.Vector3(
-        EARTH_R * Math.sin(kscPhi) * Math.cos(kscTheta),
-        EARTH_R * Math.cos(kscPhi),
-        EARTH_R * Math.sin(kscPhi) * Math.sin(kscTheta),
-      )
-      const kscDot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xff6600 }),
-      )
-      kscDot.position.copy(kscPos)
-      scene.add(kscDot)
-
-      // Splashdown marker (Pacific off San Diego — 32.7°N, -117.2°W)
-      const splashPhi   = (90 - 32.7) * Math.PI / 180
-      const splashTheta = (90 - (-117.2)) * Math.PI / 180
-      const splashPos = new THREE.Vector3(
-        EARTH_R * Math.sin(splashPhi) * Math.cos(splashTheta),
-        EARTH_R * Math.cos(splashPhi),
-        EARTH_R * Math.sin(splashPhi) * Math.sin(splashTheta),
-      )
-      const splashDot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0x00ccff }),
-      )
-      splashDot.position.copy(splashPos)
-      scene.add(splashDot)
-
-      // ── Orion spacecraft ───────────────────────────────────────────────
-      craftMesh = new THREE.Group()
-      craftMesh.position.copy(kscPos)
-
-      const CR = CRAFT_RADIUS
-      const cmMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(CR * 0.55, CR, CR * 1.1, 16),
-        new THREE.MeshPhongMaterial({ color: 0xd4a843, emissive: 0x443300, shininess: 80 }),
-      )
-      cmMesh.position.y = CR * 0.8
-      craftMesh.add(cmMesh)
-
-      const hsMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(CR, CR * 1.02, CR * 0.12, 16),
-        new THREE.MeshPhongMaterial({ color: 0x222222, emissive: 0x110000, shininess: 10 }),
-      )
-      hsMesh.position.y = CR * 0.18
-      craftMesh.add(hsMesh)
-
-      const smMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(CR * 0.75, CR * 0.75, CR * 1.4, 16),
-        new THREE.MeshPhongMaterial({ color: 0x888899, emissive: 0x111122, shininess: 120 }),
-      )
-      smMesh.position.y = -CR * 0.58
-      craftMesh.add(smMesh)
-
-      const nozzleMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(CR * 0.18, CR * 0.3, CR * 0.4, 12),
-        new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 160 }),
-      )
-      nozzleMesh.position.y = -CR * 1.5
-      craftMesh.add(nozzleMesh)
-
-      const panelMat = new THREE.MeshPhongMaterial({ color: 0x1144cc, emissive: 0x001133, shininess: 200, side: THREE.DoubleSide })
-      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
-      for (const angle of angles) {
-        const panel = new THREE.Mesh(
-          new THREE.BoxGeometry(CR * 2.8, CR * 0.06, CR * 1.0),
-          panelMat,
-        )
-        panel.position.set(Math.cos(angle) * CR * 2.0, -CR * 0.55, Math.sin(angle) * CR * 2.0)
+      // Solar panels (4 wings)
+      for (let i = 0; i < 4; i++) {
+        const panelGeo = new THREE.BoxGeometry(6, 0.1, 1.5)
+        const panelMat = new THREE.MeshPhongMaterial({ color: 0x1e3a8a, emissive: 0x0f1e50 })
+        const panel = new THREE.Mesh(panelGeo, panelMat)
+        const angle = (i * Math.PI / 2)
+        panel.position.x = Math.cos(angle) * 4
+        panel.position.z = Math.sin(angle) * 4
+        panel.position.y = -3.5
         panel.rotation.y = angle
-        craftMesh.add(panel)
-
-        const strut = new THREE.Mesh(
-          new THREE.CylinderGeometry(CR * 0.04, CR * 0.04, CR * 2.0, 6),
-          new THREE.MeshPhongMaterial({ color: 0xaaaaaa }),
-        )
-        strut.position.set(Math.cos(angle) * CR * 1.0, -CR * 0.55, Math.sin(angle) * CR * 1.0)
-        strut.rotation.z = angle + Math.PI / 2
-        strut.rotation.x = Math.PI / 2
-        craftMesh.add(strut)
+        orionGroup.add(panel)
       }
 
-      const craftLight = new THREE.PointLight(0xff9922, 10, 30)
-      craftMesh.add(craftLight)
-      scene.add(craftMesh)
-
-      // ── Trajectory: flown path (cyan solid) ─────────────────────────────
-      const flownGeo = new THREE.BufferGeometry().setFromPoints([kscPos.clone()])
-      flownLine = new THREE.Line(
-        flownGeo,
-        new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 }),
-      )
-      scene.add(flownLine)
-
-      // Fading trail behind craft
-      const trailGeo = new THREE.BufferGeometry()
-      const trailArr = new Float32Array(200 * 3)
-      trailGeo.setAttribute("position", new THREE.BufferAttribute(trailArr, 3))
-      trailLine = new THREE.Line(
-        trailGeo,
-        new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.55 }),
-      )
-      scene.add(trailLine)
-
-      sceneRef.current = { orionPos: null, flownLine, flownPts: [kscPos.clone()], trailArr }
-
-      // ── Controls ───────────────────────────────────────────────────────
-      const el = renderer.domElement
-      const onDown = (e: MouseEvent) => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY } }
-      const onUp   = () => { isDragging = false }
-      const onMove = (e: MouseEvent) => {
-        if (!isDragging) return
-        const dx = e.clientX - prevMouse.x
-        const dy = e.clientY - prevMouse.y
-        prevMouse = { x: e.clientX, y: e.clientY }
-        spherical.theta -= dx * 0.005
-        spherical.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005))
-      }
-      const onWheel = (e: WheelEvent) => {
-        spherical.r = Math.max(15, Math.min(500, spherical.r + e.deltaY * 0.1))
-      }
-      el.addEventListener("mousedown", onDown)
-      window.addEventListener("mouseup",   onUp)
-      window.addEventListener("mousemove", onMove)
-      el.addEventListener("wheel", onWheel, { passive: true })
-
-      let lastTouch: Touch | null = null
-      el.addEventListener("touchstart", (e: TouchEvent) => { lastTouch = e.touches[0]; isDragging = true })
-      el.addEventListener("touchend",   () => { isDragging = false; lastTouch = null })
-      el.addEventListener("touchmove",  (e: TouchEvent) => {
-        if (!isDragging || !lastTouch) return
-        const t = e.touches[0]
-        const dx = t.clientX - lastTouch.clientX
-        const dy = t.clientY - lastTouch.clientY
-        lastTouch = t
-        spherical.theta -= dx * 0.005
-        spherical.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005))
+      // Glow sphere for visibility
+      const glowGeo = new THREE.SphereGeometry(3, 16, 16)
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.4,
       })
+      const glow = new THREE.Mesh(glowGeo, glowMat)
+      orionGroup.add(glow)
 
-      const onResize = () => {
-        if (!mountRef.current) return
-        const w = mountRef.current.clientWidth
-        const h = mountRef.current.clientHeight
-        camera.aspect = w / h
-        camera.updateProjectionMatrix()
-        renderer.setSize(w, h)
-      }
-      window.addEventListener("resize", onResize)
+      scene.add(orionGroup)
+      orionRef.current = orionGroup
 
-      // ── Animate ──────────────────────────────────────────────────────
-      let frame = 0
-      const animate = () => {
-        animId = requestAnimationFrame(animate)
-        frame++
+      // ── KSC launch marker ─────────────────────────────────────────────
+      const KSC_LAT = 28.5
+      const KSC_LNG = -80.6
+      const kphi = (90 - KSC_LAT) * Math.PI / 180
+      const ktheta = (KSC_LNG + 180) * Math.PI / 180
+      const kscPos = new THREE.Vector3(
+        -GLOBE_R * Math.sin(kphi) * Math.cos(ktheta),
+         GLOBE_R * Math.cos(kphi),
+         GLOBE_R * Math.sin(kphi) * Math.sin(ktheta),
+      )
+      const kscMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xff8800 }),
+      )
+      kscMesh.position.copy(kscPos)
+      scene.add(kscMesh)
 
-        earthMesh.rotation.y += 0.001
-        craftMesh.rotation.y += 0.008
+      // ── Splashdown marker ─────────────────────────────────────────────
+      const SPLASH_LAT = 32.7
+      const SPLASH_LNG = -117.2
+      const sphi = (90 - SPLASH_LAT) * Math.PI / 180
+      const stheta = (SPLASH_LNG + 180) * Math.PI / 180
+      const splashPos = new THREE.Vector3(
+        -GLOBE_R * Math.sin(sphi) * Math.cos(stheta),
+         GLOBE_R * Math.cos(sphi),
+         GLOBE_R * Math.sin(sphi) * Math.sin(stheta),
+      )
+      const splashMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0x00ff88 }),
+      )
+      splashMesh.position.copy(splashPos)
+      scene.add(splashMesh)
 
-        const liveOrion = sceneRef.current?.orionPos
-        const useRealPos = liveOrion?.source === "horizons" && liveOrion.x != null && liveOrion.y != null
+      // ── Trail line for Orion's flown path ─────────────────────────────
+      const trailGeo = new THREE.BufferGeometry()
+      const trailMat = new THREE.LineBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.7,
+      })
+      const trailLine = new THREE.Line(trailGeo, trailMat)
+      scene.add(trailLine)
+      trailRef.current = trailLine
+      trailPositionsRef.current = []
+    })
 
-        if (useRealPos) {
-          craftMesh.position.set(
-            liveOrion.x / KM_PER_UNIT,
-            liveOrion.y / KM_PER_UNIT,
-            liveOrion.z / KM_PER_UNIT,
-          )
+    return () => {
+      disposeGlobe(globeInst, mountRef as any)
+      orionRef.current = null
+      trailRef.current = null
+      trailPositionsRef.current = []
+    }
+  }, [])
 
-          // Append to flown path (cyan line) — sample every ~30 frames to keep it light
-          if (frame % 30 === 0 && sceneRef.current?.flownPts && sceneRef.current?.flownLine) {
-            const fp = sceneRef.current.flownPts as any[]
-            const last = fp[fp.length - 1]
-            if (!last || last.distanceTo(craftMesh.position) > 0.05) {
-              fp.push(craftMesh.position.clone())
-              if (fp.length > 4000) fp.shift()
-              sceneRef.current.flownLine.geometry.dispose()
-              sceneRef.current.flownLine.geometry = new THREE.BufferGeometry().setFromPoints(fp)
-            }
-          }
-        }
+  // ── Orion position update ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!orionRef.current || !threeRef.current) return
+    const THREE = threeRef.current
+    const GLOBE_R_UNITS = 100
+    const KM_PER_UNIT = EARTH_R_KM / GLOBE_R_UNITS  // 63.71
 
-        // Update trail
-        if (trailLine && frame % 3 === 0) {
-          trailPositions.push(craftMesh.position.clone())
-          if (trailPositions.length > 200) trailPositions.shift()
-          const arr = trailLine.geometry.attributes.position.array as Float32Array
-          for (let i = 0; i < trailPositions.length; i++) {
-            arr[i*3]   = trailPositions[i].x
-            arr[i*3+1] = trailPositions[i].y
-            arr[i*3+2] = trailPositions[i].z
-          }
-          trailLine.geometry.setDrawRange(0, trailPositions.length)
-          trailLine.geometry.attributes.position.needsUpdate = true
-        }
+    const liveOrion = orionData
+    const useRealPos = liveOrion?.source === "horizons" && liveOrion.x != null && liveOrion.y != null && liveOrion.z != null
+    if (!useRealPos) return
 
-        // Camera focus smoothing
-        const mode = cameraModeRef.current
-        let targetX = 0, targetY = 0, targetZ = 0
-        if (mode === "orion") {
-          targetX = craftMesh.position.x
-          targetY = craftMesh.position.y
-          targetZ = craftMesh.position.z
-        }
-        camFocus.x += (targetX - camFocus.x) * 0.06
-        camFocus.y += (targetY - camFocus.y) * 0.06
-        camFocus.z += (targetZ - camFocus.z) * 0.06
+    const x = (liveOrion!.x as number) / KM_PER_UNIT
+    const y = (liveOrion!.y as number) / KM_PER_UNIT
+    const z = (liveOrion!.z as number) / KM_PER_UNIT
 
-        camera.position.x = camFocus.x + spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta)
-        camera.position.y = camFocus.y + spherical.r * Math.cos(spherical.phi)
-        camera.position.z = camFocus.z + spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta)
-        camera.lookAt(camFocus.x, camFocus.y, camFocus.z)
+    orionRef.current.position.set(x, y, z)
 
-        renderer.render(scene, camera)
-      }
-      animate()
+    // Append to trail
+    const trail = trailPositionsRef.current
+    trail.push(new THREE.Vector3(x, y, z))
+    if (trail.length > 4000) trail.shift()
 
-      return () => {
-        cancelAnimationFrame(animId)
-        window.removeEventListener("resize", onResize)
-        window.removeEventListener("mousemove", onMove)
-        window.removeEventListener("mouseup", onUp)
-        renderer.dispose()
-        if (mountRef.current) {
-          try { mountRef.current.removeChild(renderer.domElement) } catch {}
-        }
-      }
+    if (trailRef.current && trail.length > 1) {
+      const geo = new THREE.BufferGeometry().setFromPoints(trail)
+      trailRef.current.geometry.dispose()
+      trailRef.current.geometry = geo
     }
 
-    let cleanup: (() => void) | undefined
-    init().then(fn => { cleanup = fn })
-    return () => { cleanup?.() }
+    // Camera follow mode
+    const mode = cameraModeRef.current
+    if (mode === "orion" && globeInst.current) {
+      const dist = Math.sqrt(x * x + y * y + z * z)
+      if (dist > 0.01) {
+        const lat = Math.asin(y / dist) * 180 / Math.PI
+        const lng = Math.atan2(z, -x) * 180 / Math.PI - 180
+        globeInst.current.pointOfView({ lat, lng, altitude: dist / 100 + 1 }, 1000)
+      }
+    }
+  }, [orionData])
+
+  // ── Resize handler ────────────────────────────────────────────────────────
+  useEffect(() => {
+    function onResize() {
+      if (globeInst.current && mountRef.current) {
+        globeInst.current
+          .width(mountRef.current.clientWidth)
+          .height(mountRef.current.clientHeight)
+      }
+    }
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
   }, [])
 
   // ── Formatting helpers ────────────────────────────────────────────────────
