@@ -134,6 +134,35 @@ export default function UC3Page() {
   // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
   const [nasaTvMuted, setNasaTvMuted] = useState(false)
+  // NASA TV draggable position (null = use default centered position)
+  const [nasaTvPos, setNasaTvPos] = useState<{ x: number; y: number } | null>(null)
+  const dragStateRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+
+  const onNasaTvDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect()
+    dragStateRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: rect.left,
+      origY: rect.top,
+    }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragStateRef.current) return
+      const dx = ev.clientX - dragStateRef.current.startX
+      const dy = ev.clientY - dragStateRef.current.startY
+      const newX = Math.max(0, Math.min(window.innerWidth - 440, dragStateRef.current.origX + dx))
+      const newY = Math.max(0, Math.min(window.innerHeight - 290, dragStateRef.current.origY + dy))
+      setNasaTvPos({ x: newX, y: newY })
+    }
+    const onUp = () => {
+      dragStateRef.current = null
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }, [])
 
   // Units toggle (km vs mi), persisted to localStorage
   const [units, setUnits] = useState<"km" | "mi">("km")
@@ -661,15 +690,25 @@ export default function UC3Page() {
       {/* ── NASA TV panel (floating middle-right, vertically centered) ───── */}
       {showNasaTv && (
         <div
-          className="fixed right-4 z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
-          style={{ width: 440, height: 290, top: "50%", transform: "translateY(-50%)", boxShadow: "0 0 60px rgba(0,200,255,0.25)" }}
+          className="fixed z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
+          style={
+            nasaTvPos
+              ? { width: 440, height: 290, left: nasaTvPos.x, top: nasaTvPos.y, boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
+              : { width: 440, height: 290, right: 16, top: "50%", transform: "translateY(-50%)", boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
+          }
         >
-          <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-red-900/60 to-cyan-900/60">
+          <div
+            onMouseDown={onNasaTvDragStart}
+            className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-red-900/60 to-cyan-900/60"
+            style={{ cursor: dragStateRef.current ? "grabbing" : "grab", userSelect: "none" }}
+            title="Drag to move"
+          >
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-xs font-bold text-white tracking-widest">NASA LIVE TV</span>
+              <span className="text-xs text-white/40">⠿</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" onMouseDown={e => e.stopPropagation()}>
               <button
                 onClick={() => setNasaTvMuted(m => !m)}
                 className="text-white/80 hover:text-white text-xs px-2 py-0.5 rounded border border-white/20"
