@@ -163,6 +163,45 @@
   color: #cbd5e1;
 }
 
+.wp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.2) !important;
+}
+
+.wp-form-error {
+  color: #fca5a5;
+  font-size: 12px;
+  text-align: center;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  margin-top: -2px;
+}
+
+.wp-chat-viewer-bar {
+  justify-content: center;
+  text-align: center;
+}
+
+.wp-viewer-text {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.wp-viewer-text a {
+  color: #c4b5fd;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.wp-viewer-text a:hover {
+  color: #ddd6fe;
+}
+
 /* -------- Chat widget toggle button -------- */
 .wp-toggle {
   position: fixed;

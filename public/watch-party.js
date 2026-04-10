@@ -115,41 +115,81 @@
       '<div class="wp-modal" role="dialog" aria-labelledby="wp-modal-title">' +
       '  <button class="wp-modal-close" aria-label="Close">&times;</button>' +
       '  <h2 class="wp-modal-title" id="wp-modal-title">🚀 Join the Artemis II Watch Party</h2>' +
-      '  <p class="wp-modal-subtitle">Chat with other space fans watching the mission live. Both fields are optional.</p>' +
+      '  <p class="wp-modal-subtitle">Chat with other space fans watching the mission live.</p>' +
       '  <form class="wp-modal-form" id="wp-modal-form">' +
-      '    <input type="text" class="wp-input" id="wp-name-input" placeholder="Your name (optional)" autocomplete="off" maxlength="40">' +
-      '    <input type="email" class="wp-input" id="wp-email-input" placeholder="Email (optional)" autocomplete="off" maxlength="80">' +
-      '    <button type="submit" class="wp-btn-primary">Join Watch Party</button>' +
-      '    <button type="button" class="wp-btn-secondary" id="wp-just-watch">Just watch</button>' +
+      '    <input type="text" class="wp-input" id="wp-name-input" placeholder="Nick name *" autocomplete="off" maxlength="40" required>' +
+      '    <input type="email" class="wp-input" id="wp-email-input" placeholder="Email *" autocomplete="off" maxlength="80" required>' +
+      '    <div class="wp-form-error" id="wp-form-error" style="display:none"></div>' +
+      '    <button type="submit" class="wp-btn-primary" id="wp-join-btn" disabled>Join Watch Party</button>' +
+      '    <button type="button" class="wp-btn-secondary" id="wp-just-watch">Just watch (read-only)</button>' +
       '  </form>' +
       "</div>";
 
     document.body.appendChild(overlay);
 
-    function closeModal(joined) {
-      var form = document.getElementById("wp-modal-form");
-      var name = form.querySelector("#wp-name-input").value.trim();
-      var email = form.querySelector("#wp-email-input").value.trim();
-      session.name = name || "Guest";
-      session.email = email || null;
-      session.joined = joined;
+    var nameInput = document.getElementById("wp-name-input");
+    var emailInput = document.getElementById("wp-email-input");
+    var joinBtn = document.getElementById("wp-join-btn");
+    var errorEl = document.getElementById("wp-form-error");
+
+    // Enable join button only when both fields are filled
+    function validateForm() {
+      var nameOk = nameInput.value.trim().length > 0;
+      var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+      joinBtn.disabled = !(nameOk && emailOk);
+      errorEl.style.display = "none";
+    }
+    nameInput.addEventListener("input", validateForm);
+    emailInput.addEventListener("input", validateForm);
+
+    function joinWithDetails() {
+      var name = nameInput.value.trim();
+      var email = emailInput.value.trim();
+      if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorEl.textContent = "Please enter a nick name and a valid email.";
+        errorEl.style.display = "block";
+        return;
+      }
+      session.name = name;
+      session.email = email;
+      session.joined = true;
+      session.canChat = true;
+      saveSession(session);
+      // Save user record to Firebase /watchparty/users
+      if (db) {
+        try {
+          db.ref("watchparty/users/" + session.id).set({
+            nickName: name,
+            email: email,
+            joinedAt: Date.now(),
+          });
+        } catch (e) {
+          console.warn("[WatchParty] Failed to save user:", e);
+        }
+      }
+      overlay.remove();
+      showChatWidget();
+      registerPresence();
+    }
+
+    function joinAsViewer() {
+      session.name = "Viewer";
+      session.email = null;
+      session.joined = true;
+      session.canChat = false;
       saveSession(session);
       overlay.remove();
-      if (joined) {
-        showChatWidget();
-        registerPresence();
-      }
+      showChatWidget();
+      registerPresence();
     }
 
     overlay.querySelector(".wp-modal-close").addEventListener("click", function () {
       overlay.remove();
     });
-    document.getElementById("wp-just-watch").addEventListener("click", function () {
-      closeModal(true);
-    });
+    document.getElementById("wp-just-watch").addEventListener("click", joinAsViewer);
     document.getElementById("wp-modal-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      closeModal(true);
+      joinWithDetails();
     });
   }
 
@@ -194,6 +234,16 @@
     var existing = document.getElementById("wp-chat");
     if (existing) existing.remove();
 
+    var canChat = session.canChat !== false; // default true for old sessions
+    var inputRow = canChat
+      ? '<form class="wp-chat-input-row" id="wp-input-form">' +
+        '  <input type="text" class="wp-chat-input" id="wp-input" placeholder="Type a message…" autocomplete="off" maxlength="500">' +
+        '  <button type="submit" class="wp-chat-send" id="wp-send">Send</button>' +
+        "</form>"
+      : '<div class="wp-chat-input-row wp-chat-viewer-bar">' +
+        '  <span class="wp-viewer-text">👀 Read-only · <a href="#" id="wp-upgrade">Join with nick name to chat</a></span>' +
+        "</div>";
+
     var chat = document.createElement("div");
     chat.id = "wp-chat";
     chat.className = "wp-chat";
@@ -214,10 +264,7 @@
       '<div class="wp-chat-messages" id="wp-messages">' +
       '  <div class="wp-chat-empty" id="wp-empty">No messages yet. Be the first to say hi!</div>' +
       "</div>" +
-      '<form class="wp-chat-input-row" id="wp-input-form">' +
-      '  <input type="text" class="wp-chat-input" id="wp-input" placeholder="Type a message…" autocomplete="off" maxlength="500">' +
-      '  <button type="submit" class="wp-chat-send" id="wp-send">Send</button>' +
-      "</form>";
+      inputRow;
 
     document.body.appendChild(chat);
 
@@ -227,14 +274,29 @@
       renderToggle();
     });
 
-    document.getElementById("wp-input-form").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var input = document.getElementById("wp-input");
-      var text = input.value.trim();
-      if (!text) return;
-      sendMessage(text);
-      input.value = "";
-    });
+    if (canChat) {
+      document.getElementById("wp-input-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var input = document.getElementById("wp-input");
+        var text = input.value.trim();
+        if (!text) return;
+        sendMessage(text);
+        input.value = "";
+      });
+    } else {
+      var upgradeLink = document.getElementById("wp-upgrade");
+      if (upgradeLink) {
+        upgradeLink.addEventListener("click", function (e) {
+          e.preventDefault();
+          // Reset to allow joining as a chatter
+          session.joined = false;
+          session.canChat = false;
+          saveSession(session);
+          chat.remove();
+          showJoinModal();
+        });
+      }
+    }
 
     // Render any messages we already have
     renderAllMessages();
@@ -334,9 +396,11 @@
   // ── Send a message ─────────────────────────────────────────────────
   function sendMessage(text) {
     if (!messagesRef) return;
+    if (session.canChat === false) return; // viewers can't post
     var msg = {
       sessionId: session.id,
       name: session.name || "Guest",
+      email: session.email || null,
       text: text.slice(0, 500),
       timestamp: Date.now(),
     };
