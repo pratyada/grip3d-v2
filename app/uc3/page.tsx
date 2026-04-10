@@ -373,39 +373,39 @@ export default function UC3Page() {
       scene.add(orionGroup)
       orionRef.current = orionGroup
 
-      // ── KSC launch marker ─────────────────────────────────────────────
-      const KSC_LAT = 28.5
-      const KSC_LNG = -80.6
-      const kphi = (90 - KSC_LAT) * Math.PI / 180
-      const ktheta = (KSC_LNG + 180) * Math.PI / 180
-      const kscPos = new THREE.Vector3(
-        -GLOBE_R * Math.sin(kphi) * Math.cos(ktheta),
-         GLOBE_R * Math.cos(kphi),
-         GLOBE_R * Math.sin(kphi) * Math.sin(ktheta),
-      )
-      const kscMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(1.2, 16, 16),
-        new THREE.MeshBasicMaterial({ color: 0xff8800 }),
-      )
-      kscMesh.position.copy(kscPos)
-      scene.add(kscMesh)
-
-      // ── Splashdown marker ─────────────────────────────────────────────
-      const SPLASH_LAT = 32.7
-      const SPLASH_LNG = -117.2
-      const sphi = (90 - SPLASH_LAT) * Math.PI / 180
-      const stheta = (SPLASH_LNG + 180) * Math.PI / 180
-      const splashPos = new THREE.Vector3(
-        -GLOBE_R * Math.sin(sphi) * Math.cos(stheta),
-         GLOBE_R * Math.cos(sphi),
-         GLOBE_R * Math.sin(sphi) * Math.sin(stheta),
-      )
-      const splashMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(1.2, 16, 16),
-        new THREE.MeshBasicMaterial({ color: 0x00ff88 }),
-      )
-      splashMesh.position.copy(splashPos)
-      scene.add(splashMesh)
+      // ── KSC launch marker (use globe.gl getCoords for correct positioning) ──
+      // Use globe.gl's labelsData to render markers via its built-in API
+      // — guarantees correct lat/lng → scene XYZ conversion
+      globe
+        .htmlElementsData([
+          { lat: 28.5, lng: -80.6, label: "KSC", color: "#ff8800", desc: "Kennedy Space Center · Launch Site" },
+          { lat: 32.7, lng: -117.2, label: "SPLASH", color: "#00ff88", desc: "Splashdown · Pacific Ocean off San Diego" },
+        ])
+        .htmlElement((d: any) => {
+          const el = document.createElement("div")
+          el.style.cssText = `
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
+          `
+          el.innerHTML = `
+            <div style="
+              width: 18px; height: 18px; border-radius: 50%;
+              background: ${d.color};
+              box-shadow: 0 0 12px ${d.color}, 0 0 24px ${d.color}aa, 0 0 6px #fff inset;
+              border: 2px solid #fff;
+              animation: pulse 2s ease-in-out infinite;
+            "></div>
+            <div style="
+              padding: 2px 8px; border-radius: 6px; font-family: ui-monospace, monospace;
+              font-size: 10px; font-weight: 700; color: #fff;
+              background: rgba(0,0,0,0.85); border: 1px solid ${d.color}88;
+              white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            ">${d.label}</div>
+          `
+          el.title = d.desc
+          return el
+        })
+        .htmlAltitude(0.01)
 
       // ── Trail line for Orion's flown path ─────────────────────────────
       const trailGeo = new THREE.BufferGeometry()
@@ -647,10 +647,14 @@ export default function UC3Page() {
         <span className="text-xs tracking-widest">📺 NASA LIVE TV</span>
       </button>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes nasaPulse {
           0%, 100% { box-shadow: 0 0 18px rgba(255,40,40,0.55), 0 0 34px rgba(255,40,40,0.3); }
           50%      { box-shadow: 0 0 28px rgba(255,80,80,0.85), 0 0 52px rgba(255,40,40,0.55); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50%      { transform: scale(1.15); opacity: 0.85; }
         }
       `}</style>
 
