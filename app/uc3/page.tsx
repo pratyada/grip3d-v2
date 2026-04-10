@@ -159,7 +159,7 @@ export default function UC3Page() {
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
   const [dataSource,  setDataSource]  = useState("interpolated")
-  const [activePanel, setActivePanel] = useState<string | null>(null)
+  const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["recovery", "systems", "camera"]))
 
   // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
@@ -211,7 +211,12 @@ export default function UC3Page() {
     })
   }, [])
 
-  const togglePanel = (id: string) => setActivePanel(p => p === id ? null : id)
+  const togglePanel = (id: string) => setActivePanels(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
 
   // ── Fetch Orion real-time position ────────────────────────────────────────
   useEffect(() => {
@@ -563,10 +568,10 @@ export default function UC3Page() {
       className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all select-none"
       style={{
         width: 44, height: 44,
-        background:  activePanel === id ? `${activeColor}30` : "rgba(0,5,20,0.85)",
-        border:      activePanel === id ? `1.5px solid ${activeColor}` : "1px solid rgba(255,255,255,0.14)",
+        background:  activePanels.has(id) ? `${activeColor}30` : "rgba(0,5,20,0.85)",
+        border:      activePanels.has(id) ? `1.5px solid ${activeColor}` : "1px solid rgba(255,255,255,0.14)",
         backdropFilter: "blur(10px)",
-        boxShadow: activePanel === id ? `0 0 10px ${activeColor}40` : "none",
+        boxShadow: activePanels.has(id) ? `0 0 10px ${activeColor}40` : "none",
       }}
     >
       <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
@@ -821,12 +826,12 @@ export default function UC3Page() {
       {/* ── PANELS ────────────────────────────────────────────────────────── */}
 
       {/* Mission Phase panel */}
-      {activePanel === "phase" && (
+      {activePanels.has("phase") && (
         <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
           style={{ top: launched ? 72 : 56, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,140,0,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-orange-400 font-semibold tracking-widest">MISSION PHASE</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("phase")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="text-sm font-bold text-white mb-1">{currentEvent.title}</div>
           <div className="text-xs text-gray-400 leading-snug mb-2">{currentEvent.description}</div>
@@ -842,12 +847,12 @@ export default function UC3Page() {
       )}
 
       {/* Telemetry panel */}
-      {activePanel === "telemetry" && (
+      {activePanels.has("telemetry") && (
         <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
           style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(50,150,255,0.35)", backdropFilter: "blur(14px)", maxHeight: "70vh", overflowY: "auto" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-blue-400 font-semibold tracking-widest">ORION TELEMETRY</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("telemetry")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="grid grid-cols-2 gap-1.5 text-xs">
             {[
@@ -876,12 +881,12 @@ export default function UC3Page() {
       )}
 
       {/* Crew panel */}
-      {activePanel === "crew" && (
+      {activePanels.has("crew") && (
         <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
           style={{ top: launched ? 164 : 148, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(100,200,100,0.3)", backdropFilter: "blur(14px)", maxHeight: "70vh", overflowY: "auto" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-green-400 font-semibold tracking-widest">CREW — 4 ASTRONAUTS</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("crew")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="space-y-1.5">
             {CREW.map(c => (
@@ -912,12 +917,12 @@ export default function UC3Page() {
       )}
 
       {/* Systems panel */}
-      {activePanel === "systems" && (
+      {activePanels.has("systems") && (
         <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
           style={{ top: launched ? 210 : 194, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(20,184,166,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-teal-400 font-semibold tracking-widest">SYSTEMS STATUS</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("systems")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="space-y-1.5">
             {SYSTEMS.map(s => (
@@ -935,12 +940,12 @@ export default function UC3Page() {
       )}
 
       {/* Records panel */}
-      {activePanel === "records" && (
+      {activePanels.has("records") && (
         <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
           style={{ top: launched ? 256 : 240, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(251,191,36,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-yellow-300 font-semibold tracking-widest">HISTORIC RECORDS</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("records")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <ul className="space-y-1.5">
             {RECORDS.map((r, i) => (
@@ -955,7 +960,7 @@ export default function UC3Page() {
 
       {/* Mission Events timeline panel */}
       {/* Recovery & Splashdown Sequence panel */}
-      {activePanel === "recovery" && (
+      {activePanels.has("recovery") && (
         <div className="absolute right-14 z-10 w-80 rounded-xl overflow-hidden"
           style={{ top: launched ? 120 : 104, maxHeight: "78vh", background: "rgba(0,5,20,0.94)", border: "1px solid rgba(34,197,94,0.4)", backdropFilter: "blur(14px)" }}>
           <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -963,7 +968,7 @@ export default function UC3Page() {
               <div className="text-xs text-green-400 font-semibold tracking-widest">RECOVERY SEQUENCE</div>
               <div className="text-[10px] text-gray-500 mt-0.5">Final 30 min · Splashdown to Crew Out</div>
             </div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("recovery")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: "calc(78vh - 56px)" }}>
             {(() => {
@@ -1035,12 +1040,12 @@ export default function UC3Page() {
         </div>
       )}
 
-      {activePanel === "events" && (
+      {activePanels.has("events") && (
         <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
           style={{ top: launched ? 120 : 104, maxHeight: "70vh", background: "rgba(0,5,20,0.94)", border: "1px solid rgba(180,100,255,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="text-xs text-purple-400 font-semibold tracking-widest">MISSION EVENTS</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("events")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: "calc(70vh - 46px)" }}>
             {MISSION_EVENTS.map((e, i) => {
@@ -1072,12 +1077,12 @@ export default function UC3Page() {
       )}
 
       {/* Mission Facts panel */}
-      {activePanel === "facts" && (
+      {activePanels.has("facts") && (
         <div className="absolute right-14 z-10 w-60 rounded-xl p-3"
           style={{ top: launched ? 166 : 150, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,200,50,0.3)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-yellow-400 font-semibold tracking-widest">MISSION FACTS</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("facts")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="space-y-1.5 text-xs">
             {[
@@ -1103,12 +1108,12 @@ export default function UC3Page() {
       )}
 
       {/* NASA News drawer */}
-      {activePanel === "news" && (
+      {activePanels.has("news") && (
         <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
           style={{ top: launched ? 212 : 196, maxHeight: "calc(100vh - 260px)", background: "rgba(0,5,25,0.96)", border: "1px solid rgba(100,150,255,0.25)", backdropFilter: "blur(14px)" }}>
           <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="text-xs font-bold text-blue-300 tracking-wide">NASA ARTEMIS II — LATEST</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("news")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="overflow-y-auto p-3 space-y-3" style={{ maxHeight: "calc(100vh - 320px)" }}>
             {news.length === 0 && (
@@ -1135,12 +1140,12 @@ export default function UC3Page() {
       )}
 
       {/* Camera panel */}
-      {activePanel === "camera" && (
+      {activePanels.has("camera") && (
         <div className="absolute right-14 z-10 w-56 rounded-xl p-3"
           style={{ top: launched ? 258 : 242, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(6,182,212,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-cyan-400 font-semibold tracking-widest">CAMERA</div>
-            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+            <button onClick={() => togglePanel("camera")} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
           <div className="space-y-1.5">
             {[
