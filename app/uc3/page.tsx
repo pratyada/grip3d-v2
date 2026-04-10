@@ -287,6 +287,21 @@ export default function UC3Page() {
     return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`
   }, [nextMilestone, missionT])
 
+  // Splashdown countdown — broken into parts for big visual display
+  const splashdownParts = useMemo(() => {
+    const splashEvent = MISSION_EVENTS.find(e => e.id === "splashdown")!
+    const dtH = splashEvent.metHours - missionT
+    if (dtH <= 0) return { d: "00", h: "00", m: "00", s: "00", complete: true }
+    const totalSec = Math.floor(dtH * 3600)
+    return {
+      d: String(Math.floor(totalSec / 86400)).padStart(2, "0"),
+      h: String(Math.floor((totalSec % 86400) / 3600)).padStart(2, "0"),
+      m: String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0"),
+      s: String(totalSec % 60).padStart(2, "0"),
+      complete: false,
+    }
+  }, [missionT])
+
   // ── Globe.gl scene ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mountRef.current || globeInst.current) return
@@ -554,6 +569,58 @@ export default function UC3Page() {
             color: dataSource === "horizons" ? "#86efac" : "#fde68a",
           }}>
           {dataSource === "horizons" ? "✓ JPL Horizons — Live" : "~ MET interpolation"}
+        </div>
+      )}
+
+      {/* ── BIG SPLASHDOWN COUNTDOWN (top-center hero) ─────────────────────── */}
+      {launched && !splashdownParts.complete && (
+        <div className="absolute z-20 pointer-events-none" style={{ top: 60, left: "50%", transform: "translateX(-50%)" }}>
+          <div className="flex flex-col items-center" style={{
+            background: "linear-gradient(180deg, rgba(0,0,15,0.85) 0%, rgba(0,0,30,0.6) 100%)",
+            border: "1px solid rgba(0,200,255,0.35)",
+            borderRadius: 16,
+            padding: "12px 24px",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 0 40px rgba(0,200,255,0.18), 0 0 80px rgba(0,200,255,0.08)",
+          }}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold tracking-[0.25em]" style={{
+                color: "#67e8f9",
+                textShadow: "0 0 12px rgba(0,200,255,0.6)",
+              }}>
+                🌊 SPLASHDOWN IN
+              </span>
+            </div>
+            <div className="flex items-end gap-2 sm:gap-3 font-mono">
+              {[
+                { v: splashdownParts.d, l: "DAYS" },
+                { v: splashdownParts.h, l: "HRS" },
+                { v: splashdownParts.m, l: "MIN" },
+                { v: splashdownParts.s, l: "SEC" },
+              ].map((seg, i) => (
+                <div key={seg.l} className="flex items-end gap-2 sm:gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className="tabular-nums leading-none" style={{
+                      fontSize: "clamp(36px, 6vw, 64px)",
+                      fontWeight: 900,
+                      color: "#fff",
+                      textShadow: "0 0 16px rgba(0,200,255,0.85), 0 0 32px rgba(0,200,255,0.45)",
+                      letterSpacing: "-0.02em",
+                    }}>{seg.v}</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] mt-1" style={{ color: "#94a3b8" }}>
+                      {seg.l}
+                    </span>
+                  </div>
+                  {i < 3 && (
+                    <span className="text-cyan-400/40 leading-none pb-3 sm:pb-4" style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 200 }}>:</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] mt-1 tracking-wide" style={{ color: "#64748b" }}>
+              Pacific Ocean · 11 Apr 2026 · 01:07 UTC
+            </div>
+          </div>
         </div>
       )}
 
