@@ -159,7 +159,7 @@ export default function UC3Page() {
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
   const [dataSource,  setDataSource]  = useState("interpolated")
-  const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["recovery", "systems"]))
+  const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["systems"]))
 
   // Detect white-label host (artemis.yprateek.com) — adds a link back to personal site
   const [isWhiteLabelHost, setIsWhiteLabelHost] = useState(false)

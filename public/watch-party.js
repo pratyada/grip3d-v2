@@ -160,7 +160,9 @@
 
   function showChatWidget() {
     if (document.getElementById("wp-toggle") || document.getElementById("wp-chat")) return;
-    renderToggle();
+    // Open expanded by default — users see the chat panel right away
+    chatExpanded = true;
+    renderChat();
     listenToMessages();
   }
 
