@@ -87,13 +87,24 @@ export default async function RootLayout({
   const hdrs = await headers()
   const host = (hdrs.get("host") ?? "").toLowerCase()
   const isEmbedMode = EMBED_HOSTS.has(host)
+  const enableWatchParty = host === "artemis.yprateek.com"
 
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
+      <head>
+        {enableWatchParty && <link rel="stylesheet" href="/watch-party.css" />}
+      </head>
       <body className="min-h-full flex flex-col" style={{ background: "var(--bg)", color: "var(--text)" }}>
         {!isEmbedMode && <Navbar />}
         <main className="flex-1">{children}</main>
         {!isEmbedMode && <Footer />}
+        {enableWatchParty && (
+          <>
+            <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" async />
+            <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js" async />
+            <script src="/watch-party.js" defer />
+          </>
+        )}
       </body>
     </html>
   )
