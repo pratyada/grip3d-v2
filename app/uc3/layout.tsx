@@ -7,6 +7,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
   // White-label branding for artemis.yprateek.com — no GRIP 3D anywhere
   if (host === "artemis.yprateek.com") {
+    // Use a build-time timestamp so og:updated_time changes on every deploy,
+    // hinting to crawlers (Teams/Slack/etc.) that the preview should be re-fetched
+    const updatedAt = new Date().toISOString()
     return {
       metadataBase: new URL("https://artemis.yprateek.com"),
       title: "Artemis II Live Tracker",
@@ -19,16 +22,27 @@ export async function generateMetadata(): Promise<Metadata> {
         url: "https://artemis.yprateek.com",
         siteName: "Artemis II Live Tracker",
         type: "website",
-        images: [{ url: "/img/favicon-artemis.svg", width: 64, height: 64 }],
+        images: [
+          {
+            url: "/img/og-artemis.svg",
+            width: 1200,
+            height: 630,
+            alt: "Artemis II Live Tracker — NASA Orion mission",
+          },
+        ],
       },
       twitter: {
         card: "summary_large_image",
         title: "Artemis II Live Tracker",
         description:
           "Real-time NASA Artemis II mission tracker — splashdown countdown, NASA Live TV, recovery sequence, and 3D Orion trajectory.",
+        images: ["/img/og-artemis.svg"],
       },
       icons: {
         icon: [{ url: "/img/favicon-artemis.svg", type: "image/svg+xml" }],
+      },
+      other: {
+        "og:updated_time": updatedAt,
       },
     }
   }

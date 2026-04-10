@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#0a0a2e"/>
+      <stop offset="100%" stop-color="#000005"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <radialGradient id="earth" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="60%" stop-color="#1e40af"/>
+      <stop offset="100%" stop-color="#0c1e40"/>
+    </radialGradient>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Space background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Stars -->
+  <g fill="#fff">
+    <circle cx="100" cy="80" r="1.5" opacity="0.9"/>
+    <circle cx="200" cy="150" r="1" opacity="0.7"/>
+    <circle cx="350" cy="60" r="2" opacity="1"/>
+    <circle cx="500" cy="120" r="1.2" opacity="0.8"/>
+    <circle cx="700" cy="40" r="1.5" opacity="0.9"/>
+    <circle cx="850" cy="180" r="1" opacity="0.7"/>
+    <circle cx="1000" cy="80" r="2" opacity="1"/>
+    <circle cx="1100" cy="200" r="1.3" opacity="0.8"/>
+    <circle cx="80" cy="300" r="1" opacity="0.6"/>
+    <circle cx="150" cy="450" r="1.5" opacity="0.9"/>
+    <circle cx="400" cy="500" r="1" opacity="0.7"/>
+    <circle cx="900" cy="450" r="1.3" opacity="0.85"/>
+    <circle cx="1050" cy="380" r="1" opacity="0.6"/>
+    <circle cx="1150" cy="500" r="1.5" opacity="0.9"/>
+    <circle cx="50" cy="550" r="1" opacity="0.7"/>
+    <circle cx="600" cy="80" r="1.5" opacity="0.95"/>
+    <circle cx="780" cy="320" r="1" opacity="0.7"/>
+  </g>
+
+  <!-- Earth (left side) -->
+  <circle cx="220" cy="430" r="180" fill="url(#glow)" opacity="0.5"/>
+  <circle cx="220" cy="430" r="140" fill="url(#earth)"/>
+  <!-- Earth continents (simplified) -->
+  <g fill="#22c55e" opacity="0.65">
+    <ellipse cx="190" cy="395" rx="35" ry="22"/>
+    <ellipse cx="245" cy="430" rx="28" ry="18"/>
+    <ellipse cx="200" cy="465" rx="40" ry="20"/>
+    <ellipse cx="280" cy="470" rx="22" ry="14"/>
+  </g>
+  <!-- Earth highlight -->
+  <ellipse cx="180" cy="380" rx="40" ry="30" fill="#fff" opacity="0.15"/>
+
+  <!-- Trajectory arc from Earth to Orion -->
+  <path d="M 340 350 Q 600 100 870 280" stroke="#22d3ee" stroke-width="3" fill="none" stroke-dasharray="8,6" opacity="0.6"/>
+
+  <!-- Orion rocket (right side, middle area) -->
+  <g transform="translate(870 280) rotate(-15)">
+    <!-- glow -->
+    <circle cx="0" cy="0" r="60" fill="url(#glow)" opacity="0.6"/>
+    <!-- body -->
+    <path d="M -22 -55 L -32 30 L -32 70 L 32 70 L 32 30 L 22 -55 Z" fill="#e5e7eb" stroke="#94a3b8" stroke-width="1.5"/>
+    <!-- nose -->
+    <path d="M -22 -55 L 0 -90 L 22 -55 Z" fill="#f8fafc"/>
+    <!-- window -->
+    <circle cx="0" cy="-15" r="10" fill="#22d3ee" stroke="#0e7490" stroke-width="1.5"/>
+    <circle cx="-3" cy="-18" r="3" fill="#fff" opacity="0.85"/>
+    <!-- stripes -->
+    <rect x="-32" y="20" width="64" height="6" fill="#dc2626"/>
+    <rect x="-32" y="40" width="64" height="3" fill="#0ea5e9"/>
+    <!-- left fin -->
+    <path d="M -32 50 L -55 95 L -32 70 Z" fill="#dc2626"/>
+    <!-- right fin -->
+    <path d="M 32 50 L 55 95 L 32 70 Z" fill="#dc2626"/>
+    <!-- center fin -->
+    <path d="M 0 70 L -8 95 L 8 95 Z" fill="#94a3b8"/>
+    <!-- flame -->
+    <path d="M -20 70 Q 0 130 20 70 Q 14 100 0 80 Q -14 100 -20 70 Z" fill="url(#flame)"/>
+    <path d="M -10 75 Q 0 110 10 75 Q 6 92 0 82 Q -6 92 -10 75 Z" fill="#fef3c7" opacity="0.85"/>
+  </g>
+
+  <!-- LIVE badge top right -->
+  <g transform="translate(1080 60)">
+    <rect x="-50" y="-18" width="100" height="36" rx="18" fill="#dc2626"/>
+    <circle cx="-30" cy="0" r="5" fill="#fff"/>
+    <circle cx="-30" cy="0" r="8" fill="#fff" opacity="0.4"/>
+    <text x="-15" y="6" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="900" fill="#fff" letter-spacing="2">LIVE</text>
+  </g>
+
+  <!-- Mission tag top left -->
+  <text x="60" y="80" font-family="-apple-system, system-ui, sans-serif" font-size="14" font-weight="700" fill="#a5b4fc" letter-spacing="4">NASA · ORION MPCV · LUNAR FLYBY</text>
+
+  <!-- Title -->
+  <text x="60" y="180" font-family="-apple-system, system-ui, sans-serif" font-size="84" font-weight="900" fill="url(#title)" letter-spacing="-2">ARTEMIS II</text>
+
+  <!-- Subtitle -->
+  <text x="60" y="240" font-family="-apple-system, system-ui, sans-serif" font-size="36" font-weight="700" fill="#f1f5f9" letter-spacing="-1">Live Tracker</text>
+
+  <!-- Description -->
+  <text x="60" y="290" font-family="-apple-system, system-ui, sans-serif" font-size="20" fill="#94a3b8">Real-time Orion trajectory · Splashdown countdown</text>
+  <text x="60" y="318" font-family="-apple-system, system-ui, sans-serif" font-size="20" fill="#94a3b8">NASA Live TV · Recovery sequence · Watch party</text>
+
+  <!-- Bottom URL bar -->
+  <g transform="translate(60 580)">
+    <rect x="0" y="-22" width="320" height="40" rx="20" fill="rgba(168,85,247,0.15)" stroke="rgba(168,85,247,0.4)" stroke-width="1"/>
+    <text x="20" y="4" font-family="ui-monospace, Menlo, monospace" font-size="16" font-weight="700" fill="#c4b5fd">🚀 artemis.yprateek.com</text>
+  </g>
+</svg>
