@@ -131,9 +131,9 @@ export default function UC3Page() {
   const [dataSource,  setDataSource]  = useState("interpolated")
   const [activePanel, setActivePanel] = useState<string | null>(null)
 
-  // NASA TV panel state — open by default
+  // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
-  const [nasaTvMuted, setNasaTvMuted] = useState(true)
+  const [nasaTvMuted, setNasaTvMuted] = useState(false)
 
   // Units toggle (km vs mi), persisted to localStorage
   const [units, setUnits] = useState<"km" | "mi">("km")
@@ -809,11 +809,11 @@ export default function UC3Page() {
         }
       `}</style>
 
-      {/* ── NASA TV panel (floating bottom-right) ─────────────────────────── */}
+      {/* ── NASA TV panel (floating middle-right, vertically centered) ───── */}
       {showNasaTv && (
         <div
-          className="fixed bottom-4 right-4 z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
-          style={{ width: 400, height: 280 }}
+          className="fixed right-4 z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
+          style={{ width: 440, height: 290, top: "50%", transform: "translateY(-50%)", boxShadow: "0 0 60px rgba(0,200,255,0.25)" }}
         >
           <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-red-900/60 to-cyan-900/60">
             <div className="flex items-center gap-2">
@@ -834,8 +834,8 @@ export default function UC3Page() {
           <iframe
             key={nasaTvMuted ? "muted" : "unmuted"}
             src={`https://www.youtube.com/embed/m3kR2KK8TEs?si=i8sUw9uyCmeQZNRQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}`}
-            width="400"
-            height="248"
+            width="440"
+            height="258"
             frameBorder={0}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerPolicy="strict-origin-when-cross-origin"
