@@ -81,6 +81,36 @@ const MISSION_EVENTS: MissionEvent[] = [
   { id: "splashdown", metHours: 217.5,   utc: "2026-04-11T01:07:00Z", title: "🎉 Splashdown",         type: "milestone", description: "Pacific Ocean off San Diego — Welcome home!" },
 ]
 
+// Recovery & re-entry sequence (final ~30 minutes before & 2 hours after splashdown)
+interface RecoveryStep {
+  id: string
+  metHoursOffset: number  // offset from splashdown (negative = before)
+  altitudeFt: number      // approximate altitude in feet (0 = water level)
+  speedMph: number        // approximate speed
+  title: string
+  emoji: string
+  desc: string
+  phase: "entry" | "descent" | "splash" | "recovery"
+}
+
+const RECOVERY_STEPS: RecoveryStep[] = [
+  { id: "sm-sep",      metHoursOffset: -0.50, altitudeFt: 5000000, speedMph: 24500, title: "Service Module Separation", emoji: "🛰️",  desc: "Crew Module separates from European Service Module", phase: "entry" },
+  { id: "ei",          metHoursOffset: -0.32, altitudeFt: 400000,  speedMph: 24500, title: "Entry Interface (EI)",      emoji: "🔥",  desc: "Capsule enters atmosphere at 122 km altitude, heatshield forward", phase: "entry" },
+  { id: "peak-heat",   metHoursOffset: -0.30, altitudeFt: 280000,  speedMph: 24000, title: "Peak Heating",              emoji: "🌡️",  desc: "Heatshield reaches ~2,760°C — half the temperature of the Sun", phase: "entry" },
+  { id: "skip",        metHoursOffset: -0.28, altitudeFt: 260000,  speedMph: 21000, title: "Skip Entry Maneuver",       emoji: "↗️",  desc: "Capsule skips off the atmosphere, then re-enters — lowers G-load on crew", phase: "entry" },
+  { id: "blackout",    metHoursOffset: -0.25, altitudeFt: 200000,  speedMph: 18000, title: "Communications Blackout",   emoji: "📡",  desc: "Plasma sheath blocks radio signals for ~3-4 minutes", phase: "entry" },
+  { id: "second-entry",metHoursOffset: -0.20, altitudeFt: 130000,  speedMph: 12000, title: "Second Entry",              emoji: "🔥",  desc: "Capsule re-enters denser atmosphere after the skip", phase: "entry" },
+  { id: "drogue",      metHoursOffset: -0.07, altitudeFt: 25000,   speedMph: 290,   title: "Drogue Chutes Deploy",      emoji: "🪂",  desc: "Two drogue parachutes stabilize and slow the capsule", phase: "descent" },
+  { id: "main-chute",  metHoursOffset: -0.04, altitudeFt: 9500,    speedMph: 100,   title: "Main Parachutes Deploy",    emoji: "🪂",  desc: "Three large main parachutes (116 ft diameter each) fully open", phase: "descent" },
+  { id: "splashdown",  metHoursOffset:  0,    altitudeFt: 0,       speedMph: 17,    title: "🎉 SPLASHDOWN",             emoji: "🌊",  desc: "Capsule touches down in the Pacific at ~17 mph (~7.6 m/s)", phase: "splash" },
+  { id: "stabilize",   metHoursOffset:  0.05, altitudeFt: 0,       speedMph: 0,     title: "Capsule Stabilization",     emoji: "⚖️",  desc: "Crew Module Uprighting System (CMUS) airbags inflate to keep capsule upright", phase: "recovery" },
+  { id: "comms",       metHoursOffset: 0.10,  altitudeFt: 0,       speedMph: 0,     title: "Crew Comms Restored",       emoji: "📞",  desc: "First voice contact with crew after splashdown — 'Crew is GO'", phase: "recovery" },
+  { id: "divers",      metHoursOffset: 0.30,  altitudeFt: 0,       speedMph: 0,     title: "Recovery Divers Deployed",  emoji: "🤿",  desc: "Navy divers from USS San Diego attach the collar and tow lines", phase: "recovery" },
+  { id: "tow",         metHoursOffset: 0.75,  altitudeFt: 0,       speedMph: 0,     title: "Capsule Tow to Ship",       emoji: "🚢",  desc: "Capsule winched into the well deck of USS San Diego (LPD-22)", phase: "recovery" },
+  { id: "extraction",  metHoursOffset: 1.50,  altitudeFt: 0,       speedMph: 0,     title: "Crew Extraction",           emoji: "👨‍🚀", desc: "Hatch opens — Wiseman, Glover, Koch, and Hansen step out", phase: "recovery" },
+  { id: "medical",     metHoursOffset: 2.00,  altitudeFt: 0,       speedMph: 0,     title: "Medical Evaluation",        emoji: "🏥",  desc: "Initial medical checks aboard USS San Diego", phase: "recovery" },
+]
+
 // System status list
 const SYSTEMS: { id: string; label: string; status: "nominal" | "caution" | "alert" }[] = [
   { id: "comms",   label: "Communications",              status: "nominal" },
@@ -133,7 +163,8 @@ export default function UC3Page() {
 
   // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
-  const [nasaTvMuted, setNasaTvMuted] = useState(false)
+  // Must start muted for browsers to allow autoplay (then user can unmute)
+  const [nasaTvMuted, setNasaTvMuted] = useState(true)
   // NASA TV draggable position (null = use default centered position)
   const [nasaTvPos, setNasaTvPos] = useState<{ x: number; y: number } | null>(null)
   const dragStateRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
@@ -727,7 +758,7 @@ export default function UC3Page() {
           </div>
           <iframe
             key={nasaTvMuted ? "muted" : "unmuted"}
-            src={`https://www.youtube.com/embed/m3kR2KK8TEs?si=i8sUw9uyCmeQZNRQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}`}
+            src={`https://www.youtube.com/embed/m3kR2KK8TEs?si=i8sUw9uyCmeQZNRQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}&playsinline=1&rel=0`}
             width="440"
             height="258"
             frameBorder={0}
@@ -750,7 +781,8 @@ export default function UC3Page() {
 
       {/* ── RIGHT icon toolbar ────────────────────────────────────────────── */}
       <div className="absolute right-3 z-20 flex flex-col gap-2" style={{ top: launched ? 120 : 104 }}>
-        {iconBtn("events",   "📅", "Mission Events",  "#a855f7")}
+        {iconBtn("events",   "📅", "Mission Events",   "#a855f7")}
+        {iconBtn("recovery", "🪂", "Recovery Sequence","#22c55e")}
         {iconBtn("facts",    "ℹ️",  "Mission Facts",    "#eab308")}
         {iconBtn("news",     "📰", "NASA News",        "#60a5fa")}
         {iconBtn("camera",   "🎥", "Camera",           "#06b6d4")}
@@ -922,6 +954,87 @@ export default function UC3Page() {
       )}
 
       {/* Mission Events timeline panel */}
+      {/* Recovery & Splashdown Sequence panel */}
+      {activePanel === "recovery" && (
+        <div className="absolute right-14 z-10 w-80 rounded-xl overflow-hidden"
+          style={{ top: launched ? 120 : 104, maxHeight: "78vh", background: "rgba(0,5,20,0.94)", border: "1px solid rgba(34,197,94,0.4)", backdropFilter: "blur(14px)" }}>
+          <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div>
+              <div className="text-xs text-green-400 font-semibold tracking-widest">RECOVERY SEQUENCE</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">Final 30 min · Splashdown to Crew Out</div>
+            </div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: "calc(78vh - 56px)" }}>
+            {(() => {
+              const splashdownEvent = MISSION_EVENTS.find(e => e.id === "splashdown")!
+              const splashdownMet = splashdownEvent.metHours
+              return RECOVERY_STEPS.map((step) => {
+                const stepMet = splashdownMet + step.metHoursOffset
+                const isPast = missionT >= stepMet
+                const isCurrent = !isPast && Math.abs(missionT - stepMet) < 0.05
+                const phaseColor = step.phase === "entry" ? "#ef4444" : step.phase === "descent" ? "#f97316" : step.phase === "splash" ? "#06b6d4" : "#22c55e"
+                const dtH = stepMet - missionT
+                let etaLabel: string
+                if (isPast) etaLabel = "✓ Complete"
+                else if (Math.abs(dtH) < 1) {
+                  const totalSec = Math.floor(Math.abs(dtH) * 3600)
+                  const m = Math.floor(totalSec / 60)
+                  const s = totalSec % 60
+                  etaLabel = `T-${m}m ${String(s).padStart(2, "0")}s`
+                } else etaLabel = `T-${Math.floor(dtH)}h ${Math.floor((dtH % 1) * 60)}m`
+                return (
+                  <div key={step.id} className="rounded-lg p-2"
+                    style={{
+                      background: isCurrent ? `${phaseColor}25` : isPast ? "rgba(255,255,255,0.02)" : "transparent",
+                      border: isCurrent ? `1px solid ${phaseColor}80` : `1px solid ${phaseColor}15`,
+                    }}>
+                    <div className="flex items-start gap-2">
+                      <div className="text-xl flex-shrink-0">{step.emoji}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="text-xs font-bold leading-tight" style={{ color: isPast ? "#fff" : isCurrent ? phaseColor : "#94a3b8" }}>
+                            {step.title}
+                          </div>
+                          <div className="text-[10px] font-mono tabular-nums" style={{ color: isCurrent ? phaseColor : "#64748b" }}>
+                            {etaLabel}
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-gray-400 leading-snug mt-1">{step.desc}</div>
+                        {(step.altitudeFt > 0 || step.speedMph > 0) && (
+                          <div className="flex gap-3 mt-1.5 text-[10px] font-mono tabular-nums" style={{ color: phaseColor }}>
+                            {step.altitudeFt > 0 && <span>📏 {step.altitudeFt.toLocaleString()} ft</span>}
+                            {step.speedMph > 0 && <span>⚡ {step.speedMph.toLocaleString()} mph</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+            <div className="mt-3 p-2.5 rounded-lg" style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-red-400 tracking-widest">LIVE COVERAGE</span>
+              </div>
+              <p className="text-[10px] text-gray-400 leading-snug">
+                NASA Live TV streams parachute deploy, splashdown, capsule orientation,
+                and crew extraction. Live cameras typically show the capsule within 1–2
+                hours of splashdown as recovery divers reach the Crew Module.
+              </p>
+              <button
+                onClick={() => setShowNasaTv(true)}
+                className="mt-2 w-full text-[10px] font-bold py-1.5 rounded transition-colors"
+                style={{ background: "rgba(220,38,38,0.18)", border: "1px solid rgba(220,38,38,0.4)", color: "#fca5a5" }}
+              >
+                📺 OPEN NASA LIVE TV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activePanel === "events" && (
         <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
           style={{ top: launched ? 120 : 104, maxHeight: "70vh", background: "rgba(0,5,20,0.94)", border: "1px solid rgba(180,100,255,0.35)", backdropFilter: "blur(14px)" }}>
