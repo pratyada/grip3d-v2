@@ -13,7 +13,7 @@ const SECTIONS = [
     title: "The Mission",
     icon: "🚀",
     color: "#ff8822",
-    body: `Artemis II is NASA's first crewed mission to the Moon since Apollo 17 in December 1972. Launching April 1, 2026 aboard the Space Launch System (SLS) Block 1 rocket from Launch Complex 39B at Kennedy Space Center, it carries four astronauts on a free-return lunar flyby lasting approximately 10 days. The Orion Multi-Purpose Crew Vehicle (MPCV) will pass within 8,900 km of the lunar surface — closer than any crewed spacecraft since Apollo — before returning to a Pacific Ocean splashdown.
+    body: `Artemis II is NASA's first crewed mission to the Moon since Apollo 17 in December 1972. Liftoff occurs 2026-04-01 22:35:12 UTC aboard the Space Launch System (SLS) Block 1 rocket from Launch Complex 39B at Kennedy Space Center. The mission lasts 217.5 hours (9 days 1 hour 31 minutes) and carries four astronauts on a free-return lunar flyby. The Orion Multi-Purpose Crew Vehicle (MPCV) will pass within ~6,540 km (4,067 mi) of the lunar surface — closer than any crewed spacecraft in 54 years — reach a peak distance of 406,771 km (252,756 mi) from Earth, then splash down in the Pacific Ocean off San Diego at 2026-04-11 01:07:00 UTC.
 
 Unlike Apollo, Artemis II does not insert into lunar orbit. It uses a free-return trajectory: the Moon's gravity naturally redirects Orion back toward Earth without any additional engine burn, making the mission extremely robust to abort scenarios. This is the critical human-rating flight before Artemis III attempts the first crewed lunar landing since 1972.`,
   },
@@ -37,21 +37,27 @@ Jeremy Hansen (Mission Specialist 2, CSA) — Royal Canadian Air Force fighter p
     title: "Trajectory — Free Return to the Moon",
     icon: "🛸",
     color: "#cc44ff",
-    body: `Artemis II follows a Distant Retrograde Orbit approach rather than a direct insertion. The trajectory unfolds in seven phases:
+    body: `Artemis II follows a free-return trajectory around the Moon rather than a direct orbital insertion. The trajectory unfolds across the 217.5-hour mission:
 
-T+0 — Launch: SLS Block 1 lifts off with 8.8 million pounds of thrust. The core stage and twin solid rocket boosters burn for ~8 minutes, placing Orion's upper stage into a low Earth parking orbit at ~190 km.
+T+0 — Liftoff (2026-04-01 22:35:12Z): SLS Block 1 lifts off from LC-39B with 8.8 million pounds of thrust. The core stage and twin solid rocket boosters burn for ~8 minutes, placing Orion's upper stage into a low Earth parking orbit.
 
-T+1.5h — Earth Orbit: The Interim Cryogenic Propulsion Stage (ICPS) circularises Orion's parking orbit. The crew performs full systems checks across all four Orion systems domains.
+T+0.25h — Orbit Insertion: Initial Earth orbit achieved. The crew performs full systems checks.
 
-T+2.5h — Trans-Lunar Injection: The ICPS fires for approximately 18 minutes, accelerating Orion to ~10.2 km/s and placing it on a trajectory to the Moon. The ICPS separates and Orion deploys its four solar panel wings.
+T+1.8h — Trans-Lunar Injection: The Interim Cryogenic Propulsion Stage (ICPS) fires, accelerating Orion to ~10.4 km/s and placing it on a trajectory to the Moon. ICPS separation follows shortly after.
 
-T+3 to T+4 days — Outbound Coast: Orion coasts 384,400 km to the Moon at a decelerating average of ~1–3 km/s as Earth's gravity decelerates the spacecraft. No major burns required.
+T+8.5h / T+28h — MCC-1 and MCC-2: First and second mid-course corrections refine the outbound path.
 
-T+~96h — Lunar Flyby: Orion swings within 8,900 km of the lunar surface (closer than the International Space Station's altitude above Earth). The Moon's gravity accelerates Orion and redirects it back toward Earth — no engine burn needed.
+T+24h — ~120,000 km from Earth. T+72h — ~250,000 km from Earth, approaching the Moon.
 
-T+5 to T+10 days — Return Coast: Orion coasts back to Earth on the free-return trajectory, decelerating under Earth's gravity pull.
+T+120.45h — Lunar Flyby (2026-04-06 22:02Z): Orion swings to a closest approach of ~6,540 km (4,067 mi) from the lunar surface. The Moon's gravity redirects Orion back toward Earth — no engine burn needed.
 
-T+240h — Splashdown: Orion re-enters Earth's atmosphere at ~11 km/s (Mach 32), protected by its Avcoat ablative heat shield (the largest ever flown). Parachutes deploy and Orion splashes down in the Pacific Ocean off San Diego, recovered by USS San Diego.`,
+T+130h — Maximum Distance: Peak distance from Earth of 406,771 km (252,756 mi).
+
+T+168h / T+192h — MCC-R1 and MCC-R2: Return mid-course corrections.
+
+T+217h — Entry Interface: Orion re-enters at ~11 km/s, protected by its Avcoat ablative heat shield (the largest ever flown).
+
+T+217.5h — Splashdown (2026-04-11 01:07Z): Parachutes deploy and Orion splashes down in the Pacific Ocean off San Diego.`,
   },
   {
     n: "04",
@@ -66,7 +72,9 @@ NASA JPL Horizons (Moon position): The Moon (body ID 301) is queried separately 
 
 NASA Image and Video Library (News feed): NASA's public multimedia API is queried for recent "Artemis II" imagery without authentication. The gallery drawer shows the latest 12 items returned, updated hourly.
 
-Mission-Elapsed-Time Fallback: If Horizons has not yet catalogued the Orion spacecraft (typical within the first 12–24 hours after launch), the API falls back to a physics-interpolated position derived from published mission waypoints (LEO insertion, TLI completion, closest lunar approach, splashdown) using linear interpolation between known distance and velocity at each milestone. A banner on the visualisation indicates which data source is active.`,
+NASA Live TV (YouTube embed): A prominent "NASA LIVE TV" button opens an inline YouTube live-stream panel tuned to NASA's official channel for Artemis II mission coverage. Users can mute/unmute the audio directly from the panel header — the stream auto-reloads with the updated mute state when toggled.
+
+Mission-Elapsed-Time Fallback: If Horizons has not yet catalogued the Orion spacecraft (typical within the first 12–24 hours after launch), the API falls back to a physics-interpolated position derived from the corrected mission waypoints (LEO insertion at T+0.1h, TLI at T+1.8h, 120,000 km at T+24h, lunar flyby at T+120.45h, peak distance 406,771 km at T+130h, splashdown at T+217.5h) using linear interpolation between known distance and velocity at each milestone. A banner on the visualisation indicates which data source is active.`,
   },
   {
     n: "05",
@@ -110,15 +118,52 @@ const STATS = [
   { label: "Launch Vehicle", value: "SLS Block 1", sub: "8.8M lbf thrust" },
   { label: "Spacecraft", value: "Orion MPCV", sub: "European Service Module" },
   { label: "Launch Pad", value: "LC-39B", sub: "Kennedy Space Center" },
-  { label: "Launch Date", value: "1 Apr 2026", sub: "18:00 UTC" },
-  { label: "Duration", value: "~10 days", sub: "240 hours" },
-  { label: "Lunar Distance", value: "8,900 km", sub: "Closest approach" },
+  { label: "Launch Date", value: "1 Apr 2026", sub: "22:35:12 UTC" },
+  { label: "Splashdown", value: "11 Apr 2026", sub: "01:07:00 UTC" },
+  { label: "Duration", value: "217.5 hours", sub: "9 d 1 h 31 m" },
+  { label: "Closest Moon", value: "6,540 km", sub: "4,067 mi from surface" },
+  { label: "Peak Earth Distance", value: "406,771 km", sub: "252,756 mi" },
+  { label: "Total Trajectory", value: "~1.12 M km", sub: "Full flight distance" },
   { label: "Crew Size", value: "4 astronauts", sub: "CDR / PLT / MS1 / MS2" },
-  { label: "Splashdown", value: "Pacific Ocean", sub: "USS San Diego recovery" },
+  { label: "Recovery", value: "Pacific Ocean", sub: "Off San Diego" },
   { label: "Max Speed", value: "~11 km/s", sub: "Re-entry Mach 32" },
   { label: "Heat Shield", value: "5.03 m dia", sub: "Avcoat ablative, largest ever" },
   { label: "Trajectory", value: "Free-return", sub: "No lunar orbit insertion" },
   { label: "Previous Crewed Moon", value: "Apollo 17", sub: "December 1972" },
+]
+
+const LIVE_TELEMETRY_FIELDS = [
+  ["Distance from Earth",       "km (and miles via UI toggle)"],
+  ["Distance from Moon",        "computed against JPL Horizons lunar ephemeris"],
+  ["Altitude above Earth",      "distance minus 6,371 km Earth radius"],
+  ["Speed",                     "km/s, km/h, and Mach number"],
+  ["Light-time delay",          "one-way latency to/from Earth"],
+  ["g-force",                   "gravity from Earth + Moon"],
+  ["Mission progress",          "percentage of 217.5-hour duration"],
+  ["Total distance travelled",  "~1,118,800 km cumulative"],
+  ["Hull sunlit / shadow",      "+120°C / −150°C estimates"],
+  ["Cabin temperature",         "~22°C constant"],
+  ["Heatshield temperature",    "cruise ~22°C, re-entry ~2,700°C"],
+]
+
+const MISSION_EVENT_TABLE = [
+  { t: "T+0",       utc: "2026-04-01 22:35:12Z", title: "Liftoff",               type: "Milestone" },
+  { t: "T+0.13h",   utc: "2026-04-01 22:43:00Z", title: "Stage Separation",      type: "Milestone" },
+  { t: "T+0.25h",   utc: "2026-04-01 22:50:00Z", title: "Orbit Insertion",       type: "Milestone" },
+  { t: "T+1.8h",    utc: "2026-04-02 00:23:00Z", title: "Trans-Lunar Injection", type: "Burn" },
+  { t: "T+2.0h",    utc: "2026-04-02 00:35:00Z", title: "ICPS Separation",       type: "Milestone" },
+  { t: "T+8.5h",    utc: "2026-04-02 07:05:00Z", title: "MCC-1",                 type: "Burn" },
+  { t: "T+28h",     utc: "2026-04-03 02:35:00Z", title: "MCC-2",                 type: "Burn" },
+  { t: "T+48h",     utc: "2026-04-03 22:35:00Z", title: "Outbound Day 2",        type: "Phase" },
+  { t: "T+72h",     utc: "2026-04-04 22:35:00Z", title: "Outbound Day 3",        type: "Phase" },
+  { t: "T+96h",     utc: "2026-04-05 22:35:00Z", title: "MCC-3",                 type: "Burn" },
+  { t: "T+120.45h", utc: "2026-04-06 22:02:00Z", title: "Lunar Flyby (6,540 km)",type: "Milestone" },
+  { t: "T+130h",    utc: "2026-04-07 08:35:00Z", title: "Peak Earth Distance",   type: "Milestone" },
+  { t: "T+144h",    utc: "2026-04-07 22:35:00Z", title: "Return Trajectory",     type: "Phase" },
+  { t: "T+168h",    utc: "2026-04-08 22:35:00Z", title: "MCC-R1",                type: "Burn" },
+  { t: "T+192h",    utc: "2026-04-09 22:35:00Z", title: "MCC-R2",                type: "Burn" },
+  { t: "T+217h",    utc: "2026-04-11 00:35:00Z", title: "Entry Interface",       type: "Milestone" },
+  { t: "T+217.5h",  utc: "2026-04-11 01:07:00Z", title: "Splashdown",            type: "Milestone" },
 ]
 
 export default function UC3DetailsPage() {
@@ -186,13 +231,16 @@ export default function UC3DetailsPage() {
           <div className="absolute left-4 top-0 bottom-0 w-px" style={{ background: "rgba(255,136,34,0.3)" }} />
           <div className="space-y-6 pl-12">
             {[
-              { t: "T+0",     label: "Launch",         detail: "SLS lifts off LC-39B with 8.8M lbf thrust. First stage burns 8 minutes.", color: "#ff6600" },
-              { t: "T+1.5h",  label: "LEO Insertion",  detail: "ICPS circularises parking orbit at 190 km. Crew checks all systems.", color: "#ff8822" },
-              { t: "T+2.5h",  label: "TLI Burn",       detail: "18-minute ICPS burn accelerates Orion to 10.2 km/s. Solar panels deploy.", color: "#ffaa44" },
-              { t: "T+3d",    label: "Outbound Coast",  detail: "3-day coast to the Moon. Crew performs science and vehicle systems checks.", color: "#ffcc66" },
-              { t: "T+96h",   label: "Lunar Flyby",     detail: "8,900 km closest approach. Moon's gravity redirects Orion — no engine burn.", color: "#33ccdd" },
-              { t: "T+5d",    label: "Return Coast",    detail: "5-day coast back to Earth under free-return trajectory.", color: "#5588ff" },
-              { t: "T+10d",   label: "Splashdown",      detail: "Re-entry at Mach 32, Avcoat heat shield absorbs 2,900°C. Pacific Ocean landing.", color: "#44ff88" },
+              { t: "T+0",        label: "Liftoff",         detail: "SLS Block 1 lifts off from LC-39B with 8.8M lbf thrust at 22:35:12 UTC.", color: "#ff6600" },
+              { t: "T+0.25h",    label: "Orbit Insertion", detail: "Initial Earth orbit achieved. Crew checks all systems.", color: "#ff8822" },
+              { t: "T+1.8h",     label: "TLI Burn",        detail: "ICPS fires, accelerating Orion to ~10.4 km/s toward the Moon.", color: "#ffaa44" },
+              { t: "T+24h",      label: "~120,000 km",     detail: "Day 1 outbound coast.", color: "#ffcc66" },
+              { t: "T+72h",      label: "~250,000 km",     detail: "Day 3 outbound, approaching Moon.", color: "#ffcc66" },
+              { t: "T+120.45h",  label: "Lunar Flyby",     detail: "Closest approach 6,540 km (4,067 mi) from lunar surface. Free-return redirect.", color: "#33ccdd" },
+              { t: "T+130h",     label: "Peak Distance",   detail: "Farthest from Earth: 406,771 km (252,756 mi) — new human record.", color: "#a855f7" },
+              { t: "T+168h",     label: "Return Coast",    detail: "Return trajectory, ~200,000 km from Earth.", color: "#5588ff" },
+              { t: "T+217h",     label: "Entry Interface", detail: "Re-entry at 11 km/s (Mach 32). Avcoat heat shield absorbs ~2,700°C.", color: "#ef4444" },
+              { t: "T+217.5h",   label: "Splashdown",      detail: "Pacific Ocean off San Diego at 01:07 UTC. Welcome home!", color: "#44ff88" },
             ].map((step, i) => (
               <div key={i} className="relative flex gap-4">
                 <div className="absolute -left-8 w-4 h-4 rounded-full border-2 flex-shrink-0"
@@ -230,6 +278,71 @@ export default function UC3DetailsPage() {
             </div>
           </section>
         ))}
+
+        {/* Live telemetry fields */}
+        <section className="rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(59,130,246,0.18)", background: "rgba(255,255,255,0.015)" }}>
+          <div className="flex items-center gap-4 px-6 py-4"
+            style={{ borderBottom: "1px solid rgba(59,130,246,0.18)", background: "rgba(59,130,246,0.05)" }}>
+            <span className="text-2xl">📡</span>
+            <div>
+              <div className="text-xs font-mono text-blue-400">LIVE TELEMETRY</div>
+              <h2 className="text-lg font-bold text-white">Orion Telemetry Fields</h2>
+            </div>
+          </div>
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {LIVE_TELEMETRY_FIELDS.map(([k, v]) => (
+              <div key={k} className="rounded-lg p-3"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="text-sm font-semibold text-white">{k}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{v}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Mission events table */}
+        <section className="rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(168,85,247,0.18)", background: "rgba(255,255,255,0.015)" }}>
+          <div className="flex items-center gap-4 px-6 py-4"
+            style={{ borderBottom: "1px solid rgba(168,85,247,0.18)", background: "rgba(168,85,247,0.05)" }}>
+            <span className="text-2xl">📅</span>
+            <div>
+              <div className="text-xs font-mono text-purple-400">COVERAGE EVENTS</div>
+              <h2 className="text-lg font-bold text-white">Mission Event Schedule</h2>
+            </div>
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-3 py-2">MET</th>
+                  <th className="text-left px-3 py-2">UTC</th>
+                  <th className="text-left px-3 py-2">Event</th>
+                  <th className="text-left px-3 py-2">Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MISSION_EVENT_TABLE.map((e, i) => (
+                  <tr key={i} className="border-t" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+                    <td className="px-3 py-2 font-mono text-orange-300 tabular-nums">{e.t}</td>
+                    <td className="px-3 py-2 font-mono text-gray-400 tabular-nums">{e.utc}</td>
+                    <td className="px-3 py-2 text-white">{e.title}</td>
+                    <td className="px-3 py-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          background: e.type === "Burn" ? "rgba(251,146,60,0.15)" : e.type === "Milestone" ? "rgba(168,85,247,0.15)" : "rgba(96,165,250,0.15)",
+                          color: e.type === "Burn" ? "#fb923c" : e.type === "Milestone" ? "#a855f7" : "#60a5fa",
+                        }}>
+                        {e.type}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* Crew cards */}
         <section className="rounded-2xl overflow-hidden"

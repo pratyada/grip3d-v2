@@ -1,125 +1,155 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
 
-// ── Mission constants ─────────────────────────────────────────────────────────
-
-// Artemis II: first crewed Artemis lunar flyby
+// ── Mission constants (corrected) ─────────────────────────────────────────────
+// Artemis II — first crewed Artemis lunar flyby
 // Crew: Reid Wiseman (CDR), Victor Glover (PLT), Christina Koch (MS1), Jeremy Hansen (MS2)
-// Launch: April 1 2026, LC-39B, KSC  |  Duration: ~10 days  |  Closest approach: ~8 900 km
-const LAUNCH_DATE = new Date("2026-04-01T18:00:00Z") // Confirmed launch date — update exact T-0 if known
-
-const CREW = [
-  { name: "Reid Wiseman",    role: "Commander",          flag: "🇺🇸", agency: "NASA", bio: "USN test pilot, ISS Exp 40/41 veteran, 165 EVA days." },
-  { name: "Victor Glover",   role: "Pilot",              flag: "🇺🇸", agency: "NASA", bio: "USN test pilot, SpaceX Crew-1, first Black pilot on lunar mission." },
-  { name: "Christina Koch",  role: "Mission Specialist", flag: "🇺🇸", agency: "NASA", bio: "328-day ISS record, record female EVA hours, first woman to lunar vicinity." },
-  { name: "Jeremy Hansen",   role: "Mission Specialist", flag: "🇨🇦", agency: "CSA",  bio: "First Canadian to fly to the Moon. Fighter pilot, astronomer." },
-]
-
-// Mission phases with offset in hours from launch and description
-const PHASES = [
-  { label: "Launch",             hoursFromL:   0, desc: "SLS Block 1 lifts off from LC-39B, Kennedy Space Center." },
-  { label: "Earth Orbit",        hoursFromL:   1.5, desc: "Orion reaches parking orbit, crew checks all systems." },
-  { label: "TLI Burn",           hoursFromL:   2.5, desc: "Trans-Lunar Injection — Orion's engine fires, setting course for the Moon." },
-  { label: "Outbound Coast",     hoursFromL:  72, desc: "Three-day coast to the Moon at ~2,200 km/h average." },
-  { label: "Lunar Flyby",        hoursFromL:  96, desc: "Closest approach ~8 900 km from lunar surface — free-return trajectory." },
-  { label: "Return Coast",       hoursFromL: 120, desc: "Return coast to Earth spanning five days." },
-  { label: "Splashdown",         hoursFromL: 240, desc: "Orion re-enters atmosphere at 40,000 km/h — Pacific Ocean recovery." },
-]
+// Liftoff:  2026-04-01 22:35:12 UTC from LC-39B, KSC
+// Splashdown: 2026-04-11 01:07:00 UTC (Pacific, off San Diego)
+// Duration: 217.5 h (9 d 1 h 31 m)
+// Closest approach: ~6,540 km (4,067 mi) from lunar surface
+// Peak Earth distance: 406,771 km (252,756 mi)
+const LAUNCH_DATE        = new Date("2026-04-01T22:35:12Z")
+const SPLASHDOWN_DATE    = new Date("2026-04-11T01:07:00Z")
+const DURATION_HOURS     = 217.5
+const CLOSEST_APPROACH_KM = 6540
+const CLOSEST_APPROACH_MI = 4067
+const PEAK_EARTH_KM      = 406771
+const PEAK_EARTH_MI      = 252756
+const TOTAL_DISTANCE_KM  = 1_118_800
 
 // Scale: 1 Three.js unit = 5 000 km
 const KM_PER_UNIT  = 5000
 const EARTH_R_KM   = 6371
 const MOON_R_KM    = 1737
-const EARTH_R      = EARTH_R_KM  / KM_PER_UNIT     // ~1.27
-const MOON_R       = MOON_R_KM   / KM_PER_UNIT     // ~0.35
-const MEAN_DIST    = 384400      / KM_PER_UNIT     // ~76.9 units
-const CRAFT_RADIUS = 1.8                            // visual size in scene (intentionally large — craft is tiny IRL but must be visible)
+const EARTH_R      = EARTH_R_KM / KM_PER_UNIT
+const MOON_R       = MOON_R_KM  / KM_PER_UNIT
+const CRAFT_RADIUS = 1.8
+
+// ── Crew ──────────────────────────────────────────────────────────────────────
+const CREW = [
+  {
+    name: "Reid Wiseman",    role: "Commander",          flag: "🇺🇸", agency: "NASA",
+    bio: "USN test pilot, ISS Exp 40/41 veteran, 165 EVA days.",
+    portrait: "https://www.nasa.gov/wp-content/uploads/2023/04/wiseman-reid-1.jpg",
+  },
+  {
+    name: "Victor Glover",   role: "Pilot",              flag: "🇺🇸", agency: "NASA",
+    bio: "USN test pilot, SpaceX Crew-1, first Black astronaut beyond LEO.",
+    portrait: "https://www.nasa.gov/wp-content/uploads/2023/04/glover-victor-1.jpg",
+  },
+  {
+    name: "Christina Koch",  role: "Mission Specialist", flag: "🇺🇸", agency: "NASA",
+    bio: "328-day ISS record, first woman to travel beyond LEO.",
+    portrait: "https://www.nasa.gov/wp-content/uploads/2023/04/koch-christina-1.jpg",
+  },
+  {
+    name: "Jeremy Hansen",   role: "Mission Specialist", flag: "🇨🇦", agency: "CSA",
+    bio: "First Canadian to travel to the Moon. RCAF fighter pilot, astronomer.",
+    portrait: "https://www.nasa.gov/wp-content/uploads/2023/04/hansen-jeremy-1.jpg",
+  },
+]
+
+// ── Mission events / coverage ────────────────────────────────────────────────
+interface MissionEvent {
+  id: string
+  metHours: number
+  utc: string
+  title: string
+  type: "burn" | "milestone" | "coverage" | "phase"
+  description: string
+}
+
+const MISSION_EVENTS: MissionEvent[] = [
+  { id: "launch",     metHours:   0,     utc: "2026-04-01T22:35:12Z", title: "Liftoff",              type: "milestone", description: "SLS Block 1 launches from KSC LC-39B" },
+  { id: "ascent",     metHours:   0.13,  utc: "2026-04-01T22:43:00Z", title: "Stage Separation",     type: "milestone", description: "SRB jettison and core stage separation" },
+  { id: "orbit",      metHours:   0.25,  utc: "2026-04-01T22:50:00Z", title: "Orbit Insertion",      type: "milestone", description: "Initial Earth orbit achieved" },
+  { id: "tli",        metHours:   1.8,   utc: "2026-04-02T00:23:00Z", title: "Trans-Lunar Injection",type: "burn",      description: "ICPS burn boosts Orion toward the Moon" },
+  { id: "icps-sep",   metHours:   2.0,   utc: "2026-04-02T00:35:00Z", title: "ICPS Separation",      type: "milestone", description: "Orion separates from ICPS upper stage" },
+  { id: "mcc1",       metHours:   8.5,   utc: "2026-04-02T07:05:00Z", title: "MCC-1 Burn",           type: "burn",      description: "First mid-course correction" },
+  { id: "mcc2",       metHours:  28,     utc: "2026-04-03T02:35:00Z", title: "MCC-2 Burn",           type: "burn",      description: "Second mid-course correction" },
+  { id: "outbound1",  metHours:  48,     utc: "2026-04-03T22:35:00Z", title: "Outbound Day 2",       type: "phase",     description: "Outbound coast, ~190,000 km from Earth" },
+  { id: "outbound2",  metHours:  72,     utc: "2026-04-04T22:35:00Z", title: "Outbound Day 3",       type: "phase",     description: "Approaching Moon, ~250,000 km from Earth" },
+  { id: "mcc3",       metHours:  96,     utc: "2026-04-05T22:35:00Z", title: "MCC-3 Burn",           type: "burn",      description: "Final approach correction" },
+  { id: "flyby",      metHours: 120.45,  utc: "2026-04-06T22:02:00Z", title: "🌙 Lunar Flyby",        type: "milestone", description: "Closest approach ~6,540 km from lunar surface (4,067 mi)" },
+  { id: "peak",       metHours: 130,     utc: "2026-04-07T08:35:00Z", title: "Maximum Distance",     type: "milestone", description: "Peak distance from Earth: 406,771 km" },
+  { id: "return1",    metHours: 144,     utc: "2026-04-07T22:35:00Z", title: "Return Trajectory",    type: "phase",     description: "Return cruise begins" },
+  { id: "mccr1",      metHours: 168,     utc: "2026-04-08T22:35:00Z", title: "MCC-R1 Burn",          type: "burn",      description: "First return correction" },
+  { id: "mccr2",      metHours: 192,     utc: "2026-04-09T22:35:00Z", title: "MCC-R2 Burn",          type: "burn",      description: "Second return correction" },
+  { id: "ei",         metHours: 217,     utc: "2026-04-11T00:35:00Z", title: "Entry Interface",      type: "milestone", description: "Spacecraft enters atmosphere at 11 km/s" },
+  { id: "splashdown", metHours: 217.5,   utc: "2026-04-11T01:07:00Z", title: "🎉 Splashdown",         type: "milestone", description: "Pacific Ocean off San Diego — Welcome home!" },
+]
+
+// System status list
+const SYSTEMS: { id: string; label: string; status: "nominal" | "caution" | "alert" }[] = [
+  { id: "comms",   label: "Communications",              status: "nominal" },
+  { id: "power",   label: "Power",                       status: "nominal" },
+  { id: "gnc",     label: "Guidance, Navigation & Ctrl", status: "nominal" },
+  { id: "eclss",   label: "Life Support (ECLSS)",        status: "nominal" },
+  { id: "thermal", label: "Thermal Control",             status: "nominal" },
+  { id: "nav",     label: "Navigation",                  status: "nominal" },
+]
+
+// Historic records
+const RECORDS: string[] = [
+  "First crewed lunar mission in 54 years (since Apollo 17, 1972)",
+  "Farthest human travel from Earth: 406,771 km",
+  "First Black astronaut beyond LEO: Victor Glover",
+  "First Canadian to travel to the Moon: Jeremy Hansen",
+  "First woman to travel beyond LEO: Christina Koch",
+  "Crew of 4 — largest beyond Earth orbit since Apollo era",
+]
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MoonPos   { x: number; y: number; z: number; distKm: number; fallback?: boolean }
-interface OrionPos  { x: number | null; y: number | null; z: number | null; distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string }
-interface NewsItem  { title: string; description: string; date: string; thumb: string }
-
-// ── Trajectory helpers ────────────────────────────────────────────────────────
-
-// Build a simplified free-return trajectory in 3D space (ECI frame approximation).
-// We animate the craft position along this path based on mission elapsed time.
-function buildTrajectoryPoints(moonPos: MoonPos, segments = 120): any[] {
-  // Import THREE lazily inside — this file is "use client"
-  const THREE = (window as any).__THREE__
-  if (!THREE) return []
-
-  // Earth at origin
-  const earthPos = new THREE.Vector3(0, 0, 0)
-
-  // Moon position in scene units
-  const moonVec = new THREE.Vector3(
-    moonPos.x / KM_PER_UNIT,
-    moonPos.y / KM_PER_UNIT,
-    moonPos.z / KM_PER_UNIT,
-  )
-
-  // Closest approach point: 8900 km from Moon center, on the Earth-facing side
-  const earthToMoon = moonVec.clone().normalize()
-  const flybyPt = moonVec.clone().sub(earthToMoon.clone().multiplyScalar(8900 / KM_PER_UNIT))
-
-  // Splashdown: ~Pacific, opposite side of Earth from Moon approach
-  // Approximate: shift Earth position by 5000 km in XZ
-  const splashPt = new THREE.Vector3(-EARTH_R * 0.4, -EARTH_R * 0.3, EARTH_R * 0.5)
-
-  // KSC launch point on Earth surface (~28.6°N, 80.6°W)
-  const launchPhi   = (90 - 28.6)  * Math.PI / 180
-  const launchTheta = (90 - (-80.6)) * Math.PI / 180
-  const launchPt = new THREE.Vector3(
-    EARTH_R * Math.sin(launchPhi) * Math.cos(launchTheta),
-    EARTH_R * Math.cos(launchPhi),
-    EARTH_R * Math.sin(launchPhi) * Math.sin(launchTheta),
-  )
-
-  // Build a smooth CatmullRom spline through key waypoints
-  const outbound = new THREE.CatmullRomCurve3([
-    launchPt,
-    launchPt.clone().add(earthToMoon.clone().multiplyScalar(20)).add(new THREE.Vector3(0, 8, 0)),
-    moonVec.clone().sub(earthToMoon.clone().multiplyScalar(30)).add(new THREE.Vector3(0, 4, 0)),
-    flybyPt,
-  ])
-
-  const returnPath = new THREE.CatmullRomCurve3([
-    flybyPt,
-    flybyPt.clone().add(new THREE.Vector3(-10, 5, -10)),
-    splashPt.clone().add(new THREE.Vector3(-15, 10, 5)),
-    splashPt,
-  ])
-
-  const outPts  = outbound.getPoints(segments)
-  const retPts  = returnPath.getPoints(segments)
-  return [...outPts, ...retPts]
+interface OrionPos  {
+  x: number | null; y: number | null; z: number | null
+  distEarth: number; velKms: number; elapsedH: number; source: string; phase?: string
 }
+interface NewsItem  { title: string; description: string; date: string; thumb: string }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function UC3Page() {
   const mountRef    = useRef<HTMLDivElement>(null)
   const sceneRef    = useRef<any>(null)
-  const animRef     = useRef<number>(0)
+  const cameraModeRef = useRef<"orbit" | "orion" | "moon">("orbit")
 
   const [moonData,  setMoonData]  = useState<MoonPos | null>(null)
   const [orionData, setOrionData] = useState<OrionPos | null>(null)
   const [news,      setNews]      = useState<NewsItem[]>([])
-  const [phase,     setPhase]     = useState(0)          // index into PHASES
-  const [missionT,  setMissionT]  = useState(0)          // hours since launch (negative = pre-launch)
+  const [missionT,  setMissionT]  = useState(0)          // hours since launch
   const [launched,  setLaunched]  = useState(false)
   const [countdown, setCountdown] = useState("")
   const [selected,  setSelected]  = useState<string | null>(null)
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [distMoon,  setDistMoon]  = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
-  const [dataSource,   setDataSource]   = useState("interpolated")
-  const [showNews,     setShowNews]     = useState(false)
-  const [activePanel,  setActivePanel]  = useState<string | null>(null)
+  const [dataSource,  setDataSource]  = useState("interpolated")
+  const [activePanel, setActivePanel] = useState<string | null>(null)
+
+  // NASA TV panel state
+  const [showNasaTv, setShowNasaTv] = useState(false)
+  const [nasaTvMuted, setNasaTvMuted] = useState(true)
+
+  // Units toggle (km vs mi), persisted to localStorage
+  const [units, setUnits] = useState<"km" | "mi">("km")
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("uc3-units")
+      if (stored === "km" || stored === "mi") setUnits(stored)
+    } catch {}
+  }, [])
+  const toggleUnits = useCallback(() => {
+    setUnits(u => {
+      const next = u === "km" ? "mi" : "km"
+      try { localStorage.setItem("uc3-units", next) } catch {}
+      return next
+    })
+  }, [])
 
   const togglePanel = (id: string) => setActivePanel(p => p === id ? null : id)
 
@@ -131,7 +161,7 @@ export default function UC3Page() {
       .catch(() => setMoonData({ x: 384400, y: 0, z: 0, distKm: 384400 }))
   }, [])
 
-  // ── Fetch Orion real-time position (polls every 2 min) ───────────────────
+  // ── Fetch Orion real-time position ────────────────────────────────────────
   useEffect(() => {
     const load = () => {
       fetch("/api/orion-position")
@@ -141,7 +171,6 @@ export default function UC3Page() {
           setDataSource(d.source)
           setDistEarth(d.distEarth)
           setVelKms(parseFloat(d.velKms.toFixed(2)))
-          // Push into sceneRef so the animation loop picks it up immediately
           if (sceneRef.current) sceneRef.current.orionPos = d
         })
         .catch(() => {})
@@ -162,14 +191,13 @@ export default function UC3Page() {
   // ── Mission clock ─────────────────────────────────────────────────────────
   useEffect(() => {
     const tick = () => {
-      const now     = Date.now()
-      const diffMs  = now - LAUNCH_DATE.getTime()
-      const diffH   = diffMs / 3_600_000
+      const now    = Date.now()
+      const diffMs = now - LAUNCH_DATE.getTime()
+      const diffH  = diffMs / 3_600_000
       setMissionT(diffH)
       setLaunched(diffH >= 0)
 
       if (diffH < 0) {
-        // Countdown
         const absMs = Math.abs(diffMs)
         const d = Math.floor(absMs / 86400000)
         const h = Math.floor((absMs % 86400000) / 3600000)
@@ -179,15 +207,95 @@ export default function UC3Page() {
       } else {
         setCountdown("")
       }
-
-      // Determine phase
-      const phaseIdx = PHASES.reduce((best, p, i) => diffH >= p.hoursFromL ? i : best, 0)
-      setPhase(phaseIdx)
     }
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [])
+
+  // ── Derived telemetry ─────────────────────────────────────────────────────
+  const telemetry = useMemo(() => {
+    const speed = velKms ?? 0
+    const de    = distEarth ?? 0
+    const dm    = distMoon  ?? 0
+
+    const altitudeAboveEarth = Math.max(0, de - EARTH_R_KM)
+    const speedKmh           = speed * 3600
+    const speedMach          = speed / 0.343   // relative to sea-level sound speed
+
+    // Light-time delay (one-way) in seconds
+    const lightTimeDelay = de / 299_792.458
+
+    // g-force from gravity of Earth + Moon
+    const muEarth = 398600.4418   // km^3/s^2
+    const muMoon  =   4902.800066 // km^3/s^2
+    const gEarthMs2 = (muEarth / Math.max(de * de, 1)) * 1e9 / 1e6 // km->m: simplified
+    // Simpler: g = mu / r^2 with r in km, g in km/s^2. Convert to g (9.80665 m/s^2 = 9.80665e-3 km/s^2)
+    const gE = muEarth / Math.max(de * de, 1)
+    const gM = dm > 0 ? muMoon / (dm * dm) : 0
+    const gTotal = (gE + gM) / 9.80665e-3
+
+    // Mission progress
+    const missionProgress = Math.max(0, Math.min(100, (missionT / DURATION_HOURS) * 100))
+
+    // Return phase detection
+    const isReturn = missionT > 130
+    const distanceBackToEarth = isReturn ? de : null
+
+    // Hull / thermal estimates
+    const hullSunlit    = 120
+    const hullShadow    = -150
+    const cabinTemp     = 22
+    // Re-entry spike only in final hour
+    const inReentry     = missionT > 217 && missionT < 217.6
+    const heatshieldTemp = inReentry ? 2700 : 22
+
+    return {
+      distEarth: de,
+      distMoon:  dm,
+      speed,
+      altitudeAboveEarth,
+      speedKmh,
+      speedMach,
+      lightTimeDelay,
+      gForce: gTotal,
+      missionProgress,
+      totalDistanceTravelled: TOTAL_DISTANCE_KM,
+      distanceBackToEarth,
+      hullSunlit,
+      hullShadow,
+      cabinTemp,
+      heatshieldTemp,
+    }
+  }, [velKms, distEarth, distMoon, missionT])
+
+  // ── Current phase / next event ────────────────────────────────────────────
+  const currentEventIndex = useMemo(() => {
+    let best = 0
+    for (let i = 0; i < MISSION_EVENTS.length; i++) {
+      if (missionT >= MISSION_EVENTS[i].metHours) best = i
+    }
+    return best
+  }, [missionT])
+  const currentEvent = MISSION_EVENTS[currentEventIndex]
+  const nextEvent    = MISSION_EVENTS[currentEventIndex + 1] ?? null
+
+  // Countdown to next significant milestone (flyby or splashdown)
+  const nextMilestone = useMemo(() => {
+    if (missionT < 120.45) return MISSION_EVENTS.find(e => e.id === "flyby")!
+    return MISSION_EVENTS.find(e => e.id === "splashdown")!
+  }, [missionT])
+
+  const nextMilestoneCountdown = useMemo(() => {
+    const dtH = nextMilestone.metHours - missionT
+    if (dtH <= 0) return "—"
+    const totalSec = Math.floor(dtH * 3600)
+    const d = Math.floor(totalSec / 86400)
+    const h = Math.floor((totalSec % 86400) / 3600)
+    const m = Math.floor((totalSec % 3600) / 60)
+    const s = totalSec % 60
+    return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`
+  }, [nextMilestone, missionT])
 
   // ── Three.js scene ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -196,35 +304,42 @@ export default function UC3Page() {
     let THREE: any
     let renderer: any, scene: any, camera: any
     let earthMesh: any, moonMesh: any, craftMesh: any
-    let trajectoryLine: any, moonOrbitLine: any
+    let flownLine: any, upcomingLine: any, moonOrbitLine: any
+    let trailPositions: any[] = []
+    let trailLine: any
     let starField: any
     let animId = 0
     let isDragging = false, prevMouse = { x: 0, y: 0 }
-    let spherical = { theta: 0.4, phi: 1.1, r: 110 }
+    const spherical = { theta: 0.4, phi: 1.1, r: 110 }
+    // Smooth camera focus target
+    const camFocus = { x: 0, y: 0, z: 0 }
 
     async function init() {
       const mod = await import("three")
-      THREE = mod;
-      (window as any).__THREE__ = THREE
+      THREE = mod
+      ;(window as any).__THREE__ = THREE
 
-      // ── Renderer ───────────────────────────────────────────────────────
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
       renderer.setSize(mountRef.current!.clientWidth, mountRef.current!.clientHeight)
       renderer.setClearColor(0x000005)
       mountRef.current!.appendChild(renderer.domElement)
 
-      // ── Scene / Camera ─────────────────────────────────────────────────
       scene  = new THREE.Scene()
       camera = new THREE.PerspectiveCamera(45, mountRef.current!.clientWidth / mountRef.current!.clientHeight, 0.1, 5000)
       camera.position.set(60, 40, 60)
       camera.lookAt(0, 0, 0)
 
-      // ── Lighting ───────────────────────────────────────────────────────
-      scene.add(new THREE.AmbientLight(0x223344, 1.2))
-      const sunLight = new THREE.DirectionalLight(0xffffff, 2.5)
-      sunLight.position.set(500, 200, 300)
+      // ── Lighting — explicit sun direction so the terminator looks right ───
+      scene.add(new THREE.AmbientLight(0x1a2233, 0.8))
+      const sunLight = new THREE.DirectionalLight(0xffffff, 2.6)
+      // Sun in roughly +X+Y direction of ECI frame (chosen for aesthetics)
+      sunLight.position.set(1200, 400, 600)
       scene.add(sunLight)
+      // Subtle fill from the opposite side
+      const fill = new THREE.DirectionalLight(0x4466aa, 0.35)
+      fill.position.set(-1000, -200, -500)
+      scene.add(fill)
 
       // ── Stars ──────────────────────────────────────────────────────────
       const starGeo = new THREE.BufferGeometry()
@@ -248,17 +363,15 @@ export default function UC3Page() {
       earthMesh = new THREE.Mesh(earthGeo, earthMat)
       scene.add(earthMesh)
 
-      // Earth atmosphere glow
       const atmGeo = new THREE.SphereGeometry(EARTH_R * 1.04, 32, 32)
       const atmMat = new THREE.MeshPhongMaterial({ color: 0x4488cc, transparent: true, opacity: 0.12, side: THREE.FrontSide })
       scene.add(new THREE.Mesh(atmGeo, atmMat))
 
-      // Earth grid overlay
       const wireGeo = new THREE.SphereGeometry(EARTH_R * 1.001, 18, 12)
       const wireMat = new THREE.MeshBasicMaterial({ color: 0x336699, wireframe: true, transparent: true, opacity: 0.08 })
       scene.add(new THREE.Mesh(wireGeo, wireMat))
 
-      // KSC launch site marker
+      // KSC marker
       const kscPhi   = (90 - 28.6)  * Math.PI / 180
       const kscTheta = (90 - (-80.6)) * Math.PI / 180
       const kscPos   = new THREE.Vector3(
@@ -266,11 +379,27 @@ export default function UC3Page() {
         EARTH_R * Math.cos(kscPhi),
         EARTH_R * Math.sin(kscPhi) * Math.sin(kscTheta),
       )
-      const kscGeo = new THREE.SphereGeometry(0.08, 8, 8)
-      const kscMat = new THREE.MeshBasicMaterial({ color: 0xff6600 })
-      const kscDot = new THREE.Mesh(kscGeo, kscMat)
+      const kscDot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff6600 }),
+      )
       kscDot.position.copy(kscPos)
       scene.add(kscDot)
+
+      // Splashdown marker (Pacific off San Diego — 32.7°N, -117.2°W)
+      const splashPhi   = (90 - 32.7) * Math.PI / 180
+      const splashTheta = (90 - (-117.2)) * Math.PI / 180
+      const splashPos = new THREE.Vector3(
+        EARTH_R * Math.sin(splashPhi) * Math.cos(splashTheta),
+        EARTH_R * Math.cos(splashPhi),
+        EARTH_R * Math.sin(splashPhi) * Math.sin(splashTheta),
+      )
+      const splashDot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x00ccff }),
+      )
+      splashDot.position.copy(splashPos)
+      scene.add(splashDot)
 
       // ── Moon ──────────────────────────────────────────────────────────
       const md = moonData!
@@ -285,113 +414,135 @@ export default function UC3Page() {
       moonMesh.position.copy(moonScenePos)
       scene.add(moonMesh)
 
-      // Moon label ring
       const ringGeo = new THREE.TorusGeometry(MOON_R * 1.5, 0.04, 8, 32)
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x8888ff, transparent: true, opacity: 0.4 })
-      const ring = new THREE.Mesh(ringGeo, ringMat)
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x8888ff, transparent: true, opacity: 0.4 }))
       ring.position.copy(moonScenePos)
       scene.add(ring)
 
-      // Moon orbit path (dashed circle in orbital plane)
+      // Moon orbit path
       const orbitPts: any[] = []
       const orbitDist = md.distKm / KM_PER_UNIT
       for (let i = 0; i <= 128; i++) {
         const a = (i / 128) * Math.PI * 2
-        // Approximate lunar orbital plane (inclined ~5.1° to ecliptic, ~18.3°–28.6° to equator)
-        const inc = 23.4 * Math.PI / 180  // use ecliptic tilt as approximation
+        const inc = 23.4 * Math.PI / 180
         const x = orbitDist * Math.cos(a)
         const y = orbitDist * Math.sin(a) * Math.sin(inc)
         const z = orbitDist * Math.sin(a) * Math.cos(inc)
         orbitPts.push(new THREE.Vector3(x, y, z))
       }
-      const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPts)
-      moonOrbitLine = new THREE.Line(orbitGeo, new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.35 }))
+      moonOrbitLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(orbitPts),
+        new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.35 }),
+      )
       scene.add(moonOrbitLine)
 
-      // ── Orion spacecraft — built from primitives to resemble the real vehicle ──
-      // Orion consists of: Crew Module (cone) + Service Module (cylinder) + 4 solar panels
+      // ── Orion spacecraft ───────────────────────────────────────────────
       craftMesh = new THREE.Group()
       craftMesh.position.copy(kscPos)
 
-      const CR = CRAFT_RADIUS  // base radius reference
-
-      // Crew Module: truncated cone (wider base, narrow top — heat-shield down)
-      const cmGeo = new THREE.CylinderGeometry(CR * 0.55, CR, CR * 1.1, 16)
-      const cmMat = new THREE.MeshPhongMaterial({ color: 0xd4a843, emissive: 0x443300, shininess: 80 })
-      const cmMesh = new THREE.Mesh(cmGeo, cmMat)
+      const CR = CRAFT_RADIUS
+      const cmMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(CR * 0.55, CR, CR * 1.1, 16),
+        new THREE.MeshPhongMaterial({ color: 0xd4a843, emissive: 0x443300, shininess: 80 }),
+      )
       cmMesh.position.y = CR * 0.8
       craftMesh.add(cmMesh)
 
-      // Heat shield: flat dark disc at base of crew module
-      const hsGeo = new THREE.CylinderGeometry(CR, CR * 1.02, CR * 0.12, 16)
-      const hsMat = new THREE.MeshPhongMaterial({ color: 0x222222, emissive: 0x110000, shininess: 10 })
-      const hsMesh = new THREE.Mesh(hsGeo, hsMat)
+      const hsMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(CR, CR * 1.02, CR * 0.12, 16),
+        new THREE.MeshPhongMaterial({ color: 0x222222, emissive: 0x110000, shininess: 10 }),
+      )
       hsMesh.position.y = CR * 0.18
       craftMesh.add(hsMesh)
 
-      // Service Module: cylinder below crew module
-      const smGeo = new THREE.CylinderGeometry(CR * 0.75, CR * 0.75, CR * 1.4, 16)
-      const smMat = new THREE.MeshPhongMaterial({ color: 0x888899, emissive: 0x111122, shininess: 120 })
-      const smMesh = new THREE.Mesh(smGeo, smMat)
+      const smMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(CR * 0.75, CR * 0.75, CR * 1.4, 16),
+        new THREE.MeshPhongMaterial({ color: 0x888899, emissive: 0x111122, shininess: 120 }),
+      )
       smMesh.position.y = -CR * 0.58
       craftMesh.add(smMesh)
 
-      // Service Module engine nozzle
-      const nozzleGeo = new THREE.CylinderGeometry(CR * 0.18, CR * 0.3, CR * 0.4, 12)
-      const nozzleMat = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 160 })
-      const nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat)
+      const nozzleMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(CR * 0.18, CR * 0.3, CR * 0.4, 12),
+        new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 160 }),
+      )
       nozzleMesh.position.y = -CR * 1.5
       craftMesh.add(nozzleMesh)
 
-      // 4 solar panels — two pairs extending left/right and front/back from SM
       const panelMat = new THREE.MeshPhongMaterial({ color: 0x1144cc, emissive: 0x001133, shininess: 200, side: THREE.DoubleSide })
       const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
       for (const angle of angles) {
-        const panelGeo = new THREE.BoxGeometry(CR * 2.8, CR * 0.06, CR * 1.0)
-        const panel = new THREE.Mesh(panelGeo, panelMat)
-        // Position panels radially outward from SM
-        panel.position.set(
-          Math.cos(angle) * CR * 2.0,
-          -CR * 0.55,
-          Math.sin(angle) * CR * 2.0,
+        const panel = new THREE.Mesh(
+          new THREE.BoxGeometry(CR * 2.8, CR * 0.06, CR * 1.0),
+          panelMat,
         )
+        panel.position.set(Math.cos(angle) * CR * 2.0, -CR * 0.55, Math.sin(angle) * CR * 2.0)
         panel.rotation.y = angle
         craftMesh.add(panel)
 
-        // Panel strut
-        const strutGeo = new THREE.CylinderGeometry(CR * 0.04, CR * 0.04, CR * 2.0, 6)
-        const strut = new THREE.Mesh(strutGeo, new THREE.MeshPhongMaterial({ color: 0xaaaaaa }))
-        strut.position.set(
-          Math.cos(angle) * CR * 1.0,
-          -CR * 0.55,
-          Math.sin(angle) * CR * 1.0,
+        const strut = new THREE.Mesh(
+          new THREE.CylinderGeometry(CR * 0.04, CR * 0.04, CR * 2.0, 6),
+          new THREE.MeshPhongMaterial({ color: 0xaaaaaa }),
         )
+        strut.position.set(Math.cos(angle) * CR * 1.0, -CR * 0.55, Math.sin(angle) * CR * 1.0)
         strut.rotation.z = angle + Math.PI / 2
         strut.rotation.x = Math.PI / 2
         craftMesh.add(strut)
       }
 
-      // Glow point light travelling with craft
       const craftLight = new THREE.PointLight(0xff9922, 10, 30)
       craftMesh.add(craftLight)
-
       scene.add(craftMesh)
 
-      // ── Trajectory ──────────────────────────────────────────────────
-      const trajPts = buildTrajectoryPoints(md)
-      if (trajPts.length > 0) {
-        const trajGeo = new THREE.BufferGeometry().setFromPoints(trajPts)
-        trajectoryLine = new THREE.Line(
-          trajGeo,
-          new THREE.LineBasicMaterial({ color: 0xff8822, transparent: true, opacity: 0.6 })
-        )
-        scene.add(trajectoryLine)
-        sceneRef.current = { trajPts, orionPos: null }
-      }
+      // ── Trajectory: flown (cyan solid) + upcoming (amber dashed) ───────
+      const earthToMoon = moonScenePos.clone().normalize()
+      const flybyPt = moonScenePos.clone().sub(earthToMoon.clone().multiplyScalar(CLOSEST_APPROACH_KM / KM_PER_UNIT))
 
-      // ── Mouse controls ───────────────────────────────────────────────
+      const outbound = new THREE.CatmullRomCurve3([
+        kscPos.clone(),
+        kscPos.clone().add(earthToMoon.clone().multiplyScalar(20)).add(new THREE.Vector3(0, 8, 0)),
+        moonScenePos.clone().sub(earthToMoon.clone().multiplyScalar(30)).add(new THREE.Vector3(0, 4, 0)),
+        flybyPt,
+      ])
+      const returnPath = new THREE.CatmullRomCurve3([
+        flybyPt,
+        flybyPt.clone().add(new THREE.Vector3(-10, 5, -10)),
+        splashPos.clone().add(new THREE.Vector3(-15, 10, 5)),
+        splashPos.clone(),
+      ])
+      const outPts = outbound.getPoints(120)
+      const retPts = returnPath.getPoints(120)
+      const allPts: any[] = [...outPts, ...retPts]
+
+      const flownGeo = new THREE.BufferGeometry().setFromPoints([allPts[0]])
+      flownLine = new THREE.Line(
+        flownGeo,
+        new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 }),
+      )
+      scene.add(flownLine)
+
+      const upcomingGeo = new THREE.BufferGeometry().setFromPoints(allPts)
+      upcomingLine = new THREE.Line(
+        upcomingGeo,
+        new THREE.LineDashedMaterial({ color: 0xffaa33, transparent: true, opacity: 0.7, dashSize: 2, gapSize: 1 }),
+      )
+      ;(upcomingLine as any).computeLineDistances?.()
+      scene.add(upcomingLine)
+
+      // Fading trail behind craft
+      const trailGeo = new THREE.BufferGeometry()
+      const trailArr = new Float32Array(200 * 3)
+      trailGeo.setAttribute("position", new THREE.BufferAttribute(trailArr, 3))
+      trailLine = new THREE.Line(
+        trailGeo,
+        new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.55 }),
+      )
+      scene.add(trailLine)
+
+      sceneRef.current = { trajPts: allPts, orionPos: null, flownLine, upcomingLine, trailArr }
+
+      // ── Controls ───────────────────────────────────────────────────────
       const el = renderer.domElement
-
       const onDown = (e: MouseEvent) => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY } }
       const onUp   = () => { isDragging = false }
       const onMove = (e: MouseEvent) => {
@@ -403,14 +554,13 @@ export default function UC3Page() {
         spherical.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005))
       }
       const onWheel = (e: WheelEvent) => {
-        spherical.r = Math.max(30, Math.min(500, spherical.r + e.deltaY * 0.1))
+        spherical.r = Math.max(15, Math.min(500, spherical.r + e.deltaY * 0.1))
       }
       el.addEventListener("mousedown", onDown)
       window.addEventListener("mouseup",   onUp)
       window.addEventListener("mousemove", onMove)
       el.addEventListener("wheel", onWheel, { passive: true })
 
-      // Touch
       let lastTouch: Touch | null = null
       el.addEventListener("touchstart", (e: TouchEvent) => { lastTouch = e.touches[0]; isDragging = true })
       el.addEventListener("touchend",   () => { isDragging = false; lastTouch = null })
@@ -424,7 +574,6 @@ export default function UC3Page() {
         spherical.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005))
       })
 
-      // ── Resize ───────────────────────────────────────────────────────
       const onResize = () => {
         if (!mountRef.current) return
         const w = mountRef.current.clientWidth
@@ -441,19 +590,11 @@ export default function UC3Page() {
         animId = requestAnimationFrame(animate)
         frame++
 
-        // Rotate Earth slowly
         earthMesh.rotation.y += 0.001
-
-        // Rotate craft slowly so solar panels are visible from all angles
         craftMesh.rotation.y += 0.008
 
-        // Move craft: prefer live Orion position from API, fallback to trajectory animation
         const liveOrion = sceneRef.current?.orionPos
         const trajPts2  = sceneRef.current?.trajPts
-
-        // Use real Horizons x/y/z ONLY when source is "horizons" and coordinates are present.
-        // Interpolated data omits x/y/z (null) so the trajectory spline is used instead —
-        // spline IS aligned to the real Moon position so the craft stays in the correct corridor.
         const useRealPos = liveOrion?.source === "horizons" && liveOrion.x != null && liveOrion.y != null
 
         if (useRealPos) {
@@ -465,57 +606,66 @@ export default function UC3Page() {
           const dM = craftMesh.position.distanceTo(moonMesh.position) * KM_PER_UNIT
           setDistMoon(dM)
         } else if (trajPts2 && trajPts2.length > 0) {
-          // Trajectory spline: for MET interpolation use distEarth to pick the spline index,
-          // for pre-launch loop the full path for preview
-          const totalH   = PHASES[PHASES.length - 1].hoursFromL
           const elapsedH = (Date.now() - LAUNCH_DATE.getTime()) / 3_600_000
           let t: number
           if (elapsedH < 0) {
-            t = (frame % 600) / 600  // preview loop
-          } else if (liveOrion?.distEarth) {
-            // Pin to trajectory point whose Earth distance matches MET estimate
-            const moonDistKm = moonMesh.position.length() * KM_PER_UNIT
-            // Outbound: t in [0, 0.5], return: [0.5, 1]
-            const isReturn = elapsedH > 96
-            const halfPts  = Math.floor(trajPts2.length / 2)
-            if (!isReturn) {
-              // Find outbound point closest in Earth distance
-              let best = 0, bestDiff = Infinity
-              for (let i = 0; i < halfPts; i++) {
-                const p = trajPts2[i]
-                const d = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT
-                const diff = Math.abs(d - liveOrion.distEarth)
-                if (diff < bestDiff) { bestDiff = diff; best = i }
-              }
-              t = best / (trajPts2.length - 1)
-            } else {
-              // Return half
-              let best = halfPts, bestDiff = Infinity
-              for (let i = halfPts; i < trajPts2.length; i++) {
-                const p = trajPts2[i]
-                const d = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT
-                const diff = Math.abs(d - liveOrion.distEarth)
-                if (diff < bestDiff) { bestDiff = diff; best = i }
-              }
-              t = best / (trajPts2.length - 1)
-            }
+            t = (frame % 600) / 600
           } else {
-            t = Math.min(1, elapsedH / totalH)
+            t = Math.min(1, elapsedH / DURATION_HOURS)
           }
-
           const idx = Math.min(trajPts2.length - 1, Math.floor(t * (trajPts2.length - 1)))
           craftMesh.position.copy(trajPts2[idx])
 
           const p = craftMesh.position
           setDistEarth(Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) * KM_PER_UNIT)
           setDistMoon(p.distanceTo(moonMesh.position) * KM_PER_UNIT)
+
+          // Update flown vs upcoming geometry
+          if (sceneRef.current?.flownLine && sceneRef.current?.upcomingLine) {
+            const flownPts = trajPts2.slice(0, idx + 1)
+            const upPts    = trajPts2.slice(idx)
+            sceneRef.current.flownLine.geometry.dispose()
+            sceneRef.current.flownLine.geometry = new THREE.BufferGeometry().setFromPoints(flownPts)
+            sceneRef.current.upcomingLine.geometry.dispose()
+            sceneRef.current.upcomingLine.geometry = new THREE.BufferGeometry().setFromPoints(upPts)
+            sceneRef.current.upcomingLine.computeLineDistances?.()
+          }
         }
 
-        // Camera orbit
-        camera.position.x = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta)
-        camera.position.y = spherical.r * Math.cos(spherical.phi)
-        camera.position.z = spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta)
-        camera.lookAt(0, 0, 0)
+        // Update trail
+        if (trailLine && frame % 3 === 0) {
+          trailPositions.push(craftMesh.position.clone())
+          if (trailPositions.length > 200) trailPositions.shift()
+          const arr = trailLine.geometry.attributes.position.array as Float32Array
+          for (let i = 0; i < trailPositions.length; i++) {
+            arr[i*3]   = trailPositions[i].x
+            arr[i*3+1] = trailPositions[i].y
+            arr[i*3+2] = trailPositions[i].z
+          }
+          trailLine.geometry.setDrawRange(0, trailPositions.length)
+          trailLine.geometry.attributes.position.needsUpdate = true
+        }
+
+        // Camera focus smoothing
+        const mode = cameraModeRef.current
+        let targetX = 0, targetY = 0, targetZ = 0
+        if (mode === "orion") {
+          targetX = craftMesh.position.x
+          targetY = craftMesh.position.y
+          targetZ = craftMesh.position.z
+        } else if (mode === "moon") {
+          targetX = moonMesh.position.x
+          targetY = moonMesh.position.y
+          targetZ = moonMesh.position.z
+        }
+        camFocus.x += (targetX - camFocus.x) * 0.06
+        camFocus.y += (targetY - camFocus.y) * 0.06
+        camFocus.z += (targetZ - camFocus.z) * 0.06
+
+        camera.position.x = camFocus.x + spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta)
+        camera.position.y = camFocus.y + spherical.r * Math.cos(spherical.phi)
+        camera.position.z = camFocus.z + spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta)
+        camera.lookAt(camFocus.x, camFocus.y, camFocus.z)
 
         renderer.render(scene, camera)
       }
@@ -538,13 +688,14 @@ export default function UC3Page() {
     return () => { cleanup?.() }
   }, [moonData])
 
-  // ── UI helpers ────────────────────────────────────────────────────────────
-  const fmt = (n: number | null, unit: string) =>
-    n == null ? "—" : `${n.toLocaleString("en-US", { maximumFractionDigits: 0 })} ${unit}`
+  // ── Formatting helpers ────────────────────────────────────────────────────
+  const kmToDisp = useCallback((km: number | null): string => {
+    if (km == null) return "—"
+    if (units === "km") return `${Math.round(km).toLocaleString("en-US")} km`
+    return `${Math.round(km * 0.621371).toLocaleString("en-US")} mi`
+  }, [units])
 
-  const currentPhase = PHASES[phase]
-
-  // ── Icon button helper ─────────────────────────────────────────────────────
+  // ── Icon button helper ────────────────────────────────────────────────────
   const iconBtn = (id: string, icon: string, label: string, activeColor: string) => (
     <button
       key={id}
@@ -563,14 +714,16 @@ export default function UC3Page() {
     </button>
   )
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const statusColor = (s: string) => s === "nominal" ? "#22c55e" : s === "caution" ? "#eab308" : "#ef4444"
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full" style={{ height: "calc(100vh - 64px)", background: "#000008" }}>
 
-      {/* Three.js canvas mount */}
+      {/* Three.js canvas */}
       <div ref={mountRef} className="absolute inset-0" />
 
-      {/* ── Compact top bar ────────────────────────────────────────────────── */}
+      {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2"
         style={{ background: "rgba(0,0,10,0.80)", borderBottom: "1px solid rgba(255,150,50,0.25)" }}>
         <div className="flex items-center gap-2">
@@ -581,7 +734,6 @@ export default function UC3Page() {
           </div>
         </div>
 
-        {/* Mission status — compact */}
         {!launched ? (
           <div className="flex flex-col items-center gap-0.5">
             <div className="text-xs font-mono text-orange-400 bg-orange-900/30 border border-orange-600/40 px-2 py-0.5 rounded">
@@ -594,17 +746,28 @@ export default function UC3Page() {
             <div className="text-xs font-mono text-green-400 bg-green-900/30 border border-green-600/40 px-2 py-0.5 rounded">
               MISSION ACTIVE
             </div>
-            <div className="text-xs text-gray-400 tabular-nums">MET {Math.floor(missionT)}h {Math.floor((missionT % 1) * 60)}m</div>
+            <div className="text-xs text-gray-400 tabular-nums">
+              MET {Math.floor(missionT)}h {Math.floor((missionT % 1) * 60)}m
+            </div>
           </div>
         )}
 
-        <Link href="/uc3/details"
-          className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors hidden sm:block">
-          Details →
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleUnits}
+            className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+            title="Toggle km/mi"
+          >
+            {units.toUpperCase()}
+          </button>
+          <Link href="/uc3/details"
+            className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors hidden sm:block">
+            Details →
+          </Link>
+        </div>
       </div>
 
-      {/* ── Data source pill (only when live) ─────────────────────────────── */}
+      {/* ── Data source pill ──────────────────────────────────────────────── */}
       {launched && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full text-xs font-semibold tracking-wide whitespace-nowrap"
           style={{
@@ -616,21 +779,119 @@ export default function UC3Page() {
         </div>
       )}
 
+      {/* ── NASA LIVE TV launch button (prominent, top-right floating) ────── */}
+      <button
+        onClick={() => setShowNasaTv(v => !v)}
+        className="absolute z-30 flex items-center gap-2 px-3 py-2 rounded-xl transition-all"
+        style={{
+          top: 64,
+          right: 12,
+          background: "linear-gradient(135deg, rgba(220,38,38,0.95), rgba(190,20,20,0.92))",
+          border: "1.5px solid rgba(255,100,100,0.75)",
+          boxShadow: "0 0 18px rgba(255,40,40,0.55), 0 0 34px rgba(255,40,40,0.3)",
+          color: "#fff",
+          fontWeight: 700,
+          animation: "nasaPulse 2.4s ease-in-out infinite",
+        }}
+        title="Open NASA Live TV"
+      >
+        <span className="relative flex items-center justify-center" style={{ width: 10, height: 10 }}>
+          <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-70 animate-ping" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+        </span>
+        <span className="text-xs tracking-widest">📺 NASA LIVE TV</span>
+      </button>
+
+      <style jsx>{`
+        @keyframes nasaPulse {
+          0%, 100% { box-shadow: 0 0 18px rgba(255,40,40,0.55), 0 0 34px rgba(255,40,40,0.3); }
+          50%      { box-shadow: 0 0 28px rgba(255,80,80,0.85), 0 0 52px rgba(255,40,40,0.55); }
+        }
+      `}</style>
+
+      {/* ── NASA TV panel (floating bottom-right) ─────────────────────────── */}
+      {showNasaTv && (
+        <div
+          className="fixed bottom-4 right-4 z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
+          style={{ width: 400, height: 280 }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-red-900/60 to-cyan-900/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs font-bold text-white tracking-widest">NASA LIVE TV</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setNasaTvMuted(m => !m)}
+                className="text-white/80 hover:text-white text-xs px-2 py-0.5 rounded border border-white/20"
+                title={nasaTvMuted ? "Unmute" : "Mute"}
+              >
+                {nasaTvMuted ? "🔇" : "🔊"}
+              </button>
+              <button onClick={() => setShowNasaTv(false)} className="text-white/70 hover:text-white">✕</button>
+            </div>
+          </div>
+          <iframe
+            key={nasaTvMuted ? "muted" : "unmuted"}
+            src={`https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}`}
+            width="400"
+            height="248"
+            frameBorder={0}
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="NASA Live TV"
+          />
+        </div>
+      )}
+
       {/* ── LEFT icon toolbar ─────────────────────────────────────────────── */}
       <div className="absolute left-3 z-20 flex flex-col gap-2" style={{ top: launched ? 72 : 56 }}>
         {iconBtn("phase",     "🎯", "Mission Phase",   "#f97316")}
         {iconBtn("telemetry", "📡", "Orion Telemetry", "#3b82f6")}
         {iconBtn("crew",      "👨‍🚀", "Crew",            "#22c55e")}
+        {iconBtn("systems",   "🛰️", "Systems",         "#14b8a6")}
+        {iconBtn("records",   "🏆", "Historic Records","#fbbf24")}
       </div>
 
       {/* ── RIGHT icon toolbar ────────────────────────────────────────────── */}
-      <div className="absolute right-3 z-20 flex flex-col gap-2" style={{ top: launched ? 72 : 56 }}>
-        {iconBtn("timeline", "📅", "Mission Timeline", "#a855f7")}
+      <div className="absolute right-3 z-20 flex flex-col gap-2" style={{ top: launched ? 120 : 104 }}>
+        {iconBtn("events",   "📅", "Mission Events",  "#a855f7")}
         {iconBtn("facts",    "ℹ️",  "Mission Facts",    "#eab308")}
         {iconBtn("news",     "📰", "NASA News",        "#60a5fa")}
+        {iconBtn("camera",   "🎥", "Camera",           "#06b6d4")}
       </div>
 
-      {/* ── PANELS — shown only when their icon is active ─────────────────── */}
+      {/* ── T-minus to next milestone + progress (bottom center) ──────────── */}
+      <div className="absolute left-1/2 -translate-x-1/2 z-20 rounded-xl px-4 py-2"
+        style={{ bottom: 56, background: "rgba(0,5,20,0.88)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(10px)", minWidth: 320 }}>
+        <div className="flex items-center justify-between gap-4 mb-1.5">
+          <div>
+            <div className="text-xs text-gray-500 tracking-widest">NEXT</div>
+            <div className="text-xs font-semibold text-white">{nextMilestone.title}</div>
+          </div>
+          <div className="text-sm font-mono tabular-nums text-cyan-300">{nextMilestoneCountdown}</div>
+        </div>
+        <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <div className="absolute inset-y-0 left-0 rounded-full"
+            style={{ width: `${telemetry.missionProgress}%`, background: "linear-gradient(90deg, #f97316, #eab308, #06b6d4)" }} />
+          {/* Maneuver tick marks */}
+          {MISSION_EVENTS.filter(e => e.type === "burn" || e.id === "flyby" || e.id === "splashdown").map(e => (
+            <div key={e.id}
+              title={e.title}
+              className="absolute top-0 bottom-0 w-0.5"
+              style={{
+                left: `${Math.min(100, (e.metHours / DURATION_HOURS) * 100)}%`,
+                background: e.id === "flyby" || e.id === "splashdown" ? "#fff" : "rgba(255,255,255,0.45)",
+              }} />
+          ))}
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 mt-0.5 tabular-nums">
+          <span>{telemetry.missionProgress.toFixed(1)}%</span>
+          <span>{Math.round(DURATION_HOURS)}h total</span>
+        </div>
+      </div>
+
+      {/* ── PANELS ────────────────────────────────────────────────────────── */}
 
       {/* Mission Phase panel */}
       {activePanel === "phase" && (
@@ -640,36 +901,48 @@ export default function UC3Page() {
             <div className="text-xs text-orange-400 font-semibold tracking-widest">MISSION PHASE</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
-          <div className="text-sm font-bold text-white mb-1">{currentPhase.label}</div>
-          <div className="text-xs text-gray-400 leading-snug mb-2">{currentPhase.desc}</div>
-          <div className="flex gap-1 flex-wrap">
-            {PHASES.map((p, i) => (
-              <div key={i} className="w-2 h-2 rounded-full transition-colors"
-                style={{ background: i <= phase ? "#f97316" : "#334" }} title={p.label} />
-            ))}
-          </div>
+          <div className="text-sm font-bold text-white mb-1">{currentEvent.title}</div>
+          <div className="text-xs text-gray-400 leading-snug mb-2">{currentEvent.description}</div>
+          {nextEvent && (
+            <div className="mt-2 pt-2 border-t border-white/10">
+              <div className="text-xs text-gray-500">Next: {nextEvent.title}</div>
+              <div className="text-xs text-orange-300 tabular-nums">
+                T+{nextEvent.metHours.toFixed(2)}h
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Telemetry panel */}
       {activePanel === "telemetry" && (
-        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
-          style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(50,150,255,0.35)", backdropFilter: "blur(14px)" }}>
+        <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
+          style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(50,150,255,0.35)", backdropFilter: "blur(14px)", maxHeight: "70vh", overflowY: "auto" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-blue-400 font-semibold tracking-widest">ORION TELEMETRY</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
             {[
-              { label: "Dist. Earth", val: fmt(distEarth, "km") },
-              { label: "Dist. Moon",  val: fmt(distMoon, "km") },
-              { label: "Velocity",    val: velKms != null ? `${velKms} km/s` : "—" },
-              { label: "Moon–Earth",  val: moonData ? `${Math.round(moonData.distKm).toLocaleString()} km` : "—" },
+              { label: "Dist. Earth",   val: kmToDisp(telemetry.distEarth),        color: "#60a5fa" },
+              { label: "Dist. Moon",    val: kmToDisp(telemetry.distMoon),         color: "#a5b4fc" },
+              { label: "Altitude",      val: kmToDisp(telemetry.altitudeAboveEarth), color: "#7dd3fc" },
+              { label: "Speed km/s",    val: `${telemetry.speed.toFixed(2)} km/s`, color: "#fbbf24" },
+              { label: "Speed km/h",    val: `${Math.round(telemetry.speedKmh).toLocaleString()} km/h`, color: "#fbbf24" },
+              { label: "Mach",          val: `M ${telemetry.speedMach.toFixed(1)}`, color: "#f97316" },
+              { label: "Light delay",   val: `${telemetry.lightTimeDelay.toFixed(2)} s`, color: "#c4b5fd" },
+              { label: "g-force",       val: `${telemetry.gForce.toExponential(2)} g`, color: "#f472b6" },
+              { label: "Mission prog.", val: `${telemetry.missionProgress.toFixed(1)}%`, color: "#34d399" },
+              { label: "Total dist",    val: kmToDisp(telemetry.totalDistanceTravelled), color: "#34d399" },
+              { label: "Hull sunlit",   val: `+${telemetry.hullSunlit}°C`, color: "#fb923c" },
+              { label: "Hull shadow",   val: `${telemetry.hullShadow}°C`, color: "#60a5fa" },
+              { label: "Cabin",         val: `${telemetry.cabinTemp}°C`, color: "#86efac" },
+              { label: "Heatshield",    val: `${telemetry.heatshieldTemp}°C`, color: telemetry.heatshieldTemp > 1000 ? "#ef4444" : "#86efac" },
             ].map(m => (
-              <div key={m.label} className="flex justify-between items-center text-xs rounded px-2 py-1.5"
+              <div key={m.label} className="rounded px-2 py-1.5"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <span className="text-gray-400">{m.label}</span>
-                <span className="text-white font-mono tabular-nums">{m.val}</span>
+                <div className="text-gray-500 text-xs">{m.label}</div>
+                <div className="font-mono tabular-nums text-xs" style={{ color: m.color }}>{m.val}</div>
               </div>
             ))}
           </div>
@@ -678,8 +951,8 @@ export default function UC3Page() {
 
       {/* Crew panel */}
       {activePanel === "crew" && (
-        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
-          style={{ top: launched ? 164 : 148, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(100,200,100,0.3)", backdropFilter: "blur(14px)" }}>
+        <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
+          style={{ top: launched ? 164 : 148, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(100,200,100,0.3)", backdropFilter: "blur(14px)", maxHeight: "70vh", overflowY: "auto" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-green-400 font-semibold tracking-widest">CREW — 4 ASTRONAUTS</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
@@ -691,10 +964,15 @@ export default function UC3Page() {
                 style={{ background: selected === c.name ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
                 onClick={() => setSelected(selected === c.name ? null : c.name)}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-base leading-none">{c.flag}</span>
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">{c.name}</div>
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.portrait} alt={c.name} className="w-10 h-10 rounded-full object-cover border border-white/10"
+                    onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden" }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm leading-none">{c.flag}</span>
+                      <span className="text-xs font-semibold text-white truncate">{c.name}</span>
+                    </div>
                     <div className="text-xs text-gray-500">{c.role} · {c.agency}</div>
                   </div>
                 </div>
@@ -707,27 +985,81 @@ export default function UC3Page() {
         </div>
       )}
 
-      {/* Mission Timeline panel */}
-      {activePanel === "timeline" && (
-        <div className="absolute right-14 z-10 w-60 rounded-xl p-3"
-          style={{ top: launched ? 72 : 56, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(180,100,255,0.35)", backdropFilter: "blur(14px)" }}>
+      {/* Systems panel */}
+      {activePanel === "systems" && (
+        <div className="absolute left-14 z-10 w-64 rounded-xl p-3"
+          style={{ top: launched ? 210 : 194, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(20,184,166,0.35)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
-            <div className="text-xs text-purple-400 font-semibold tracking-widest">TIMELINE</div>
+            <div className="text-xs text-teal-400 font-semibold tracking-widest">SYSTEMS STATUS</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
-          <div className="space-y-2">
-            {PHASES.map((p, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <div className="mt-0.5 w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: i < phase ? "#86efac" : i === phase ? "#fb923c" : "#334" }} />
-                <div>
-                  <div className="text-xs font-semibold" style={{ color: i === phase ? "#fb923c" : i < phase ? "#86efac" : "#666" }}>
-                    {p.label}
-                  </div>
-                  <div className="text-xs text-gray-600">L+{p.hoursFromL < 1 ? `${p.hoursFromL * 60}min` : `${p.hoursFromL}h`}</div>
+          <div className="space-y-1.5">
+            {SYSTEMS.map(s => (
+              <div key={s.id} className="flex items-center justify-between text-xs rounded px-2 py-1.5"
+                style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: statusColor(s.status), boxShadow: `0 0 6px ${statusColor(s.status)}` }} />
+                  <span className="text-gray-300">{s.label}</span>
                 </div>
+                <span className="uppercase text-xs tracking-wider" style={{ color: statusColor(s.status) }}>{s.status}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Records panel */}
+      {activePanel === "records" && (
+        <div className="absolute left-14 z-10 w-72 rounded-xl p-3"
+          style={{ top: launched ? 256 : 240, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(251,191,36,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-yellow-300 font-semibold tracking-widest">HISTORIC RECORDS</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <ul className="space-y-1.5">
+            {RECORDS.map((r, i) => (
+              <li key={i} className="text-xs text-gray-300 flex gap-2">
+                <span className="text-yellow-400 flex-shrink-0">★</span>
+                <span>{r}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Mission Events timeline panel */}
+      {activePanel === "events" && (
+        <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
+          style={{ top: launched ? 120 : 104, maxHeight: "70vh", background: "rgba(0,5,20,0.94)", border: "1px solid rgba(180,100,255,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="text-xs text-purple-400 font-semibold tracking-widest">MISSION EVENTS</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: "calc(70vh - 46px)" }}>
+            {MISSION_EVENTS.map((e, i) => {
+              const isPast    = missionT >= e.metHours
+              const isCurrent = i === currentEventIndex
+              const typeColor = e.type === "burn" ? "#fb923c" : e.type === "milestone" ? "#a855f7" : e.type === "phase" ? "#60a5fa" : "#14b8a6"
+              return (
+                <div key={e.id} className="flex gap-2 items-start rounded-lg p-1.5"
+                  style={{
+                    background: isCurrent ? `${typeColor}20` : "transparent",
+                    border: isCurrent ? `1px solid ${typeColor}60` : "1px solid transparent",
+                  }}>
+                  <div className="mt-1 w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: isPast ? typeColor : "#334", boxShadow: isCurrent ? `0 0 6px ${typeColor}` : "none" }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold" style={{ color: isPast ? "#fff" : "#666" }}>
+                      {e.title}
+                    </div>
+                    <div className="text-xs text-gray-500 tabular-nums">
+                      T+{e.metHours.toFixed(2)}h · {e.utc.slice(5, 16).replace("T", " ")}Z
+                    </div>
+                    <div className="text-xs text-gray-400 leading-snug mt-0.5">{e.description}</div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -735,7 +1067,7 @@ export default function UC3Page() {
       {/* Mission Facts panel */}
       {activePanel === "facts" && (
         <div className="absolute right-14 z-10 w-60 rounded-xl p-3"
-          style={{ top: launched ? 118 : 102, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,200,50,0.3)", backdropFilter: "blur(14px)" }}>
+          style={{ top: launched ? 166 : 150, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(255,200,50,0.3)", backdropFilter: "blur(14px)" }}>
           <div className="flex justify-between items-center mb-2">
             <div className="text-xs text-yellow-400 font-semibold tracking-widest">MISSION FACTS</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
@@ -745,10 +1077,13 @@ export default function UC3Page() {
               ["Vehicle",       "SLS Block 1"],
               ["Spacecraft",    "Orion MPCV"],
               ["Launch pad",    "LC-39B, KSC"],
-              ["Duration",      "~10 days"],
-              ["Closest Moon",  "~8,900 km"],
+              ["Launch",        "2026-04-01 22:35:12Z"],
+              ["Splashdown",    "2026-04-11 01:07:00Z"],
+              ["Duration",      "217.5h (9d 1h 31m)"],
+              ["Closest Moon",  units === "km" ? `${CLOSEST_APPROACH_KM.toLocaleString()} km` : `${CLOSEST_APPROACH_MI.toLocaleString()} mi`],
+              ["Peak Earth",    units === "km" ? `${PEAK_EARTH_KM.toLocaleString()} km` : `${PEAK_EARTH_MI.toLocaleString()} mi`],
               ["Trajectory",    "Free-return"],
-              ["Splashdown",    "Pacific Ocean"],
+              ["Recovery",      "Pacific — San Diego"],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between rounded px-2 py-1"
                 style={{ background: "rgba(255,255,255,0.03)" }}>
@@ -763,12 +1098,12 @@ export default function UC3Page() {
       {/* NASA News drawer */}
       {activePanel === "news" && (
         <div className="absolute right-14 z-10 w-72 rounded-xl overflow-hidden"
-          style={{ top: launched ? 164 : 148, maxHeight: "calc(100vh - 220px)", background: "rgba(0,5,25,0.96)", border: "1px solid rgba(100,150,255,0.25)", backdropFilter: "blur(14px)" }}>
+          style={{ top: launched ? 212 : 196, maxHeight: "calc(100vh - 260px)", background: "rgba(0,5,25,0.96)", border: "1px solid rgba(100,150,255,0.25)", backdropFilter: "blur(14px)" }}>
           <div className="p-3 flex justify-between items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="text-xs font-bold text-blue-300 tracking-wide">NASA ARTEMIS II — LATEST</div>
             <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
           </div>
-          <div className="overflow-y-auto p-3 space-y-3" style={{ maxHeight: "calc(100vh - 280px)" }}>
+          <div className="overflow-y-auto p-3 space-y-3" style={{ maxHeight: "calc(100vh - 320px)" }}>
             {news.length === 0 && (
               <div className="text-xs text-gray-500">Loading NASA imagery…</div>
             )}
@@ -792,18 +1127,50 @@ export default function UC3Page() {
         </div>
       )}
 
+      {/* Camera panel */}
+      {activePanel === "camera" && (
+        <div className="absolute right-14 z-10 w-56 rounded-xl p-3"
+          style={{ top: launched ? 258 : 242, background: "rgba(0,5,20,0.92)", border: "1px solid rgba(6,182,212,0.35)", backdropFilter: "blur(14px)" }}>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-cyan-400 font-semibold tracking-widest">CAMERA</div>
+            <button onClick={() => setActivePanel(null)} className="text-gray-500 hover:text-white text-sm leading-none">✕</button>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { id: "orbit", label: "Earth View" },
+              { id: "orion", label: "Lock on Orion" },
+              { id: "moon",  label: "Follow Moon" },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => { cameraModeRef.current = opt.id as any }}
+                className="w-full text-left text-xs px-2 py-1.5 rounded transition-colors"
+                style={{
+                  background: cameraModeRef.current === opt.id ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "#fff",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Bottom legend bar ─────────────────────────────────────────────── */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-400 px-4 py-2 rounded-lg"
         style={{ background: "rgba(0,5,20,0.75)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 opacity-70 inline-block" /> Earth</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-400 opacity-70 inline-block" /> Moon</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-400 opacity-70 inline-block" /> Orion</span>
-        <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-orange-400 opacity-70" style={{ width: 12 }} /> Trajectory</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-cyan-400 opacity-90" style={{ width: 12 }} /> Flown</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-0.5 bg-orange-400 opacity-80" style={{ width: 12 }} /> Upcoming</span>
         <span className="text-gray-600 hidden sm:inline">|</span>
         <span className="hidden sm:inline">Drag · Scroll to zoom</span>
       </div>
 
-      {/* ── Attribution ───────────────────────────────────────────────────── */}
+      {/* Attribution */}
       <div className="absolute bottom-3 right-3 z-10 text-xs text-gray-700 hidden sm:block">
         {dataSource === "horizons" ? "JPL Horizons -1032" : "MET interp."} · Moon: JPL · News: NASA
       </div>

@@ -3,43 +3,91 @@
 // Tries live Horizons first; falls back to physics-based MET interpolation if not yet catalogued.
 export const revalidate = 120  // 2-min cache — spacecraft moves ~1,400 km/min at TLI
 
-// Artemis II confirmed launch: 2026-04-01 18:00 UTC (update to exact T-0 when known)
-export const LAUNCH_ISO = "2026-04-01T18:00:00Z"
+// ── Mission constants (corrected) ────────────────────────────────────────────
+// Liftoff: 2026-04-01 22:35:12 UTC  |  Splashdown: 2026-04-11 01:07:00 UTC
+// Duration: 217.5 h (9 d 1 h 31 m)  |  Closest approach: ~6,540 km (4,067 mi)
+// Peak Earth distance: 406,771 km (252,756 mi)
+export const LAUNCH_ISO       = "2026-04-01T22:35:12Z"
+export const SPLASHDOWN_ISO   = "2026-04-11T01:07:00Z"
+export const DURATION_HOURS   = 217.5
+export const CLOSEST_APPROACH_KM = 6540        // from lunar surface
+export const PEAK_EARTH_KM       = 406771      // maximum distance from Earth center
+export const TOTAL_DISTANCE_KM   = 1_118_800   // estimated full trajectory length
 
-// Known trajectory waypoints [hours from T-0, distFromEarth km, distFromMoon km]
-// Based on published Artemis II mission profile (free-return, 10-day, 8,900 km closest approach)
+// Known trajectory waypoints matching the corrected mission profile.
+// Each row: hours from T-0, distance from Earth center (km), velocity (km/s),
+// and (for visual placement) a normalized direction toward the Moon used by the
+// spline fallback in the page component.
 const WAYPOINTS = [
-  { h:   0,   distEarth:     6571, velKms: 9.8  },   // Launch: ~200 km LEO insertion
-  { h:   1.5, distEarth:     6571, velKms: 9.8  },   // Parking orbit
-  { h:   2.5, distEarth:    10000, velKms: 10.2 },   // TLI burn — accelerating
-  { h:  24,   distEarth:   100000, velKms:  5.4 },   // Day 1 coast
-  { h:  48,   distEarth:   205000, velKms:  3.1 },   // Day 2 coast
-  { h:  72,   distEarth:   310000, velKms:  1.8 },   // Day 3 — approaching Moon
-  { h:  96,   distEarth:   380000, velKms:  0.9 },   // Closest approach ~8,900 km from Moon surface
-  { h: 120,   distEarth:   310000, velKms:  1.8 },   // Day 5 — returning
-  { h: 168,   distEarth:   185000, velKms:  2.8 },   // Day 7
-  { h: 216,   distEarth:    80000, velKms:  4.5 },   // Day 9
-  { h: 240,   distEarth:     6571, velKms:  9.0 },   // Splashdown
+  { h:    0.0, distEarth:   6371,  velKms:  0.00 },  // Liftoff — KSC surface
+  { h:    0.1, distEarth:   6571,  velKms:  7.80 },  // LEO insertion ~200 km
+  { h:    1.8, distEarth:   6571,  velKms: 10.40 },  // TLI burn complete
+  { h:    8.5, distEarth:  40000,  velKms:  5.20 },  // Early outbound (MCC-1)
+  { h:   24.0, distEarth: 120000,  velKms:  2.80 },  // T+24h — ~120 000 km
+  { h:   48.0, distEarth: 195000,  velKms:  2.00 },  // Day 2
+  { h:   72.0, distEarth: 250000,  velKms:  1.55 },  // T+72h — approaching Moon
+  { h:   96.0, distEarth: 330000,  velKms:  1.25 },  // Final approach corridor
+  { h:  120.45, distEarth: 390000, velKms:  1.35 },  // Lunar flyby — closest approach 6,540 km from surface
+  { h:  130.0, distEarth: PEAK_EARTH_KM, velKms: 1.20 }, // Peak Earth distance
+  { h:  144.0, distEarth: 360000,  velKms:  1.40 },  // Early return
+  { h:  168.0, distEarth: 200000,  velKms:  2.10 },  // T+168h — returning
+  { h:  192.0, distEarth: 110000,  velKms:  3.40 },  // Day 8
+  { h:  200.0, distEarth:  50000,  velKms:  5.10 },  // T+200h
+  { h:  210.0, distEarth:  15000,  velKms:  8.60 },  // Final approach
+  { h:  217.0, distEarth:   6471,  velKms: 11.00 },  // Entry interface (EI)
+  { h:  217.5, distEarth:   6371,  velKms:  0.00 },  // Splashdown — Pacific off San Diego
 ]
 
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
 
+// Mission phases in order; we pick by elapsed hours
+const PHASE_TABLE: { h: number; phase: string }[] = [
+  { h:    0.0, phase: "Liftoff" },
+  { h:    0.1, phase: "Ascent" },
+  { h:    0.25, phase: "Earth Orbit" },
+  { h:    1.8, phase: "Trans-Lunar Injection" },
+  { h:    8.0, phase: "Outbound Coast" },
+  { h:  115.0, phase: "Lunar Approach" },
+  { h:  120.0, phase: "Lunar Flyby" },
+  { h:  122.0, phase: "Return Coast" },
+  { h:  216.5, phase: "Entry Interface" },
+  { h:  217.5, phase: "Splashdown" },
+]
+
+function phaseForHours(h: number): string {
+  if (h < 0) return "Pre-Launch"
+  let best = PHASE_TABLE[0].phase
+  for (const row of PHASE_TABLE) {
+    if (h >= row.h) best = row.phase
+  }
+  return best
+}
+
 function interpolateMet(elapsedH: number) {
-  if (elapsedH <= 0) return { distEarth: 6371, velKms: 0, phase: "Pre-Launch" }
-  if (elapsedH >= 240) return { distEarth: 6371, velKms: 0, phase: "Splashdown" }
+  if (elapsedH <= 0) {
+    return { distEarth: 6371, velKms: 0, phase: "Pre-Launch" }
+  }
+  if (elapsedH >= DURATION_HOURS) {
+    return { distEarth: 6371, velKms: 0, phase: "Splashdown" }
+  }
 
   const idx = WAYPOINTS.findIndex(w => w.h > elapsedH)
-  if (idx <= 0) return { distEarth: WAYPOINTS[0].distEarth, velKms: WAYPOINTS[0].velKms, phase: "Ascent" }
+  if (idx <= 0) {
+    return {
+      distEarth: WAYPOINTS[0].distEarth,
+      velKms:    WAYPOINTS[0].velKms,
+      phase:     phaseForHours(elapsedH),
+    }
+  }
 
   const w0 = WAYPOINTS[idx - 1]
   const w1 = WAYPOINTS[idx]
   const t  = (elapsedH - w0.h) / (w1.h - w0.h)
 
-  const PHASES = ["Launch", "Earth Orbit", "TLI Burn", "Outbound Coast", "Outbound Coast", "Approaching Moon", "Lunar Flyby", "Return Coast", "Return Coast", "Return Coast", "Splashdown"]
   return {
     distEarth: lerp(w0.distEarth, w1.distEarth, t),
     velKms:    lerp(w0.velKms,    w1.velKms,    t),
-    phase:     PHASES[Math.min(idx, PHASES.length - 1)],
+    phase:     phaseForHours(elapsedH),
   }
 }
 
@@ -68,7 +116,6 @@ async function queryHorizons(nowISO: string, stopISO: string) {
   if (!res.ok) return null
   const data = JSON.parse(await res.text())
   const raw: string = data.result ?? ""
-  // Check for known error messages in the result text
   if (raw.includes("No ephemeris") || raw.includes("Cannot find") || raw.includes("does not exist")) return null
   const soe = raw.indexOf("$$SOE")
   const eoe = raw.indexOf("$$EOE")
@@ -85,9 +132,7 @@ async function queryHorizons(nowISO: string, stopISO: string) {
   const vz = parseFloat(cols[7])
   if (isNaN(x)) return null
 
-  // Sanity check: Orion must be within Earth-Moon system (< 700 000 km from Earth).
-  // If Horizons matched a wrong catalogue entry (asteroid etc.) the distance will be
-  // millions of km — we reject it and fall through to MET interpolation.
+  // Sanity check: Orion must stay within the Earth-Moon system (< 700 000 km).
   const dist = Math.sqrt(x*x + y*y + z*z)
   if (dist > 700_000) return null
 
@@ -95,15 +140,15 @@ async function queryHorizons(nowISO: string, stopISO: string) {
 }
 
 export async function GET() {
-  const now     = new Date()
-  const stop    = new Date(now.getTime() + 30 * 60 * 1000) // +30 min window
-  const fmt     = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ")
-  const launch  = new Date(LAUNCH_ISO)
+  const now      = new Date()
+  const stop     = new Date(now.getTime() + 30 * 60 * 1000) // +30 min window
+  const fmt      = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ")
+  const launch   = new Date(LAUNCH_ISO)
   const elapsedH = (now.getTime() - launch.getTime()) / 3_600_000
 
   // ── Try live Horizons first ────────────────────────────────────────────────
   let horizons: Awaited<ReturnType<typeof queryHorizons>> = null
-  if (elapsedH > 0) {
+  if (elapsedH > 0 && elapsedH < DURATION_HOURS + 1) {
     try { horizons = await queryHorizons(fmt(now), fmt(stop)) } catch {}
   }
 
@@ -116,7 +161,10 @@ export async function GET() {
       x, y, z, vx, vy, vz,
       distEarth, velKms,
       elapsedH,
-      launchIso: LAUNCH_ISO,
+      phase: phaseForHours(elapsedH),
+      launchIso:     LAUNCH_ISO,
+      splashdownIso: SPLASHDOWN_ISO,
+      durationHours: DURATION_HOURS,
       ts: now.toISOString(),
     }), {
       headers: {
@@ -127,9 +175,6 @@ export async function GET() {
   }
 
   // ── Fallback: physics-based MET interpolation ──────────────────────────────
-  // Do NOT return x/y/z here — the page will use the trajectory spline (which is
-  // aligned to the real Moon position from Horizons) for visual placement.
-  // We only supply distEarth + velKms for the telemetry panel.
   const { distEarth, velKms, phase } = interpolateMet(elapsedH)
 
   return new Response(JSON.stringify({
@@ -138,7 +183,9 @@ export async function GET() {
     distEarth, velKms,
     elapsedH,
     phase,
-    launchIso: LAUNCH_ISO,
+    launchIso:     LAUNCH_ISO,
+    splashdownIso: SPLASHDOWN_ISO,
+    durationHours: DURATION_HOURS,
     ts: now.toISOString(),
   }), {
     headers: {
