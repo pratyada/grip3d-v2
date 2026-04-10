@@ -161,6 +161,14 @@ export default function UC3Page() {
   const [dataSource,  setDataSource]  = useState("interpolated")
   const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["recovery", "systems"]))
 
+  // Detect white-label host (artemis.yprateek.com) — adds a link back to personal site
+  const [isWhiteLabelHost, setIsWhiteLabelHost] = useState(false)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsWhiteLabelHost(window.location.hostname === "artemis.yprateek.com")
+    }
+  }, [])
+
   // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
   // Must start muted for browsers to allow autoplay (then user can unmute)
@@ -628,6 +636,20 @@ export default function UC3Page() {
             className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors hidden sm:block">
             Details →
           </Link>
+          {/* Show "back to home" link only on the artemis.yprateek.com white-label host */}
+          {isWhiteLabelHost && (
+            <a
+              href="https://yprateek.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-2 py-1 rounded border transition-colors hidden sm:flex items-center gap-1"
+              style={{ borderColor: "rgba(51,204,221,0.5)", color: "#67e8f9", background: "rgba(51,204,221,0.08)" }}
+              title="Visit yprateek.com"
+            >
+              <span>←</span>
+              <span>yprateek.com</span>
+            </a>
+          )}
         </div>
       </div>
 

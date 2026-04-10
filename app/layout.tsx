@@ -87,7 +87,6 @@ export default async function RootLayout({
   const hdrs = await headers()
   const host = (hdrs.get("host") ?? "").toLowerCase()
   const isEmbedMode = EMBED_HOSTS.has(host)
-  const homeLink = EMBED_HOME_LINKS[host]
 
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
@@ -95,39 +94,6 @@ export default async function RootLayout({
         {!isEmbedMode && <Navbar />}
         <main className="flex-1">{children}</main>
         {!isEmbedMode && <Footer />}
-
-        {/* Floating "back to personal site" link for white-label hosts */}
-        {isEmbedMode && homeLink && (
-          <a
-            href={homeLink.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              position: "fixed",
-              top: 9,
-              right: 180,
-              zIndex: 100,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "5px 11px",
-              borderRadius: 999,
-              background: "rgba(0,5,20,0.85)",
-              border: "1px solid rgba(51,204,221,0.4)",
-              color: "#67e8f9",
-              fontSize: 11,
-              fontWeight: 600,
-              textDecoration: "none",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
-              transition: "all 0.2s ease",
-            }}
-            title={`Visit ${homeLink.label}`}
-          >
-            <span>←</span>
-            <span>{homeLink.label}</span>
-          </a>
-        )}
       </body>
     </html>
   )
