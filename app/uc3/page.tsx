@@ -182,8 +182,8 @@ export default function UC3Page() {
       if (!dragStateRef.current) return
       const dx = ev.clientX - dragStateRef.current.startX
       const dy = ev.clientY - dragStateRef.current.startY
-      const newX = Math.max(0, Math.min(window.innerWidth - 440, dragStateRef.current.origX + dx))
-      const newY = Math.max(0, Math.min(window.innerHeight - 290, dragStateRef.current.origY + dy))
+      const newX = Math.max(0, Math.min(window.innerWidth - 380, dragStateRef.current.origX + dx))
+      const newY = Math.max(0, Math.min(window.innerHeight - 250, dragStateRef.current.origY + dy))
       setNasaTvPos({ x: newX, y: newY })
     }
     const onUp = () => {
@@ -735,8 +735,8 @@ export default function UC3Page() {
           className="fixed z-50 bg-black rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40"
           style={
             nasaTvPos
-              ? { width: 440, height: 290, left: nasaTvPos.x, top: nasaTvPos.y, boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
-              : { width: 440, height: 290, right: 16, top: "50%", transform: "translateY(-50%)", boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
+              ? { width: 380, height: 250, left: nasaTvPos.x, top: nasaTvPos.y, boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
+              : { width: 380, height: 250, left: 16, bottom: 56, boxShadow: "0 0 60px rgba(0,200,255,0.25)" }
           }
         >
           <div
@@ -764,8 +764,8 @@ export default function UC3Page() {
           <iframe
             key={nasaTvMuted ? "muted" : "unmuted"}
             src={`https://www.youtube.com/embed/m3kR2KK8TEs?si=i8sUw9uyCmeQZNRQ&autoplay=1&mute=${nasaTvMuted ? 1 : 0}&playsinline=1&rel=0`}
-            width="440"
-            height="258"
+            width="380"
+            height="218"
             frameBorder={0}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerPolicy="strict-origin-when-cross-origin"
