@@ -159,7 +159,7 @@ export default function UC3Page() {
   const [distEarth, setDistEarth] = useState<number | null>(null)
   const [velKms,    setVelKms]    = useState<number | null>(null)
   const [dataSource,  setDataSource]  = useState("interpolated")
-  const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["recovery", "systems", "camera"]))
+  const [activePanels, setActivePanels] = useState<Set<string>>(() => new Set(["recovery", "systems"]))
 
   // NASA TV panel state — open + sound ON by default
   const [showNasaTv, setShowNasaTv] = useState(true)
