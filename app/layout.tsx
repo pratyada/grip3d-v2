@@ -11,6 +11,11 @@ const EMBED_HOSTS = new Set([
   "artemis.yprateek.com",
 ])
 
+// Optional "back to home" link shown for embed-mode hosts.
+const EMBED_HOME_LINKS: Record<string, { url: string; label: string }> = {
+  "artemis.yprateek.com": { url: "https://yprateek.com", label: "yprateek.com" },
+}
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -82,6 +87,7 @@ export default async function RootLayout({
   const hdrs = await headers()
   const host = (hdrs.get("host") ?? "").toLowerCase()
   const isEmbedMode = EMBED_HOSTS.has(host)
+  const homeLink = EMBED_HOME_LINKS[host]
 
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
@@ -89,6 +95,39 @@ export default async function RootLayout({
         {!isEmbedMode && <Navbar />}
         <main className="flex-1">{children}</main>
         {!isEmbedMode && <Footer />}
+
+        {/* Floating "back to personal site" link for white-label hosts */}
+        {isEmbedMode && homeLink && (
+          <a
+            href={homeLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              position: "fixed",
+              top: 12,
+              left: 12,
+              zIndex: 100,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 999,
+              background: "rgba(0,5,20,0.85)",
+              border: "1px solid rgba(51,204,221,0.4)",
+              color: "#67e8f9",
+              fontSize: 12,
+              fontWeight: 600,
+              textDecoration: "none",
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
+              transition: "all 0.2s ease",
+            }}
+            title={`Visit ${homeLink.label}`}
+          >
+            <span>←</span>
+            <span>{homeLink.label}</span>
+          </a>
+        )}
       </body>
     </html>
   )
