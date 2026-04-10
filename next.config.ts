@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  // Subdomain rewrites — artemis.yprateek.com serves UC3 directly
+  async rewrites() {
+    return [
+      {
+        source: "/",
+        has: [{ type: "host", value: "artemis.yprateek.com" }],
+        destination: "/uc3",
+      },
+    ]
+  },
 }
 
 export default nextConfig
