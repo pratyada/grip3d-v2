@@ -1,8 +1,15 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { headers } from "next/headers"
 import "./globals.css"
 import { Navbar } from "@/components/Navbar"
 import { Footer } from "@/components/Footer"
+
+// Hosts that should render in "embed" mode — no GRIP navbar/footer.
+// Add more here as you launch white-label subdomains.
+const EMBED_HOSTS = new Set([
+  "artemis.yprateek.com",
+])
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,17 +43,21 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const hdrs = await headers()
+  const host = (hdrs.get("host") ?? "").toLowerCase()
+  const isEmbedMode = EMBED_HOSTS.has(host)
+
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
       <body className="min-h-full flex flex-col" style={{ background: "var(--bg)", color: "var(--text)" }}>
-        <Navbar />
+        {!isEmbedMode && <Navbar />}
         <main className="flex-1">{children}</main>
-        <Footer />
+        {!isEmbedMode && <Footer />}
       </body>
     </html>
   )
