@@ -87,7 +87,9 @@ export default async function RootLayout({
   const hdrs = await headers()
   const host = (hdrs.get("host") ?? "").toLowerCase()
   const isEmbedMode = EMBED_HOSTS.has(host)
-  const enableWatchParty = host === "artemis.yprateek.com"
+  // Watch party disabled — Artemis II splashed down successfully on 2026-04-11.
+  // Files remain in /public/ as a historical record. Re-enable for Artemis III.
+  const enableWatchParty = false
 
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
