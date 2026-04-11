@@ -259,6 +259,7 @@
       '      </div>' +
       '    </div>' +
       '  </div>' +
+      '  <button class="wp-chat-collapse" id="wp-collapse" aria-label="Minimize chat" title="Minimize">_</button>' +
       '</div>' +
       '<div class="wp-chat-messages" id="wp-messages">' +
       '  <div class="wp-chat-empty" id="wp-empty">No messages yet. Be the first to say hi!</div>' +
@@ -266,7 +267,13 @@
       inputRow;
 
     document.body.appendChild(chat);
-    // Chat is always-on — no collapse button
+
+    // Minimize button — collapses chat to the rocket toggle button
+    document.getElementById("wp-collapse").addEventListener("click", function () {
+      chatExpanded = false;
+      chat.remove();
+      renderToggle();
+    });
 
     if (canChat) {
       document.getElementById("wp-input-form").addEventListener("submit", function (e) {
