@@ -758,6 +758,30 @@ export const useCases: UseCase[] = [
     demoUrl: "/uc30",
     detailsUrl: "/uc30/details",
   },
+  {
+    id: "UC31",
+    slug: "uc31",
+    title: "FIFA World Cup 2026",
+    category: "sports",
+    image: "/img/tile-31.jpg",
+    emoji: "\u26BD",
+    tags: ["FIFA", "World Cup", "Football", "Soccer", "2026", "Sports", "Real-Time", "USA", "Mexico", "Canada"],
+    description: "Interactive 3D globe tracking FIFA World Cup 2026 — 16 stadiums across US, Mexico, and Canada with fan travel corridors, 48 qualified teams, live match data, and real-time countdown.",
+    longDescription:
+      "Visualize the biggest sporting event in history on a real-time 3D globe. 16 host stadiums across 3 countries rendered as capacity-scaled glowing points, 21 animated fan travel corridor arcs from supporter nations worldwide, 48 qualified teams mapped with group assignments and confederation data, and a live match schedule carousel with FIFA API integration. Four view modes — Stadiums, Fan Travel, Teams, and Matches — with country filtering, satellite imagery on stadium selection, and a real-time countdown to the June 11, 2026 kickoff.",
+    highlights: [
+      "16 host stadiums across USA (11), Mexico (3), and Canada (2) with capacity-scaled markers",
+      "21 animated fan travel arcs from supporter nations to host cities, weighted by volume",
+      "48 qualified nations highlighted in team colours with group assignments A-L",
+      "Real-time countdown to June 11, 2026 kickoff — days, hours, minutes, seconds",
+      "Match schedule carousel with live/finished/upcoming status from FIFA API",
+      "ESRI satellite imagery and Google Maps 3D links for each stadium",
+    ],
+    status: "live",
+    featured: true,
+    demoUrl: "/uc31",
+    detailsUrl: "/uc31/details",
+  },
 ]
 
 export const leaders: Leader[] = [
