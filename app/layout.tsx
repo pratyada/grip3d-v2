@@ -9,11 +9,13 @@ import { Footer } from "@/components/Footer"
 // Add more here as you launch white-label subdomains.
 const EMBED_HOSTS = new Set([
   "artemis.yprateek.com",
+  "fifa2026.yprateek.com",
 ])
 
 // Optional "back to home" link shown for embed-mode hosts.
 const EMBED_HOME_LINKS: Record<string, { url: string; label: string }> = {
   "artemis.yprateek.com": { url: "https://yprateek.com", label: "yprateek.com" },
+  "fifa2026.yprateek.com": { url: "https://yprateek.com", label: "yprateek.com" },
 }
 
 const inter = Inter({
@@ -28,6 +30,11 @@ const HOST_BRANDING: Record<string, { title: string; description: string; favico
     title: "Artemis II Live Tracker",
     description: "Real-time tracking of NASA's Artemis II crewed lunar mission — Orion spacecraft trajectory, splashdown countdown, NASA Live TV, recovery sequence.",
     favicon: "/img/favicon-artemis.svg",
+  },
+  "fifa2026.yprateek.com": {
+    title: "FIFA World Cup 2026 Globe",
+    description: "Interactive 3D globe tracking the FIFA World Cup 2026 across US, Mexico, and Canada — 16 stadiums, 48 teams, fan travel corridors, live match data, and countdown to kickoff.",
+    favicon: "/img/favicon-fifa.svg",
   },
 }
 

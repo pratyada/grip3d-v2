@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 // Add more white-label subdomains here as you launch them.
 const HOST_REWRITES: Record<string, string> = {
   "artemis.yprateek.com": "/uc3",
+  "fifa2026.yprateek.com": "/uc31",
 }
 
 export function middleware(req: NextRequest) {

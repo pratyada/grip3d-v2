@@ -288,6 +288,11 @@ export default function UC31Page() {
   const [isSpinning, setIsSpinning] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
 
+  const [isWhiteLabel, setIsWhiteLabel] = useState(false)
+  useEffect(() => {
+    if (typeof window !== "undefined") setIsWhiteLabel(window.location.hostname === "fifa2026.yprateek.com")
+  }, [])
+
   const countdown = useCountdown()
 
   // ── Filtered stadiums ────────────────────────────────────────────────────
@@ -584,6 +589,13 @@ export default function UC31Page() {
             <span className="text-white/20">|</span>
             <span>3 nations</span>
             <Link href="/uc31/details" className="ml-2 px-2 py-1 rounded bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors">Details &rarr;</Link>
+            {isWhiteLabel && (
+              <a href="https://yprateek.com" target="_blank" rel="noopener noreferrer"
+                className="ml-1 px-2 py-1 rounded text-xs font-semibold transition-colors hidden sm:flex items-center gap-1"
+                style={{ borderColor: "rgba(34,197,94,0.5)", border: "1px solid rgba(34,197,94,0.5)", color: "#4ade80", background: "rgba(34,197,94,0.08)" }}>
+                <span>&larr;</span><span>yprateek.com</span>
+              </a>
+            )}
           </div>
         </div>
       </div>
