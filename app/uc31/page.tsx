@@ -278,7 +278,7 @@ export default function UC31Page() {
   const globeRef = useRef<HTMLDivElement | null>(null)
   const globeInst = useRef<any>(null)
 
-  const [viewMode, setViewMode] = useState<ViewMode>("fanTravel")
+  const [viewMode, setViewMode] = useState<ViewMode>("teams")
   const [countryFilter, setCountryFilter] = useState<CountryFilter>("all")
   const [selectedStadium, setSelectedStadium] = useState<Stadium | null>(null)
   const [countries, setCountries] = useState<CountryFeature[]>([])
