@@ -600,6 +600,58 @@ export default function UC31Page() {
         </div>
       </div>
 
+      {/* ── BIG KICKOFF COUNTDOWN (top-center hero) ──────────────────── */}
+      {!countdown.live && (
+        <div className="absolute z-20 pointer-events-none" style={{ top: 60, left: "50%", transform: "translateX(-50%)" }}>
+          <div className="flex flex-col items-center" style={{
+            background: "linear-gradient(180deg, rgba(0,15,5,0.88) 0%, rgba(0,30,10,0.65) 100%)",
+            border: "1px solid rgba(34,197,94,0.4)",
+            borderRadius: 16,
+            padding: "12px 28px",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 0 40px rgba(34,197,94,0.2), 0 0 80px rgba(34,197,94,0.08)",
+          }}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold tracking-[0.25em]" style={{
+                color: "#4ade80",
+                textShadow: "0 0 12px rgba(34,197,94,0.6)",
+              }}>
+                ⚽ KICKOFF IN
+              </span>
+            </div>
+            <div className="flex items-end gap-2 sm:gap-3 font-mono">
+              {[
+                { v: String(countdown.days).padStart(2, "0"), l: "DAYS" },
+                { v: String(countdown.hours).padStart(2, "0"), l: "HRS" },
+                { v: String(countdown.mins).padStart(2, "0"), l: "MIN" },
+                { v: String(countdown.secs).padStart(2, "0"), l: "SEC" },
+              ].map((seg, i) => (
+                <div key={seg.l} className="flex items-end gap-2 sm:gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className="tabular-nums leading-none" style={{
+                      fontSize: "clamp(32px, 5.5vw, 58px)",
+                      fontWeight: 900,
+                      color: "#fff",
+                      textShadow: "0 0 16px rgba(34,197,94,0.85), 0 0 32px rgba(34,197,94,0.45)",
+                      letterSpacing: "-0.02em",
+                    }}>{seg.v}</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] mt-1" style={{ color: "#94a3b8" }}>
+                      {seg.l}
+                    </span>
+                  </div>
+                  {i < 3 && (
+                    <span className="text-green-400/40 leading-none pb-3 sm:pb-4" style={{ fontSize: "clamp(24px, 4.5vw, 46px)", fontWeight: 200 }}>:</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] mt-1 tracking-wide" style={{ color: "#64748b" }}>
+              June 11, 2026 · Mexico City · Estadio Azteca · Opening Match
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Left panel — view mode ───────────────────────────────────── */}
       <div className="absolute left-4 top-20 z-20 flex flex-col gap-2">
         {VIEW_MODES.map((m) => (
