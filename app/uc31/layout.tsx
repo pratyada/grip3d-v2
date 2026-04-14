@@ -18,12 +18,13 @@ export async function generateMetadata(): Promise<Metadata> {
         url: "https://fifa2026.yprateek.com",
         siteName: "FIFA World Cup 2026 Globe",
         type: "website",
-        images: [{ url: "/img/favicon-fifa.svg", width: 64, height: 64 }],
+        images: [{ url: "/img/tile-31.jpg", width: 1200, height: 630 }],
       },
       twitter: {
         card: "summary_large_image",
         title: "FIFA World Cup 2026 Globe",
         description: "16 stadiums · 48 teams · 3 countries. Live fan travel, match data, and countdown on a 3D globe.",
+        images: ["/img/tile-31.jpg"],
       },
       icons: {
         icon: [{ url: "/img/favicon-fifa.svg", type: "image/svg+xml" }],
