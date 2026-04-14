@@ -287,6 +287,7 @@ export default function UC31Page() {
   const [matches, setMatches] = useState<MatchData[]>(SAMPLE_MATCHES)
   const [isSpinning, setIsSpinning] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
+  const [globeReady, setGlobeReady] = useState(false)
 
   const [isWhiteLabel, setIsWhiteLabel] = useState(false)
   useEffect(() => {
@@ -349,6 +350,7 @@ export default function UC31Page() {
       globe.controls().dampingFactor = 0.1
 
       globeInst.current = globe
+      setGlobeReady(true)
     })
 
     return () => {
@@ -501,14 +503,14 @@ export default function UC31Page() {
       applyStadiums(globe)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, countryFilter, applyStadiums, applyArcs, applyTeamPoints])
+  }, [viewMode, countryFilter, applyStadiums, applyArcs, applyTeamPoints, globeReady])
 
   // ── Sync country polygons ─────────────────────────────────────────────
   useEffect(() => {
     if (!globeInst.current || !countries.length) return
     applyCountries(globeInst.current, countries, hoveredCountry, selectedCountry)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countries, hoveredCountry, selectedCountry, viewMode])
+  }, [countries, hoveredCountry, selectedCountry, viewMode, globeReady])
 
   // ── Fly to stadium from list ──────────────────────────────────────────
   const flyToStadium = useCallback((s: Stadium) => {
