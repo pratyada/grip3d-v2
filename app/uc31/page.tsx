@@ -278,7 +278,7 @@ export default function UC31Page() {
   const globeRef = useRef<HTMLDivElement | null>(null)
   const globeInst = useRef<any>(null)
 
-  const [viewMode, setViewMode] = useState<ViewMode>("stadiums")
+  const [viewMode, setViewMode] = useState<ViewMode>("fanTravel")
   const [countryFilter, setCountryFilter] = useState<CountryFilter>("all")
   const [selectedStadium, setSelectedStadium] = useState<Stadium | null>(null)
   const [countries, setCountries] = useState<CountryFeature[]>([])
@@ -286,7 +286,7 @@ export default function UC31Page() {
   const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null)
   const [matches, setMatches] = useState<MatchData[]>(SAMPLE_MATCHES)
   const [isSpinning, setIsSpinning] = useState(true)
-  const [showPanel, setShowPanel] = useState(true)
+  const [showPanel, setShowPanel] = useState(false)
 
   const countdown = useCountdown()
 
@@ -728,7 +728,7 @@ export default function UC31Page() {
       )}
 
       {/* ── Fan Travel legend ────────────────────────────────────────── */}
-      {viewMode === "fanTravel" && (
+      {showPanel && viewMode === "fanTravel" && (
         <div className="absolute right-4 top-20 z-20 w-72 rounded-xl overflow-hidden" style={{ background: "rgba(15,23,42,0.92)", backdropFilter: "blur(14px)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="px-4 py-3 border-b border-white/5">
             <h2 className="text-sm font-bold text-white">{"\u2708\uFE0F"} Fan Travel Corridors</h2>
@@ -749,7 +749,7 @@ export default function UC31Page() {
       )}
 
       {/* ── Teams legend ─────────────────────────────────────────────── */}
-      {viewMode === "teams" && (
+      {showPanel && viewMode === "teams" && (
         <div className="absolute right-4 top-20 z-20 w-72 rounded-xl overflow-hidden" style={{ background: "rgba(15,23,42,0.92)", backdropFilter: "blur(14px)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="px-4 py-3 border-b border-white/5">
             <h2 className="text-sm font-bold text-white">{"\u{1F30D}"} 48 Qualified Nations</h2>
