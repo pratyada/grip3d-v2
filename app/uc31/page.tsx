@@ -64,6 +64,21 @@ interface CountryFeature {
   geometry: { type: string; coordinates: unknown[] }
 }
 
+interface TeamDetail {
+  code: string
+  name: string
+  nickname: string
+  confederation: string
+  fifaRanking: number
+  worldCupAppearances: number
+  bestFinish: string
+  coach: string
+  captain: string
+  keyPlayers: { name: string; position: string; club: string }[]
+  funFacts: string[]
+  teamPageUrl: string
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const COUNTRY_COLORS: Record<string, string> = {
@@ -198,6 +213,607 @@ const TEAMS: Team[] = [
   { code: "GHA", name: "Ghana", group: "I", lat: 5.6, lng: -0.2, color: "#006b3f", region: "CAF" },
 ]
 
+// ── Team Details ────────────────────────────────────────────────────────────
+
+const TEAM_DETAILS: Record<string, TeamDetail> = {
+  USA: {
+    code: "USA", name: "United States", nickname: "USMNT", confederation: "CONCACAF",
+    fifaRanking: 11, worldCupAppearances: 11, bestFinish: "Semi-finals (1930)",
+    coach: "Mauricio Pochettino", captain: "Christian Pulisic",
+    keyPlayers: [
+      { name: "Christian Pulisic", position: "Forward", club: "AC Milan" },
+      { name: "Weston McKennie", position: "Midfielder", club: "Juventus" },
+      { name: "Gio Reyna", position: "Midfielder", club: "Borussia Dortmund" },
+      { name: "Yunus Musah", position: "Midfielder", club: "AC Milan" },
+      { name: "Timothy Weah", position: "Forward", club: "Juventus" },
+    ],
+    funFacts: ["Host nation for 3rd time (also 1994)", "Largest sports market in the world", "Pochettino's first major international tournament as national coach"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/USA",
+  },
+  MEX: {
+    code: "MEX", name: "Mexico", nickname: "El Tri", confederation: "CONCACAF",
+    fifaRanking: 15, worldCupAppearances: 17, bestFinish: "Quarter-finals (1970, 1986)",
+    coach: "Javier Aguirre", captain: "Edson Alvarez",
+    keyPlayers: [
+      { name: "Edson Alvarez", position: "Midfielder", club: "West Ham" },
+      { name: "Hirving Lozano", position: "Forward", club: "PSV" },
+      { name: "Raul Jimenez", position: "Forward", club: "Fulham" },
+    ],
+    funFacts: ["Estadio Azteca hosted 2 WC finals (1970, 1986)", "Most CONCACAF Gold Cup wins (12)", "16 consecutive World Cup appearances"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/MEX",
+  },
+  CAN: {
+    code: "CAN", name: "Canada", nickname: "Les Rouges", confederation: "CONCACAF",
+    fifaRanking: 43, worldCupAppearances: 2, bestFinish: "Group Stage (1986)",
+    coach: "Jesse Marsch", captain: "Alphonso Davies",
+    keyPlayers: [
+      { name: "Alphonso Davies", position: "Defender", club: "Bayern Munich" },
+      { name: "Jonathan David", position: "Forward", club: "Lille" },
+      { name: "Cyle Larin", position: "Forward", club: "Real Valladolid" },
+    ],
+    funFacts: ["Only 2nd World Cup ever (first was 1986)", "Davies is fastest player in Bundesliga history (36.51 km/h)", "Hosted Women's World Cup in 2015"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/CAN",
+  },
+  CRC: {
+    code: "CRC", name: "Costa Rica", nickname: "Los Ticos", confederation: "CONCACAF",
+    fifaRanking: 52, worldCupAppearances: 6, bestFinish: "Quarter-finals (2014)",
+    coach: "Claudio Vivas", captain: "Bryan Ruiz",
+    keyPlayers: [
+      { name: "Keylor Navas", position: "Goalkeeper", club: "Nottingham Forest" },
+      { name: "Joel Campbell", position: "Forward", club: "Alajuelense" },
+      { name: "Jewison Bennette", position: "Forward", club: "Sunderland" },
+    ],
+    funFacts: ["Shocked the world reaching QF in 2014 Brazil", "Known for producing top goalkeepers", "Smallest nation by population to reach WC QF"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/CRC",
+  },
+  JAM: {
+    code: "JAM", name: "Jamaica", nickname: "Reggae Boyz", confederation: "CONCACAF",
+    fifaRanking: 62, worldCupAppearances: 2, bestFinish: "Group Stage (1998)",
+    coach: "Heimir Hallgrimsson", captain: "Andre Blake",
+    keyPlayers: [
+      { name: "Leon Bailey", position: "Forward", club: "Aston Villa" },
+      { name: "Michail Antonio", position: "Forward", club: "West Ham" },
+      { name: "Andre Blake", position: "Goalkeeper", club: "Philadelphia Union" },
+    ],
+    funFacts: ["First Caribbean nation to qualify for a World Cup (1998)", "Reggae Boyz inspired a national movement in 1998", "Several players have dual nationality options from England"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/JAM",
+  },
+  HON: {
+    code: "HON", name: "Honduras", nickname: "Los Catrachos", confederation: "CONCACAF",
+    fifaRanking: 76, worldCupAppearances: 4, bestFinish: "Group Stage (1982, 2010, 2014)",
+    coach: "Reinaldo Rueda", captain: "Maynor Figueroa",
+    keyPlayers: [
+      { name: "Alberth Elis", position: "Forward", club: "Bordeaux" },
+      { name: "Romell Quioto", position: "Forward", club: "CF Montreal" },
+      { name: "Andy Najar", position: "Defender", club: "D.C. United" },
+    ],
+    funFacts: ["Honduras qualified for 3 World Cups in 4 cycles (2010-2014)", "Known for passionate home support in San Pedro Sula", "Produced legendary coach Chelato Ucles"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/HON",
+  },
+  ENG: {
+    code: "ENG", name: "England", nickname: "Three Lions", confederation: "UEFA",
+    fifaRanking: 4, worldCupAppearances: 16, bestFinish: "Champions (1966)",
+    coach: "Thomas Tuchel", captain: "Harry Kane",
+    keyPlayers: [
+      { name: "Harry Kane", position: "Forward", club: "Bayern Munich" },
+      { name: "Jude Bellingham", position: "Midfielder", club: "Real Madrid" },
+      { name: "Bukayo Saka", position: "Forward", club: "Arsenal" },
+      { name: "Phil Foden", position: "Midfielder", club: "Manchester City" },
+      { name: "Declan Rice", position: "Midfielder", club: "Arsenal" },
+    ],
+    funFacts: ["Invented the sport of football", "1 World Cup title (1966 at Wembley)", "Tuchel is first German to manage England"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/ENG",
+  },
+  GER: {
+    code: "GER", name: "Germany", nickname: "Die Mannschaft", confederation: "UEFA",
+    fifaRanking: 13, worldCupAppearances: 20, bestFinish: "Champions (1954, 1974, 1990, 2014)",
+    coach: "Julian Nagelsmann", captain: "Ilkay Gundogan",
+    keyPlayers: [
+      { name: "Jamal Musiala", position: "Midfielder", club: "Bayern Munich" },
+      { name: "Florian Wirtz", position: "Midfielder", club: "Bayer Leverkusen" },
+      { name: "Kai Havertz", position: "Forward", club: "Arsenal" },
+    ],
+    funFacts: ["4 World Cup titles (tied 2nd most)", "Most European Championship wins (3)", "Youngest squad rebuild under Nagelsmann"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/GER",
+  },
+  FRA: {
+    code: "FRA", name: "France", nickname: "Les Bleus", confederation: "UEFA",
+    fifaRanking: 2, worldCupAppearances: 16, bestFinish: "Champions (1998, 2018)",
+    coach: "Didier Deschamps", captain: "Kylian Mbappe",
+    keyPlayers: [
+      { name: "Kylian Mbappe", position: "Forward", club: "Real Madrid" },
+      { name: "Antoine Griezmann", position: "Forward", club: "Atletico Madrid" },
+      { name: "Aurelien Tchouameni", position: "Midfielder", club: "Real Madrid" },
+      { name: "William Saliba", position: "Defender", club: "Arsenal" },
+    ],
+    funFacts: ["2018 champions, 2022 runners-up", "Deschamps is longest-serving France coach", "Mbappe scored hat-trick in 2022 WC final"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/FRA",
+  },
+  ESP: {
+    code: "ESP", name: "Spain", nickname: "La Roja", confederation: "UEFA",
+    fifaRanking: 3, worldCupAppearances: 16, bestFinish: "Champions (2010)",
+    coach: "Luis de la Fuente", captain: "Alvaro Morata",
+    keyPlayers: [
+      { name: "Lamine Yamal", position: "Forward", club: "Barcelona" },
+      { name: "Pedri", position: "Midfielder", club: "Barcelona" },
+      { name: "Rodri", position: "Midfielder", club: "Manchester City" },
+      { name: "Nico Williams", position: "Forward", club: "Athletic Bilbao" },
+    ],
+    funFacts: ["2010 champions with tiki-taka style", "Euro 2024 champions", "Lamine Yamal youngest ever Euros goalscorer at 16"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/ESP",
+  },
+  POR: {
+    code: "POR", name: "Portugal", nickname: "A Selecao", confederation: "UEFA",
+    fifaRanking: 6, worldCupAppearances: 8, bestFinish: "3rd Place (1966)",
+    coach: "Roberto Martinez", captain: "Cristiano Ronaldo",
+    keyPlayers: [
+      { name: "Cristiano Ronaldo", position: "Forward", club: "Al Nassr" },
+      { name: "Bruno Fernandes", position: "Midfielder", club: "Manchester United" },
+      { name: "Bernardo Silva", position: "Midfielder", club: "Manchester City" },
+      { name: "Rafael Leao", position: "Forward", club: "AC Milan" },
+    ],
+    funFacts: ["Ronaldo's record 6th World Cup", "Euro 2016 champions", "Ronaldo is all-time top international goalscorer"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/POR",
+  },
+  NED: {
+    code: "NED", name: "Netherlands", nickname: "Oranje", confederation: "UEFA",
+    fifaRanking: 7, worldCupAppearances: 11, bestFinish: "Runners-up (1974, 1978, 2010)",
+    coach: "Ronald Koeman", captain: "Virgil van Dijk",
+    keyPlayers: [
+      { name: "Virgil van Dijk", position: "Defender", club: "Liverpool" },
+      { name: "Frenkie de Jong", position: "Midfielder", club: "Barcelona" },
+      { name: "Cody Gakpo", position: "Forward", club: "Liverpool" },
+    ],
+    funFacts: ["3 WC finals, 0 wins - the best team to never win it", "Invented Total Football under Rinus Michels", "Johan Cruyff's legacy still shapes Dutch football"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/NED",
+  },
+  ITA: {
+    code: "ITA", name: "Italy", nickname: "Gli Azzurri", confederation: "UEFA",
+    fifaRanking: 9, worldCupAppearances: 18, bestFinish: "Champions (1934, 1938, 1982, 2006)",
+    coach: "Luciano Spalletti", captain: "Gianluigi Donnarumma",
+    keyPlayers: [
+      { name: "Gianluigi Donnarumma", position: "Goalkeeper", club: "PSG" },
+      { name: "Federico Chiesa", position: "Forward", club: "Liverpool" },
+      { name: "Nicolo Barella", position: "Midfielder", club: "Inter Milan" },
+    ],
+    funFacts: ["4 World Cup titles (tied with Germany)", "Failed to qualify in 2018 and 2022", "Euro 2020 champions"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/ITA",
+  },
+  BEL: {
+    code: "BEL", name: "Belgium", nickname: "Red Devils", confederation: "UEFA",
+    fifaRanking: 5, worldCupAppearances: 14, bestFinish: "3rd Place (2018)",
+    coach: "Domenico Tedesco", captain: "Kevin De Bruyne",
+    keyPlayers: [
+      { name: "Kevin De Bruyne", position: "Midfielder", club: "Manchester City" },
+      { name: "Romelu Lukaku", position: "Forward", club: "Roma" },
+      { name: "Jeremy Doku", position: "Forward", club: "Manchester City" },
+    ],
+    funFacts: ["Golden generation era with De Bruyne, Lukaku, Hazard", "3rd place in 2018 Russia", "Highest FIFA ranking ever reached: #1"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/BEL",
+  },
+  CRO: {
+    code: "CRO", name: "Croatia", nickname: "Vatreni (The Blazers)", confederation: "UEFA",
+    fifaRanking: 8, worldCupAppearances: 7, bestFinish: "Runners-up (2018)",
+    coach: "Zlatko Dalic", captain: "Luka Modric",
+    keyPlayers: [
+      { name: "Luka Modric", position: "Midfielder", club: "Real Madrid" },
+      { name: "Mateo Kovacic", position: "Midfielder", club: "Manchester City" },
+      { name: "Josko Gvardiol", position: "Defender", club: "Manchester City" },
+    ],
+    funFacts: ["Runners-up in 2018, 3rd in 2022", "Population of only 3.9 million", "Modric won Ballon d'Or in 2018"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/CRO",
+  },
+  DEN: {
+    code: "DEN", name: "Denmark", nickname: "Danish Dynamite", confederation: "UEFA",
+    fifaRanking: 21, worldCupAppearances: 6, bestFinish: "Quarter-finals (1998)",
+    coach: "Kasper Hjulmand", captain: "Simon Kjaer",
+    keyPlayers: [
+      { name: "Christian Eriksen", position: "Midfielder", club: "Manchester United" },
+      { name: "Rasmus Hojlund", position: "Forward", club: "Manchester United" },
+      { name: "Pierre-Emile Hojbjerg", position: "Midfielder", club: "Marseille" },
+    ],
+    funFacts: ["Won Euro 1992 as a last-minute replacement team", "Eriksen's miraculous return after cardiac arrest at Euro 2020", "Known for strong team cohesion"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/DEN",
+  },
+  SUI: {
+    code: "SUI", name: "Switzerland", nickname: "Nati", confederation: "UEFA",
+    fifaRanking: 19, worldCupAppearances: 12, bestFinish: "Quarter-finals (1934, 1938, 1954)",
+    coach: "Murat Yakin", captain: "Granit Xhaka",
+    keyPlayers: [
+      { name: "Granit Xhaka", position: "Midfielder", club: "Bayer Leverkusen" },
+      { name: "Manuel Akanji", position: "Defender", club: "Manchester City" },
+      { name: "Breel Embolo", position: "Forward", club: "Monaco" },
+    ],
+    funFacts: ["Reached Euro 2024 quarter-finals", "Knocked out France in Euro 2020 on penalties", "Multi-lingual squad with 4 national languages"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/SUI",
+  },
+  AUT: {
+    code: "AUT", name: "Austria", nickname: "Das Team", confederation: "UEFA",
+    fifaRanking: 22, worldCupAppearances: 8, bestFinish: "3rd Place (1954)",
+    coach: "Ralf Rangnick", captain: "David Alaba",
+    keyPlayers: [
+      { name: "David Alaba", position: "Defender", club: "Real Madrid" },
+      { name: "Marcel Sabitzer", position: "Midfielder", club: "Borussia Dortmund" },
+      { name: "Christoph Baumgartner", position: "Midfielder", club: "RB Leipzig" },
+    ],
+    funFacts: ["Ralf Rangnick revolutionized Austrian football", "Beat Turkey to reach Euro 2024 knockout rounds", "Known as the 'Godfather of Gegenpressing' coaching style"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/AUT",
+  },
+  POL: {
+    code: "POL", name: "Poland", nickname: "Bialo-czerwoni (White and Reds)", confederation: "UEFA",
+    fifaRanking: 28, worldCupAppearances: 9, bestFinish: "3rd Place (1974, 1982)",
+    coach: "Michal Probierz", captain: "Robert Lewandowski",
+    keyPlayers: [
+      { name: "Robert Lewandowski", position: "Forward", club: "Barcelona" },
+      { name: "Piotr Zielinski", position: "Midfielder", club: "Inter Milan" },
+      { name: "Nicola Zalewski", position: "Midfielder", club: "Roma" },
+    ],
+    funFacts: ["Lewandowski is Poland's all-time top scorer", "Strong 1970s-80s generation reached two 3rd places", "One of the most passionate fan bases in Europe"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/POL",
+  },
+  SRB: {
+    code: "SRB", name: "Serbia", nickname: "Orlovi (Eagles)", confederation: "UEFA",
+    fifaRanking: 33, worldCupAppearances: 3, bestFinish: "Group Stage (2006, 2010, 2018, 2022 as Serbia)",
+    coach: "Dragan Stojkovic", captain: "Dusan Tadic",
+    keyPlayers: [
+      { name: "Dusan Vlahovic", position: "Forward", club: "Juventus" },
+      { name: "Aleksandar Mitrovic", position: "Forward", club: "Al Hilal" },
+      { name: "Sergej Milinkovic-Savic", position: "Midfielder", club: "Al Hilal" },
+    ],
+    funFacts: ["As Yugoslavia, reached WC semi-finals in 1930 and 1962", "Incredibly talented generation of attacking players", "Belgrade is one of oldest cities in Europe"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/SRB",
+  },
+  SCO: {
+    code: "SCO", name: "Scotland", nickname: "Tartan Army", confederation: "UEFA",
+    fifaRanking: 39, worldCupAppearances: 9, bestFinish: "Group Stage (8 times)",
+    coach: "Steve Clarke", captain: "Andy Robertson",
+    keyPlayers: [
+      { name: "Andy Robertson", position: "Defender", club: "Liverpool" },
+      { name: "John McGinn", position: "Midfielder", club: "Aston Villa" },
+      { name: "Scott McTominay", position: "Midfielder", club: "Napoli" },
+    ],
+    funFacts: ["First World Cup since 1998 if they qualify", "Tartan Army fans are known for friendliness", "Played in the very first international football match (1872 vs England)"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/SCO",
+  },
+  UKR: {
+    code: "UKR", name: "Ukraine", nickname: "Zbirna", confederation: "UEFA",
+    fifaRanking: 25, worldCupAppearances: 2, bestFinish: "Quarter-finals (2006)",
+    coach: "Serhiy Rebrov", captain: "Andriy Yarmolenko",
+    keyPlayers: [
+      { name: "Mykhailo Mudryk", position: "Forward", club: "Chelsea" },
+      { name: "Oleksandr Zinchenko", position: "Defender", club: "Arsenal" },
+      { name: "Artem Dovbyk", position: "Forward", club: "Roma" },
+    ],
+    funFacts: ["Playing through wartime conditions since 2022", "Shevchenko led them to QF in 2006", "Domestic league continues despite conflict"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/UKR",
+  },
+  TUR: {
+    code: "TUR", name: "Turkey", nickname: "Ay-Yildizlilar (Crescent-Stars)", confederation: "UEFA",
+    fifaRanking: 26, worldCupAppearances: 3, bestFinish: "3rd Place (2002)",
+    coach: "Vincenzo Montella", captain: "Hakan Calhanoglu",
+    keyPlayers: [
+      { name: "Hakan Calhanoglu", position: "Midfielder", club: "Inter Milan" },
+      { name: "Arda Guler", position: "Midfielder", club: "Real Madrid" },
+      { name: "Kenan Yildiz", position: "Forward", club: "Juventus" },
+    ],
+    funFacts: ["Sensational 3rd place in 2002 Korea/Japan", "Arda Guler dubbed 'Turkish Messi'", "Reached Euro 2024 quarter-finals"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/TUR",
+  },
+  WAL: {
+    code: "WAL", name: "Wales", nickname: "Dragons", confederation: "UEFA",
+    fifaRanking: 45, worldCupAppearances: 2, bestFinish: "Quarter-finals (1958)",
+    coach: "Craig Bellamy", captain: "Aaron Ramsey",
+    keyPlayers: [
+      { name: "Brennan Johnson", position: "Forward", club: "Tottenham" },
+      { name: "Harry Wilson", position: "Forward", club: "Fulham" },
+      { name: "Ethan Ampadu", position: "Defender", club: "Leeds United" },
+    ],
+    funFacts: ["2022 was first WC since 1958", "Gareth Bale era reignited Welsh football", "Euro 2016 semi-finalists shocked the world"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/WAL",
+  },
+  ARG: {
+    code: "ARG", name: "Argentina", nickname: "La Albiceleste", confederation: "CONMEBOL",
+    fifaRanking: 1, worldCupAppearances: 18, bestFinish: "Champions (1978, 1986, 2022)",
+    coach: "Lionel Scaloni", captain: "Lionel Messi",
+    keyPlayers: [
+      { name: "Lionel Messi", position: "Forward", club: "Inter Miami" },
+      { name: "Julian Alvarez", position: "Forward", club: "Atletico Madrid" },
+      { name: "Enzo Fernandez", position: "Midfielder", club: "Chelsea" },
+      { name: "Rodrigo De Paul", position: "Midfielder", club: "Atletico Madrid" },
+    ],
+    funFacts: ["Defending champions (Qatar 2022)", "Messi's final World Cup", "3 WC titles: 1978, 1986, 2022"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/ARG",
+  },
+  BRA: {
+    code: "BRA", name: "Brazil", nickname: "Selecao", confederation: "CONMEBOL",
+    fifaRanking: 5, worldCupAppearances: 22, bestFinish: "Champions (1958, 1962, 1970, 1994, 2002)",
+    coach: "Dorival Junior", captain: "Marquinhos",
+    keyPlayers: [
+      { name: "Vinicius Jr", position: "Forward", club: "Real Madrid" },
+      { name: "Rodrygo", position: "Forward", club: "Real Madrid" },
+      { name: "Marquinhos", position: "Defender", club: "PSG" },
+      { name: "Casemiro", position: "Midfielder", club: "Manchester United" },
+    ],
+    funFacts: ["Record 5 World Cup titles", "Most World Cup appearances (22 — never missed one)", "Only team to have played in every World Cup"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/BRA",
+  },
+  COL: {
+    code: "COL", name: "Colombia", nickname: "Los Cafeteros", confederation: "CONMEBOL",
+    fifaRanking: 12, worldCupAppearances: 7, bestFinish: "Quarter-finals (2014)",
+    coach: "Nestor Lorenzo", captain: "James Rodriguez",
+    keyPlayers: [
+      { name: "Luis Diaz", position: "Forward", club: "Liverpool" },
+      { name: "James Rodriguez", position: "Midfielder", club: "Rayo Vallecano" },
+      { name: "Jhon Arias", position: "Forward", club: "Fluminense" },
+    ],
+    funFacts: ["Copa America 2024 runners-up", "James Rodriguez was Golden Boot winner in 2014 WC", "Carlos Valderrama's hair is iconic WC imagery"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/COL",
+  },
+  URU: {
+    code: "URU", name: "Uruguay", nickname: "La Celeste", confederation: "CONMEBOL",
+    fifaRanking: 14, worldCupAppearances: 14, bestFinish: "Champions (1930, 1950)",
+    coach: "Marcelo Bielsa", captain: "Federico Valverde",
+    keyPlayers: [
+      { name: "Federico Valverde", position: "Midfielder", club: "Real Madrid" },
+      { name: "Darwin Nunez", position: "Forward", club: "Liverpool" },
+      { name: "Ronald Araujo", position: "Defender", club: "Barcelona" },
+    ],
+    funFacts: ["Won the first ever World Cup in 1930", "Population of only 3.5 million — smallest 2-time champion", "Bielsa brings his intense tactical philosophy"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/URU",
+  },
+  ECU: {
+    code: "ECU", name: "Ecuador", nickname: "La Tri", confederation: "CONMEBOL",
+    fifaRanking: 30, worldCupAppearances: 4, bestFinish: "Round of 16 (2006)",
+    coach: "Sebastian Beccacece", captain: "Enner Valencia",
+    keyPlayers: [
+      { name: "Moises Caicedo", position: "Midfielder", club: "Chelsea" },
+      { name: "Enner Valencia", position: "Forward", club: "Internacional" },
+      { name: "Piero Hincapie", position: "Defender", club: "Bayer Leverkusen" },
+    ],
+    funFacts: ["Caicedo is one of world's most expensive midfielders", "Play home qualifiers at 2,850m altitude in Quito", "Enner Valencia scored in 3 consecutive WC matches"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/ECU",
+  },
+  CHI: {
+    code: "CHI", name: "Chile", nickname: "La Roja", confederation: "CONMEBOL",
+    fifaRanking: 35, worldCupAppearances: 10, bestFinish: "3rd Place (1962)",
+    coach: "Ricardo Gareca", captain: "Claudio Bravo",
+    keyPlayers: [
+      { name: "Alexis Sanchez", position: "Forward", club: "Marseille" },
+      { name: "Ben Brereton Diaz", position: "Forward", club: "Sheffield United" },
+      { name: "Erick Pulgar", position: "Midfielder", club: "Flamengo" },
+    ],
+    funFacts: ["Won back-to-back Copa Americas in 2015, 2016", "Failed to qualify for 2018 and 2022 WC", "Hosted and placed 3rd in 1962 World Cup"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/CHI",
+  },
+  PAR: {
+    code: "PAR", name: "Paraguay", nickname: "La Albirroja", confederation: "CONMEBOL",
+    fifaRanking: 50, worldCupAppearances: 9, bestFinish: "Quarter-finals (2010)",
+    coach: "Alfaro Moreno", captain: "Gustavo Gomez",
+    keyPlayers: [
+      { name: "Miguel Almiron", position: "Midfielder", club: "Newcastle" },
+      { name: "Gustavo Gomez", position: "Defender", club: "Palmeiras" },
+      { name: "Julio Enciso", position: "Forward", club: "Brighton" },
+    ],
+    funFacts: ["Reached QF in 2010 with legendary goalkeeper Chilavert-era legacy", "Known for defensive resilience", "Enciso is one of the most exciting young South American talents"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/PAR",
+  },
+  PER: {
+    code: "PER", name: "Peru", nickname: "La Blanquirroja", confederation: "CONMEBOL",
+    fifaRanking: 32, worldCupAppearances: 6, bestFinish: "Quarter-finals (1970, 1978)",
+    coach: "Jorge Fossati", captain: "Paolo Guerrero",
+    keyPlayers: [
+      { name: "Paolo Guerrero", position: "Forward", club: "Alianza Lima" },
+      { name: "Andre Carrillo", position: "Forward", club: "Al Hilal" },
+      { name: "Renato Tapia", position: "Midfielder", club: "Celta Vigo" },
+    ],
+    funFacts: ["Returned to WC in 2018 after 36-year absence", "Passionate fans known as 'La Blanquirroja'", "1970s team was one of the most exciting in South American history"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/PER",
+  },
+  BOL: {
+    code: "BOL", name: "Bolivia", nickname: "La Verde", confederation: "CONMEBOL",
+    fifaRanking: 83, worldCupAppearances: 4, bestFinish: "Group Stage (1930, 1950, 1994)",
+    coach: "Oscar Villegas", captain: "Marcelo Moreno Martins",
+    keyPlayers: [
+      { name: "Marcelo Moreno Martins", position: "Forward", club: "Always Ready" },
+      { name: "Ramiro Vaca", position: "Midfielder", club: "The Strongest" },
+      { name: "Carlos Lampe", position: "Goalkeeper", club: "Bolivar" },
+    ],
+    funFacts: ["Play home matches at 3,640m altitude in La Paz", "Highest altitude national stadium in the world (Estadio Hernando Siles)", "Won Copa America in 1963 as hosts"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/BOL",
+  },
+  VEN: {
+    code: "VEN", name: "Venezuela", nickname: "La Vinotinto", confederation: "CONMEBOL",
+    fifaRanking: 55, worldCupAppearances: 1, bestFinish: "First World Cup appearance",
+    coach: "Fernando Batista", captain: "Tomas Rincon",
+    keyPlayers: [
+      { name: "Salomon Rondon", position: "Forward", club: "Pachuca" },
+      { name: "Yeferson Soteldo", position: "Forward", club: "Santos" },
+      { name: "Yangel Herrera", position: "Midfielder", club: "Girona" },
+    ],
+    funFacts: ["Only CONMEBOL team that had never qualified for a World Cup until now", "Baseball traditionally more popular than football in Venezuela", "Copa America 2024 quarter-finalists showed rising quality"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/VEN",
+  },
+  JPN: {
+    code: "JPN", name: "Japan", nickname: "Samurai Blue", confederation: "AFC",
+    fifaRanking: 18, worldCupAppearances: 7, bestFinish: "Round of 16 (2002, 2010, 2018, 2022)",
+    coach: "Hajime Moriyasu", captain: "Wataru Endo",
+    keyPlayers: [
+      { name: "Takefusa Kubo", position: "Forward", club: "Real Sociedad" },
+      { name: "Kaoru Mitoma", position: "Forward", club: "Brighton" },
+      { name: "Wataru Endo", position: "Midfielder", club: "Liverpool" },
+    ],
+    funFacts: ["Fans clean the stadium after every match", "Beat Germany and Spain in 2022 WC group stage", "One of Asia's most consistent WC performers"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/JPN",
+  },
+  KOR: {
+    code: "KOR", name: "South Korea", nickname: "Taegeuk Warriors", confederation: "AFC",
+    fifaRanking: 23, worldCupAppearances: 11, bestFinish: "4th Place (2002)",
+    coach: "Hong Myung-bo", captain: "Son Heung-min",
+    keyPlayers: [
+      { name: "Son Heung-min", position: "Forward", club: "Tottenham" },
+      { name: "Kim Min-jae", position: "Defender", club: "Bayern Munich" },
+      { name: "Lee Kang-in", position: "Midfielder", club: "PSG" },
+    ],
+    funFacts: ["4th place finish in 2002 as co-hosts — best ever Asian result", "Son is Asia's greatest ever player in the Premier League", "11 consecutive WC qualifications"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/KOR",
+  },
+  KSA: {
+    code: "KSA", name: "Saudi Arabia", nickname: "The Green Falcons", confederation: "AFC",
+    fifaRanking: 56, worldCupAppearances: 7, bestFinish: "Round of 16 (1994)",
+    coach: "Herve Renard", captain: "Salman Al-Faraj",
+    keyPlayers: [
+      { name: "Salem Al-Dawsari", position: "Forward", club: "Al Hilal" },
+      { name: "Salman Al-Faraj", position: "Midfielder", club: "Al Hilal" },
+      { name: "Mohammed Al-Owais", position: "Goalkeeper", club: "Al Hilal" },
+    ],
+    funFacts: ["Beat Argentina 2-1 in 2022 WC group stage — one of biggest upsets ever", "Saudi Pro League attracted Ronaldo, Neymar, Benzema", "King declared national holiday after 2022 Argentina win"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/KSA",
+  },
+  AUS: {
+    code: "AUS", name: "Australia", nickname: "Socceroos", confederation: "AFC",
+    fifaRanking: 24, worldCupAppearances: 6, bestFinish: "Round of 16 (2006, 2022)",
+    coach: "Tony Popovic", captain: "Mat Ryan",
+    keyPlayers: [
+      { name: "Mat Ryan", position: "Goalkeeper", club: "Roma" },
+      { name: "Jackson Irvine", position: "Midfielder", club: "St. Pauli" },
+      { name: "Riley McGree", position: "Midfielder", club: "Middlesbrough" },
+    ],
+    funFacts: ["Only OFC-to-AFC confederation switch in football history", "Beat Peru in intercontinental playoff to reach 2022 WC", "Tim Cahill's bicycle kick vs Netherlands is iconic WC moment"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/AUS",
+  },
+  IRN: {
+    code: "IRN", name: "Iran", nickname: "Team Melli", confederation: "AFC",
+    fifaRanking: 20, worldCupAppearances: 6, bestFinish: "Group Stage (1978, 1998, 2006, 2014, 2018, 2022)",
+    coach: "Amir Ghalenoei", captain: "Alireza Jahanbakhsh",
+    keyPlayers: [
+      { name: "Mehdi Taremi", position: "Forward", club: "Inter Milan" },
+      { name: "Sardar Azmoun", position: "Forward", club: "Roma" },
+      { name: "Alireza Jahanbakhsh", position: "Forward", club: "Feyenoord" },
+    ],
+    funFacts: ["Asia's most successful qualifying team historically", "Beat USA 2-1 in politically charged 1998 WC match", "Passionate fan culture — Azadi Stadium holds 78,000"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/IRN",
+  },
+  QAT: {
+    code: "QAT", name: "Qatar", nickname: "The Maroons", confederation: "AFC",
+    fifaRanking: 34, worldCupAppearances: 2, bestFinish: "Group Stage (2022)",
+    coach: "Carlos Queiroz", captain: "Hassan Al-Haydos",
+    keyPlayers: [
+      { name: "Akram Afif", position: "Forward", club: "Al Sadd" },
+      { name: "Almoez Ali", position: "Forward", club: "Al Duhail" },
+      { name: "Hassan Al-Haydos", position: "Midfielder", club: "Al Sadd" },
+    ],
+    funFacts: ["Hosted 2022 WC — first Middle Eastern host", "Won Asian Cup in 2019 and 2023", "Invested heavily in football academy Aspire since 2004"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/QAT",
+  },
+  IRQ: {
+    code: "IRQ", name: "Iraq", nickname: "Lions of Mesopotamia", confederation: "AFC",
+    fifaRanking: 63, worldCupAppearances: 2, bestFinish: "Group Stage (1986)",
+    coach: "Jesus Casas", captain: "Mohanad Ali",
+    keyPlayers: [
+      { name: "Mohanad Ali", position: "Forward", club: "Al Wehda" },
+      { name: "Ali Adnan", position: "Defender", club: "Al Duhail" },
+      { name: "Ibrahim Bayesh", position: "Midfielder", club: "Al Quwa Al Jawiya" },
+    ],
+    funFacts: ["Won Asian Cup in 2007 during wartime — one of sport's greatest stories", "First WC appearance since 1986", "Football united the nation through decades of conflict"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/IRQ",
+  },
+  UZB: {
+    code: "UZB", name: "Uzbekistan", nickname: "White Wolves", confederation: "AFC",
+    fifaRanking: 64, worldCupAppearances: 1, bestFinish: "First World Cup appearance",
+    coach: "Srecko Katanec", captain: "Eldor Shomurodov",
+    keyPlayers: [
+      { name: "Eldor Shomurodov", position: "Forward", club: "Roma" },
+      { name: "Abbosbek Fayzullaev", position: "Midfielder", club: "CSKA Moscow" },
+      { name: "Otabek Shukurov", position: "Midfielder", club: "Al Sadd" },
+    ],
+    funFacts: ["First ever World Cup qualification", "Nearly qualified multiple times, heartbreaking near-misses", "Silk Road nation bringing Central Asian football to world stage"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/UZB",
+  },
+  MAR: {
+    code: "MAR", name: "Morocco", nickname: "Atlas Lions", confederation: "CAF",
+    fifaRanking: 10, worldCupAppearances: 7, bestFinish: "Semi-finals (2022)",
+    coach: "Walid Regragui", captain: "Romain Saiss",
+    keyPlayers: [
+      { name: "Achraf Hakimi", position: "Defender", club: "PSG" },
+      { name: "Hakim Ziyech", position: "Midfielder", club: "Galatasaray" },
+      { name: "Youssef En-Nesyri", position: "Forward", club: "Fenerbahce" },
+    ],
+    funFacts: ["First African team in WC semi-finals (2022)", "Beat Belgium, Spain, and Portugal in 2022 run", "Huge diaspora fan support across Europe"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/MAR",
+  },
+  NGA: {
+    code: "NGA", name: "Nigeria", nickname: "Super Eagles", confederation: "CAF",
+    fifaRanking: 36, worldCupAppearances: 7, bestFinish: "Round of 16 (1994, 1998, 2014)",
+    coach: "Finidi George", captain: "William Troost-Ekong",
+    keyPlayers: [
+      { name: "Victor Osimhen", position: "Forward", club: "Napoli" },
+      { name: "Samuel Chukwueze", position: "Forward", club: "AC Milan" },
+      { name: "Alex Iwobi", position: "Midfielder", club: "Fulham" },
+    ],
+    funFacts: ["Super Eagles have Africa's most WC Round of 16 appearances", "Nigerian jersey is always one of the best-selling at WC", "Osimhen is one of world's most feared strikers"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/NGA",
+  },
+  SEN: {
+    code: "SEN", name: "Senegal", nickname: "Lions of Teranga", confederation: "CAF",
+    fifaRanking: 17, worldCupAppearances: 3, bestFinish: "Quarter-finals (2002)",
+    coach: "Aliou Cisse", captain: "Kalidou Koulibaly",
+    keyPlayers: [
+      { name: "Sadio Mane", position: "Forward", club: "Al Nassr" },
+      { name: "Kalidou Koulibaly", position: "Defender", club: "Al Hilal" },
+      { name: "Ismaila Sarr", position: "Forward", club: "Crystal Palace" },
+    ],
+    funFacts: ["2022 AFCON champions — first ever continental title", "Beat France in 2002 WC opening match as debutants", "Teranga means hospitality in Wolof"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/SEN",
+  },
+  CMR: {
+    code: "CMR", name: "Cameroon", nickname: "Indomitable Lions", confederation: "CAF",
+    fifaRanking: 47, worldCupAppearances: 8, bestFinish: "Quarter-finals (1990)",
+    coach: "Marc Brys", captain: "Vincent Aboubakar",
+    keyPlayers: [
+      { name: "Andre-Frank Zambo Anguissa", position: "Midfielder", club: "Napoli" },
+      { name: "Eric Maxim Choupo-Moting", position: "Forward", club: "Bayern Munich" },
+      { name: "Vincent Aboubakar", position: "Forward", club: "Besiktas" },
+    ],
+    funFacts: ["Roger Milla's iconic 1990 WC corner flag dance", "Most WC appearances by an African team (8)", "Beat Argentina in 1990 WC opening match"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/CMR",
+  },
+  EGY: {
+    code: "EGY", name: "Egypt", nickname: "The Pharaohs", confederation: "CAF",
+    fifaRanking: 37, worldCupAppearances: 4, bestFinish: "Group Stage (1934, 1990, 2018)",
+    coach: "Hossam Hassan", captain: "Mohamed Salah",
+    keyPlayers: [
+      { name: "Mohamed Salah", position: "Forward", club: "Liverpool" },
+      { name: "Omar Marmoush", position: "Forward", club: "Eintracht Frankfurt" },
+      { name: "Mohamed Elneny", position: "Midfielder", club: "Al Ahly" },
+    ],
+    funFacts: ["Record 7-time AFCON champions", "Salah is one of the best players in Premier League history", "First African team to play in a World Cup (1934)"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/EGY",
+  },
+  GHA: {
+    code: "GHA", name: "Ghana", nickname: "Black Stars", confederation: "CAF",
+    fifaRanking: 44, worldCupAppearances: 4, bestFinish: "Quarter-finals (2010)",
+    coach: "Otto Addo", captain: "Andre Ayew",
+    keyPlayers: [
+      { name: "Mohammed Kudus", position: "Midfielder", club: "West Ham" },
+      { name: "Thomas Partey", position: "Midfielder", club: "Arsenal" },
+      { name: "Andre Ayew", position: "Forward", club: "Le Havre" },
+    ],
+    funFacts: ["Missed 2010 semi-finals by Suarez's infamous handball on the line", "Kudus is one of Africa's most exciting talents", "Asamoah Gyan's penalty miss remains heartbreaking WC moment"],
+    teamPageUrl: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/teams/GHA",
+  },
+}
+
+// ── News Sources ────────────────────────────────────────────────────────────
+
+const NEWS_SOURCES = [
+  { label: "FIFA Official", url: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026", icon: "\u26BD" },
+  { label: "Latest News", url: "https://news.google.com/search?q=FIFA+World+Cup+2026", icon: "\u{1F4F0}" },
+  { label: "ESPN Coverage", url: "https://www.espn.com/soccer/FIFA-World-Cup", icon: "\u{1F4FA}" },
+  { label: "BBC Sport", url: "https://www.bbc.com/sport/football/world-cup", icon: "\u{1F3F4}" },
+  { label: "r/worldcup", url: "https://www.reddit.com/r/worldcup/", icon: "\u{1F4AC}" },
+  { label: "Tickets", url: "https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026/tickets", icon: "\u{1F3AB}" },
+]
+
 // ── Hardcoded sample matches ─────────────────────────────────────────────────
 
 const SAMPLE_MATCHES: MatchData[] = [
@@ -288,6 +904,7 @@ export default function UC31Page() {
   const [isSpinning, setIsSpinning] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
   const [globeReady, setGlobeReady] = useState(false)
+  const [showNewsPanel, setShowNewsPanel] = useState(false)
 
   const [isWhiteLabel, setIsWhiteLabel] = useState(false)
   useEffect(() => {
@@ -530,15 +1147,16 @@ export default function UC31Page() {
     const name = NAME_MAP[selectedCountry.properties.name] ?? selectedCountry.properties.name
     const isHost = name === "United States" || name === "Mexico" || name === "Canada"
     const team = TEAMS.find((t) => t.name === name)
+    const detail = team ? TEAM_DETAILS[team.code] ?? null : null
     if (isHost) {
       const key = name === "United States" ? "USA" : name === "Mexico" ? "MEX" : "CAN"
       const venues = STADIUMS.filter((s) => s.country === key)
       const totalCap = venues.reduce((s, v) => s + v.capacity, 0)
       const totalMatches = venues.reduce((s, v) => s + v.matches, 0)
-      return { name, isHost: true as const, venues: venues.length, totalCapacity: totalCap, totalMatches, team, color: COUNTRY_COLORS[key] }
+      return { name, isHost: true as const, venues: venues.length, totalCapacity: totalCap, totalMatches, team, detail, color: COUNTRY_COLORS[key] }
     }
-    if (team) return { name, isHost: false as const, team, color: team.color }
-    return { name, isHost: false as const, team: null, color: null }
+    if (team) return { name, isHost: false as const, team, detail, color: team.color }
+    return { name, isHost: false as const, team: null, detail: null, color: null }
   }, [selectedCountry])
 
   // ── Flag emoji from country code ──────────────────────────────────────
@@ -701,6 +1319,50 @@ export default function UC31Page() {
         >
           {isSpinning ? "\u23F8 Pause" : "\u25B6 Spin"}
         </button>
+
+        {/* News button */}
+        <button
+          onClick={() => setShowNewsPanel((p) => !p)}
+          className="mt-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+          style={{
+            background: showNewsPanel ? "rgba(34,197,94,0.2)" : "rgba(15,23,42,0.85)",
+            border: showNewsPanel ? "1px solid rgba(34,197,94,0.5)" : "1px solid rgba(255,255,255,0.1)",
+            color: showNewsPanel ? "#22c55e" : "rgba(255,255,255,0.7)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          {"\u{1F4F0}"} News
+        </button>
+
+        {/* News panel (collapsible) */}
+        {showNewsPanel && (
+          <div
+            className="mt-1 rounded-xl overflow-hidden w-48"
+            style={{
+              background: "rgba(15,23,42,0.95)",
+              backdropFilter: "blur(14px)",
+              border: "1px solid rgba(34,197,94,0.2)",
+            }}
+          >
+            <div className="px-3 py-2 border-b border-white/5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">{"\u26BD"} WC 2026 News</span>
+            </div>
+            <div className="divide-y divide-white/5">
+              {NEWS_SOURCES.map((src) => (
+                <a
+                  key={src.label}
+                  href={src.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <span>{src.icon}</span>
+                  <span>{src.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Right panel — Stadiums list / Matches ───────────────────── */}
@@ -905,33 +1567,145 @@ export default function UC31Page() {
         </div>
       )}
 
-      {/* ── Country info popup ───────────────────────────────────────── */}
+      {/* ── Country / Team detail panel ─────────────────────────────── */}
       {countryInfo && selectedCountry && (
-        <div className="absolute bottom-16 left-4 z-20 w-72 rounded-xl overflow-hidden" style={{ background: "rgba(15,23,42,0.95)", backdropFilter: "blur(14px)", border: `1px solid ${countryInfo.color ?? "rgba(255,255,255,0.1)"}` }}>
-          <div className="p-4">
+        <div
+          className="absolute bottom-16 right-4 z-20 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl"
+          style={{
+            background: "rgba(15,23,42,0.96)",
+            backdropFilter: "blur(16px)",
+            border: `1.5px solid ${countryInfo.color ?? "rgba(255,255,255,0.1)"}`,
+            boxShadow: countryInfo.color ? `0 0 30px ${countryInfo.color}22, 0 0 60px ${countryInfo.color}11` : undefined,
+          }}
+        >
+          {/* Header */}
+          <div className="px-4 pt-4 pb-3" style={{ borderBottom: `1px solid ${countryInfo.color ?? "rgba(255,255,255,0.08)"}33` }}>
             <div className="flex items-start justify-between">
-              <h3 className="text-sm font-bold text-white">{countryInfo.name}</h3>
-              <button onClick={() => setSelectedCountry(null)} className="text-white/30 hover:text-white/70 text-lg leading-none">&times;</button>
-            </div>
-
-            {countryInfo.isHost && (
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <div className="text-center p-2 rounded" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.venues}</div>
-                  <div className="text-[9px] text-white/40">Venues</div>
-                </div>
-                <div className="text-center p-2 rounded" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.totalCapacity.toLocaleString()}</div>
-                  <div className="text-[9px] text-white/40">Total Seats</div>
-                </div>
-                <div className="text-center p-2 rounded" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.totalMatches}</div>
-                  <div className="text-[9px] text-white/40">Matches</div>
-                </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight">{countryInfo.name}</h3>
+                {countryInfo.detail && (
+                  <p className="text-xs mt-0.5" style={{ color: countryInfo.color ?? "#94a3b8" }}>
+                    &ldquo;{countryInfo.detail.nickname}&rdquo;
+                  </p>
+                )}
               </div>
+              <button
+                onClick={() => setSelectedCountry(null)}
+                className="text-white/30 hover:text-white/70 text-lg leading-none transition-colors ml-2"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+
+          <div className="px-4 pb-4">
+            {/* Team detail — rich panel */}
+            {countryInfo.detail && countryInfo.team && (
+              <>
+                {/* Coach / Captain / Ranking row */}
+                <div className="mt-3 space-y-1.5 text-xs text-white/70">
+                  <div className="flex justify-between">
+                    <span className="text-white/40">Coach</span>
+                    <span className="font-medium text-white/90">{countryInfo.detail.coach}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40">Captain</span>
+                    <span className="font-medium text-white/90">{countryInfo.detail.captain}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40">FIFA Ranking</span>
+                    <span className="font-bold" style={{ color: countryInfo.color ?? "#fff" }}>#{countryInfo.detail.fifaRanking}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40">WC Appearances</span>
+                    <span className="text-white/90">{countryInfo.detail.worldCupAppearances}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40">Best Finish</span>
+                    <span className="text-white/90">
+                      {countryInfo.detail.bestFinish.includes("Champions") ? "\u{1F3C6} " : ""}{countryInfo.detail.bestFinish}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40">Group</span>
+                    <span className="text-white/90">Group {countryInfo.team.group} &middot; {countryInfo.team.region}</span>
+                  </div>
+                </div>
+
+                {/* Host nation stats */}
+                {countryInfo.isHost && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.venues}</div>
+                      <div className="text-[9px] text-white/40">Venues</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.totalCapacity.toLocaleString()}</div>
+                      <div className="text-[9px] text-white/40">Total Seats</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <div className="text-sm font-bold" style={{ color: countryInfo.color }}>{countryInfo.totalMatches}</div>
+                      <div className="text-[9px] text-white/40">Matches</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Key Players */}
+                <div className="mt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">{"\u2B50"} Key Players</h4>
+                  <div className="space-y-1.5">
+                    {countryInfo.detail.keyPlayers.map((p) => (
+                      <div key={p.name} className="flex items-center gap-2 text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: countryInfo.color ?? "#fff" }} />
+                        <span className="text-white/90 font-medium">{p.name}</span>
+                        <span className="text-white/30">&mdash;</span>
+                        <span className="text-white/50">{p.position}</span>
+                        <span className="text-white/30">&mdash;</span>
+                        <span className="text-white/40 truncate">{p.club}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fun Facts */}
+                <div className="mt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">{"\u{1F4A1}"} Fun Facts</h4>
+                  <div className="space-y-1">
+                    {countryInfo.detail.funFacts.map((f, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-white/60">
+                        <span className="text-white/30 mt-0.5">&bull;</span>
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Links */}
+                <div className="mt-3 flex flex-col gap-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+                  <a
+                    href="https://www.fifa.com/fifaplus/en/tournaments/mens/worldcup/canadamexicousa2026"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white/5"
+                    style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    {"\u{1F517}"} FIFA Team Page &rarr;
+                  </a>
+                  <a
+                    href={`https://news.google.com/search?q=${encodeURIComponent(countryInfo.name + " FIFA World Cup 2026")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white/5"
+                    style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    {"\u{1F4F0}"} Latest News &rarr;
+                  </a>
+                </div>
+              </>
             )}
 
-            {countryInfo.team && (
+            {/* Qualified team WITHOUT detail data (fallback) */}
+            {countryInfo.team && !countryInfo.detail && (
               <div className="mt-2">
                 <div className="flex gap-2 text-xs text-white/60">
                   <span>Group <strong className="text-white/90">{countryInfo.team.group}</strong></span>
@@ -945,8 +1719,9 @@ export default function UC31Page() {
               </div>
             )}
 
-            {!countryInfo.isHost && !countryInfo.team && (
-              <p className="mt-2 text-xs text-white/40">Not a qualified team or host nation</p>
+            {/* Not qualified */}
+            {!countryInfo.team && (
+              <p className="mt-3 text-xs text-white/40">Not a qualified team or host nation</p>
             )}
           </div>
         </div>
