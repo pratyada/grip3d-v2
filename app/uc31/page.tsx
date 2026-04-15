@@ -1175,11 +1175,20 @@ export default function UC31Page() {
       <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 pointer-events-auto" style={{ background: "linear-gradient(180deg, rgba(3,7,18,0.92) 0%, rgba(3,7,18,0.6) 80%, transparent 100%)" }}>
           {/* Title + Live */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-white/40 hover:text-white/70 text-sm mr-2 transition-colors">&larr; Home</Link>
-            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {isWhiteLabel && (
+              <a href="https://yprateek.com" target="_blank" rel="noopener noreferrer"
+                className="px-2 py-1 rounded text-xs font-semibold transition-colors flex items-center gap-1 flex-shrink-0"
+                style={{ border: "1px solid rgba(34,197,94,0.5)", color: "#4ade80", background: "rgba(34,197,94,0.08)" }}>
+                <span>&larr;</span><span>yprateek.com</span>
+              </a>
+            )}
+            {!isWhiteLabel && (
+              <Link href="/" className="text-white/40 hover:text-white/70 text-sm mr-1 transition-colors flex-shrink-0">&larr; Home</Link>
+            )}
+            <h1 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">
               <span className="mr-1">{"\u26BD"}</span>
-              FIFA World Cup 2026
+              <span className="hidden sm:inline">FIFA </span>World Cup 2026
             </h1>
             {countdown.live && (
               <span className="px-2 py-0.5 text-xs font-bold uppercase rounded-full bg-green-500/20 text-green-400 border border-green-500/30 animate-pulse">
@@ -1209,13 +1218,6 @@ export default function UC31Page() {
             <span className="text-white/20">|</span>
             <span>3 nations</span>
             <Link href="/uc31/details" className="ml-2 px-2 py-1 rounded bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors">Details &rarr;</Link>
-            {isWhiteLabel && (
-              <a href="https://yprateek.com" target="_blank" rel="noopener noreferrer"
-                className="ml-1 px-2 py-1 rounded text-xs font-semibold transition-colors hidden sm:flex items-center gap-1"
-                style={{ borderColor: "rgba(34,197,94,0.5)", border: "1px solid rgba(34,197,94,0.5)", color: "#4ade80", background: "rgba(34,197,94,0.08)" }}>
-                <span>&larr;</span><span>yprateek.com</span>
-              </a>
-            )}
           </div>
         </div>
       </div>
