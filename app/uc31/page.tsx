@@ -1220,15 +1220,15 @@ export default function UC31Page() {
         </div>
       </div>
 
-      {/* ── BIG KICKOFF COUNTDOWN (top-center hero) ──────────────────── */}
+      {/* ── BIG KICKOFF COUNTDOWN — top-center on desktop, bottom on mobile ── */}
       {!countdown.live && (
-        <div className="absolute z-20 pointer-events-none" style={{ top: 60, left: "50%", transform: "translateX(-50%)" }}>
+        <div className="absolute z-20 pointer-events-none left-1/2 -translate-x-1/2 bottom-12 sm:bottom-auto sm:top-[60px]">
           <div className="flex flex-col items-center" style={{
-            background: "linear-gradient(180deg, rgba(0,15,5,0.88) 0%, rgba(0,30,10,0.65) 100%)",
+            background: "linear-gradient(180deg, rgba(0,15,5,0.92) 0%, rgba(0,30,10,0.85) 100%)",
             border: "1px solid rgba(34,197,94,0.4)",
             borderRadius: 16,
-            padding: "12px 28px",
-            backdropFilter: "blur(10px)",
+            padding: "10px 20px",
+            backdropFilter: "blur(12px)",
             boxShadow: "0 0 40px rgba(34,197,94,0.2), 0 0 80px rgba(34,197,94,0.08)",
           }}>
             <div className="flex items-center gap-2 mb-1">
